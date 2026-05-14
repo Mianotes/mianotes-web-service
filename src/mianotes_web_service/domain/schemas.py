@@ -70,3 +70,17 @@ class NoteRead(BaseModel):
     source_files: list[dict[str, object]]
     comments_url: str
     actions: dict[str, ApiAction]
+
+    model_config = {"from_attributes": True}
+
+
+class NoteListItem(BaseModel):
+    id: str
+    user_id: str
+    topic_id: str
+    title: str
+    note_path: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

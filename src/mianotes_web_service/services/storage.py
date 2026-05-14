@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
@@ -57,3 +59,39 @@ class FilesystemStorage:
             comments_path=comments_path,
             source_path=source_path,
         )
+
+    def write_text_note(
+        self,
+        *,
+        username: str,
+        topic: str,
+        title: str,
+        text: str,
+    ) -> NotePaths:
+        paths = self.note_paths(
+            username=username,
+            topic=topic,
+            filename=title,
+            source_extension=".source.txt",
+        )
+        paths.directory.mkdir(parents=True, exist_ok=True)
+        paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")
+        if paths.source_path is not None:
+            paths.source_path.write_text(text, encoding="utf-8")
+        paths.comments_path.write_text(
+            json.dumps({"comments": []}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return paths
+
+
+def infer_title(text: str, fallback: str = "Untitled Note") -> str:
+    compact = " ".join(text.strip().split())
+    if not compact:
+        return fallback
+    return compact[:80].rstrip(" .,;:-") or fallback
+
+
+def render_markdown_note(title: str, text: str) -> str:
+    created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return f"# {title}\n\nCreated: {created_at}\n\n## Note\n\n{text.strip()}\n"

@@ -60,6 +60,12 @@ GET    /api/topics
 GET    /api/topics/{topic_id}
 PATCH  /api/topics/{topic_id}
 DELETE /api/topics/{topic_id}
+
+POST   /api/notes
+POST   /api/notes/from-text
+GET    /api/notes
+GET    /api/notes/{note_id}
+GET    /api/notes/{note_id}/comments
 ```
 
 FastAPI exposes interactive local API docs at:
