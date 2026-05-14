@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import BinaryIO
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
@@ -42,6 +44,7 @@ class FilesystemStorage:
         topic: str,
         filename: str,
         source_extension: str | None = None,
+        source_suffix: str = "",
     ) -> NotePaths:
         base_dir = self.topic_dir(username, topic)
         stem = slugify(Path(filename).stem)
@@ -52,7 +55,7 @@ class FilesystemStorage:
             extension = (
                 source_extension if source_extension.startswith(".") else f".{source_extension}"
             )
-            source_path = base_dir / f"{stem}{extension.lower()}"
+            source_path = base_dir / f"{stem}{source_suffix}{extension.lower()}"
         return NotePaths(
             directory=base_dir,
             note_path=note_path,
@@ -67,17 +70,50 @@ class FilesystemStorage:
         topic: str,
         title: str,
         text: str,
+        filename: str | None = None,
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
             topic=topic,
-            filename=title,
+            filename=filename or title,
             source_extension=".source.txt",
         )
         paths.directory.mkdir(parents=True, exist_ok=True)
         paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")
         if paths.source_path is not None:
             paths.source_path.write_text(text, encoding="utf-8")
+        paths.comments_path.write_text(
+            json.dumps({"comments": []}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return paths
+
+    def write_uploaded_file_note(
+        self,
+        *,
+        username: str,
+        topic: str,
+        title: str,
+        filename: str,
+        original_filename: str,
+        source_stream: BinaryIO,
+    ) -> NotePaths:
+        extension = Path(original_filename).suffix or ".bin"
+        paths = self.note_paths(
+            username=username,
+            topic=topic,
+            filename=filename,
+            source_extension=extension,
+            source_suffix=".source",
+        )
+        paths.directory.mkdir(parents=True, exist_ok=True)
+        paths.note_path.write_text(
+            render_pending_upload_note(title=title, original_filename=original_filename),
+            encoding="utf-8",
+        )
+        if paths.source_path is not None:
+            with paths.source_path.open("wb") as destination:
+                shutil.copyfileobj(source_stream, destination)
         paths.comments_path.write_text(
             json.dumps({"comments": []}, indent=2) + "\n",
             encoding="utf-8",
@@ -95,6 +131,19 @@ def infer_title(text: str, fallback: str = "Untitled Note") -> str:
 def render_markdown_note(title: str, text: str) -> str:
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f"# {title}\n\nCreated: {created_at}\n\n## Note\n\n{text.strip()}\n"
+
+
+def render_pending_upload_note(title: str, original_filename: str) -> str:
+    created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        f"# {title}\n\n"
+        f"Created: {created_at}\n\n"
+        "Status: Pending parsing\n\n"
+        "## Source\n\n"
+        f"{original_filename}\n\n"
+        "## Note\n\n"
+        "This uploaded file has been stored and is waiting for the parsing pipeline.\n"
+    )
 
 
 def replace_markdown_title(markdown: str, title: str) -> str:

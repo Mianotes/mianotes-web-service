@@ -32,3 +32,9 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(
                     text("ALTER TABLE topics ADD COLUMN archived_by_user_id VARCHAR(36)")
                 )
+        if "notes" in table_names:
+            columns = {column["name"] for column in inspector.get_columns("notes")}
+            if "status" not in columns:
+                connection.execute(
+                    text("ALTER TABLE notes ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'ready'")
+                )

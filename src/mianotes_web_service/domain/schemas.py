@@ -73,6 +73,7 @@ class NoteRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     title: str
+    status: str
     text: str
     note_url: str
     source_files: list[dict[str, object]]
@@ -87,6 +88,7 @@ class NoteListItem(BaseModel):
     user_id: str
     topic_id: str
     title: str
+    status: str
     note_path: str
     created_at: datetime
     updated_at: datetime

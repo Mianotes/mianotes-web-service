@@ -15,7 +15,9 @@ The web service app is the backend API for Mianotes. It is designed to run prima
 - Leave room for per-user developer tokens after the browser auth flow is stable.
 - Start with SQLite while keeping the storage layer adaptable for PostgreSQL later.
 - Use OpenAI ChatGPT APIs for note generation in v1.
-- Use LiteParse for supported document and image parsing in v1.
+- Prefer local parsing tools for v1 where practical: Poppler `pdftotext` for
+  PDFs, Pandoc for document/HTML/Markdown conversion, Tesseract for image OCR,
+  and `mdformat` for final Markdown cleanup.
 - Keep the system simple enough for local self-hosting, but structured enough to scale.
 
 ## Non-Goals For V1
@@ -126,29 +128,29 @@ Index storage:
 Generated notes are stored under:
 
 ```text
-/data/<username>/<topic>/<filename>.md
+/data/<username>/<topic>/<note_id>.md
 ```
 
-Source files are stored in the same folder using the same base filename and their original extension:
+Source files are stored in the same folder using the same note ID and their original extension:
 
 ```text
-/data/<username>/<topic>/<filename>.<original-extension>
+/data/<username>/<topic>/<note_id>.source.<original-extension>
 ```
 
 Comments are stored as JSON metadata sidecars:
 
 ```text
-/data/<username>/<topic>/<filename>.comments.json
+/data/<username>/<topic>/<note_id>.comments.json
 ```
 
-Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames.
+Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames. Using `note_id` as the filename keeps paths stable even when the user edits the note title.
 
 ### Plain Text Inputs
 
 For plain text note creation, v1 should save a source text file alongside the generated note when it is useful for auditability and reprocessing:
 
 ```text
-/data/<username>/<topic>/<filename>.source.txt
+/data/<username>/<topic>/<note_id>.source.txt
 ```
 
 This keeps all note types consistent: every generated note can have a traceable source file when practical.
@@ -212,6 +214,7 @@ Fields:
 - user_id
 - topic_id
 - title
+- status
 - note_path
 - created_at
 - updated_at
@@ -221,6 +224,9 @@ Notes have a relationship with `users` and `topics`.
 Notes must include timestamps so they can be sorted in API responses and in the web app.
 
 The API should return `text` by reading the Markdown file from `note_path`.
+
+`status` starts as `ready` for text notes and `pending_parse` for uploaded files
+until the parser and AI pipeline has generated the final Markdown.
 
 ### source_files
 
@@ -264,36 +270,20 @@ Users can create notes from:
 - Plain text
 - Audio files
 
-### Supported LiteParse Inputs
+### Document And Image Parsing
 
-LiteParse is used for document and image parsing.
+V1 should prefer common local tools that contributors can understand and run:
 
-Supported formats:
+- Poppler `pdftotext` for PDFs with selectable text.
+- Pandoc for DOCX, HTML, Markdown, and related document conversion.
+- Tesseract for image OCR.
+- `mdformat` to clean generated Markdown before saving.
 
-- `.pdf`
-- `.doc`
-- `.docx`
-- `.docm`
-- `.odt`
-- `.rtf`
-- `.ppt`
-- `.pptx`
-- `.pptm`
-- `.odp`
-- `.xls`
-- `.xlsx`
-- `.xlsm`
-- `.ods`
-- `.csv`
-- `.png`
-- `.jpg`
-- `.tiff`
+LiteParse remains a possible future hosted parsing adapter, but it should not be
+the only path for v1.
 
-Reference:
-
-```text
-https://developers.llamaindex.ai/liteparse/
-```
+The first upload endpoint stores files and creates `pending_parse` notes before
+the parser pipeline is wired in.
 
 ### Link Inputs
 
@@ -328,8 +318,8 @@ Every note creation flow follows this high-level pipeline:
 4. Send parsed content to OpenAI ChatGPT API.
 5. Generate a Markdown note.
 6. Generate or infer a note title.
-7. Save the Markdown file under `/data/<username>/<topic>/<filename>.md`.
-8. Save comments sidecar as `/data/<username>/<topic>/<filename>.comments.json`.
+7. Save the Markdown file under `/data/<username>/<topic>/<note_id>.md`.
+8. Save comments sidecar as `/data/<username>/<topic>/<note_id>.comments.json`.
 9. Insert database records for the note and source file.
 10. Return a JSON representation of the note.
 
@@ -506,6 +496,6 @@ Recommended v1 architecture:
 - SQLite as the default database.
 - Filesystem storage service for notes, source files, tokens, and comment JSON.
 - OpenAI integration service for note generation.
-- LiteParse integration service for document and image parsing.
+- Parser adapter layer for Poppler, Pandoc, Tesseract, `mdformat`, and future hosted parsers.
 - Link ingestion service for URL fetching and text extraction.
 - Repository interfaces that can later support PostgreSQL.

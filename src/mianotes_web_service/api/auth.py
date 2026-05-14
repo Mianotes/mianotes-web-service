@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, User
+from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, User, new_id
 from mianotes_web_service.domain.schemas import (
     AdminSetup,
     EmailCheck,
@@ -53,13 +53,16 @@ def _create_onboarding_note(session: Session, user: User) -> None:
         "shared notes, while owners keep control of their own contributions."
     )
     storage = FilesystemStorage(get_settings().data_dir)
+    note_id = new_id()
     paths = storage.write_text_note(
         username=user.username,
         topic=topic.slug,
         title="How to use Mianotes",
         text=text,
+        filename=note_id,
     )
     note = Note(
+        id=note_id,
         user_id=user.id,
         topic_id=topic.id,
         title="How to use Mianotes",

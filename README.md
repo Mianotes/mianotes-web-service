@@ -23,12 +23,12 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 ## Architecture
 
 - Filesystem-first note storage
-- Markdown notes under `/data/<username>/<topic>/<filename>.md`
+- Markdown notes under `/data/<username>/<topic>/<note_id>.md`
 - JSON sidecar files for note comments
 - SQLite index for users, topics, notes, source files, and comments
 - Repository layer designed for future PostgreSQL support
 - OpenAI ChatGPT API for v1 note generation
-- LiteParse for supported document and image parsing
+- Planned local parser pipeline: Poppler `pdftotext`, Pandoc, Tesseract, and `mdformat`
 
 ## Development
 
@@ -73,6 +73,7 @@ DELETE /api/topics/{topic_id}  archives the topic
 
 POST   /api/notes
 POST   /api/notes/from-text
+POST   /api/notes/from-file
 GET    /api/notes              session required
 GET    /api/notes/{note_id}    session required
 PATCH  /api/notes/{note_id}

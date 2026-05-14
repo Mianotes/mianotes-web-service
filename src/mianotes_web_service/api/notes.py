@@ -3,13 +3,23 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import CurrentUser
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic
+from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     NoteCreateFromText,
@@ -27,6 +37,24 @@ from mianotes_web_service.services.storage import (
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
+SUPPORTED_UPLOAD_EXTENSIONS = {
+    ".csv",
+    ".doc",
+    ".docx",
+    ".htm",
+    ".html",
+    ".jpeg",
+    ".jpg",
+    ".md",
+    ".markdown",
+    ".odt",
+    ".pdf",
+    ".png",
+    ".rtf",
+    ".tif",
+    ".tiff",
+    ".txt",
+}
 
 
 def _read_note_or_404(session: Session, note_id: str) -> Note:
@@ -73,6 +101,7 @@ def _note_response(note: Note, request: Request) -> NoteRead:
         created_at=note.created_at,
         updated_at=note.updated_at,
         title=note.title,
+        status=note.status,
         text=text,
         note_url=_file_url(request, note.note_path),
         source_files=source_files,
@@ -113,15 +142,23 @@ def create_note_from_text(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
 
     title = payload.title or infer_title(payload.text)
+    note_id = new_id()
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_text_note(
         username=user.username,
         topic=topic.slug,
         title=title,
         text=payload.text,
+        filename=note_id,
     )
 
-    note = Note(user_id=user.id, topic_id=topic.id, title=title, note_path=str(paths.note_path))
+    note = Note(
+        id=note_id,
+        user_id=user.id,
+        topic_id=topic.id,
+        title=title,
+        note_path=str(paths.note_path),
+    )
     session.add(note)
     session.flush()
     if paths.source_path is not None:
@@ -131,6 +168,67 @@ def create_note_from_text(
                 file_path=str(paths.source_path),
                 original_filename=f"{slugify(title)}.source.txt",
                 content_type="text/plain",
+            )
+        )
+    session.add(Comment(note_id=note.id, comments_path=str(paths.comments_path)))
+    session.commit()
+    return _note_response(_read_note_or_404(session, note.id), request)
+
+
+@router.post("/from-file", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
+def create_note_from_file(
+    request: Request,
+    session: SessionDep,
+    user: CurrentUser,
+    topic_id: Annotated[str, Form()],
+    file: Annotated[UploadFile, File()],
+    title: Annotated[str | None, Form()] = None,
+) -> NoteRead:
+    topic = session.get(Topic, topic_id)
+    if topic is None or topic.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="File required",
+        )
+
+    extension = Path(file.filename).suffix.lower()
+    if extension not in SUPPORTED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported file type",
+        )
+
+    note_id = new_id()
+    note_title = title or infer_title(Path(file.filename).stem.replace("-", " ").replace("_", " "))
+    storage = FilesystemStorage(get_settings().data_dir)
+    paths = storage.write_uploaded_file_note(
+        username=user.username,
+        topic=topic.slug,
+        title=note_title,
+        filename=note_id,
+        original_filename=file.filename,
+        source_stream=file.file,
+    )
+
+    note = Note(
+        id=note_id,
+        user_id=user.id,
+        topic_id=topic.id,
+        title=note_title,
+        status="pending_parse",
+        note_path=str(paths.note_path),
+    )
+    session.add(note)
+    session.flush()
+    if paths.source_path is not None:
+        session.add(
+            SourceFile(
+                note_id=note.id,
+                file_path=str(paths.source_path),
+                original_filename=file.filename,
+                content_type=file.content_type,
             )
         )
     session.add(Comment(note_id=note.id, comments_path=str(paths.comments_path)))

@@ -71,22 +71,31 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["title"] == "Kickoff Notes"
     assert note["user"]["id"] == user["id"]
     assert note["topic"]["id"] == topic["id"]
+    assert note["status"] == "ready"
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
-    assert note["note_url"].endswith("/data/926c16eeec762774/meeting-notes/kickoff-notes.md")
+    assert note["note_url"].endswith(f"/data/926c16eeec762774/meeting-notes/{note['id']}.md")
     assert note["source_files"][0]["url"].endswith(
-        "/data/926c16eeec762774/meeting-notes/kickoff-notes.source.txt"
+        f"/data/926c16eeec762774/meeting-notes/{note['id']}.source.txt"
     )
     assert note["comments_url"].endswith(
-        "/data/926c16eeec762774/meeting-notes/kickoff-notes.comments.json"
+        f"/data/926c16eeec762774/meeting-notes/{note['id']}.comments.json"
     )
 
-    note_path = tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / "kickoff-notes.md"
+    note_path = tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / f"{note['id']}.md"
     source_path = (
-        tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / "kickoff-notes.source.txt"
+        tmp_path
+        / "data"
+        / "926c16eeec762774"
+        / "meeting-notes"
+        / f"{note['id']}.source.txt"
     )
     comments_path = (
-        tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / "kickoff-notes.comments.json"
+        tmp_path
+        / "data"
+        / "926c16eeec762774"
+        / "meeting-notes"
+        / f"{note['id']}.comments.json"
     )
     assert note_path.read_text(encoding="utf-8").startswith("# Kickoff Notes")
     assert (
@@ -98,6 +107,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     listed = client.get("/api/notes", params={"topic_id": topic["id"]})
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == note["id"]
+    assert listed.json()[0]["status"] == "ready"
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
@@ -126,6 +136,48 @@ def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
 
     assert response.status_code == 201
     assert response.json()["title"] == "This note has no provided title, so the API infers one"
+
+
+def test_create_note_from_file_stores_source_and_pending_note(
+    client: TestClient,
+    tmp_path: Path,
+):
+    user = client.post(
+        "/api/auth/setup-admin",
+        json={
+            "email": "upload@example.com",
+            "name": "Upload User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    topic = client.post("/api/topics", json={"name": "Uploads"}).json()
+
+    response = client.post(
+        "/api/notes/from-file",
+        data={"topic_id": topic["id"], "title": "Receipt"},
+        files={"file": ("receipt.pdf", b"%PDF-1.4 test content", "application/pdf")},
+    )
+
+    assert response.status_code == 201
+    note = response.json()
+    assert note["user"]["id"] == user["id"]
+    assert note["topic"]["id"] == topic["id"]
+    assert note["title"] == "Receipt"
+    assert note["status"] == "pending_parse"
+    assert "waiting for the parsing pipeline" in note["text"]
+    assert note["note_url"].endswith(f"/data/43916aabf99c29b8/uploads/{note['id']}.md")
+    assert note["source_files"][0]["original_filename"] == "receipt.pdf"
+    assert note["source_files"][0]["url"].endswith(
+        f"/data/43916aabf99c29b8/uploads/{note['id']}.source.pdf"
+    )
+
+    note_path = tmp_path / "data" / "43916aabf99c29b8" / "uploads" / f"{note['id']}.md"
+    source_path = (
+        tmp_path / "data" / "43916aabf99c29b8" / "uploads" / f"{note['id']}.source.pdf"
+    )
+    assert note_path.read_text(encoding="utf-8").startswith("# Receipt")
+    assert source_path.read_bytes() == b"%PDF-1.4 test content"
 
 
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):

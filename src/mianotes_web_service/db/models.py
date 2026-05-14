@@ -67,6 +67,7 @@ class Note(Base, TimestampMixin):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     topic_id: Mapped[str] = mapped_column(ForeignKey("topics.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="ready", nullable=False)
     note_path: Mapped[str] = mapped_column(Text, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="notes")
