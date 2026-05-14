@@ -450,7 +450,12 @@ V1 should:
 
 Recommended v1 architecture:
 
-- Python API service with a clean app/domain/repository structure.
+- FastAPI Python API service with a clean app/domain/repository structure.
+- Pydantic request and response schemas.
+- SQLAlchemy database models and repositories.
+- Alembic migrations.
+- pytest test coverage.
+- Ruff linting.
 - SQLite as the default database.
 - Filesystem storage service for notes, source files, tokens, and comment JSON.
 - OpenAI integration service for note generation.

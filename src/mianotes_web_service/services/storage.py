@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+import hashlib
+import re
+from dataclasses import dataclass
+from pathlib import Path
+
+SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
+
+
+def make_username(email: str) -> str:
+    normalized = email.strip().lower().encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()[:16]
+
+
+def slugify(value: str, fallback: str = "untitled") -> str:
+    slug = SLUG_PATTERN.sub("-", value.strip().lower()).strip("-")
+    return slug or fallback
+
+
+@dataclass(frozen=True)
+class NotePaths:
+    directory: Path
+    note_path: Path
+    comments_path: Path
+    source_path: Path | None = None
+
+
+class FilesystemStorage:
+    def __init__(self, data_dir: Path) -> None:
+        self.data_dir = data_dir
+
+    def topic_dir(self, username: str, topic: str) -> Path:
+        return self.data_dir / slugify(username, "user") / slugify(topic, "topic")
+
+    def note_paths(
+        self,
+        *,
+        username: str,
+        topic: str,
+        filename: str,
+        source_extension: str | None = None,
+    ) -> NotePaths:
+        base_dir = self.topic_dir(username, topic)
+        stem = slugify(Path(filename).stem)
+        note_path = base_dir / f"{stem}.md"
+        comments_path = base_dir / f"{stem}.comments.json"
+        source_path = None
+        if source_extension:
+            extension = (
+                source_extension if source_extension.startswith(".") else f".{source_extension}"
+            )
+            source_path = base_dir / f"{stem}{extension.lower()}"
+        return NotePaths(
+            directory=base_dir,
+            note_path=note_path,
+            comments_path=comments_path,
+            source_path=source_path,
+        )
