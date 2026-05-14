@@ -95,3 +95,11 @@ def infer_title(text: str, fallback: str = "Untitled Note") -> str:
 def render_markdown_note(title: str, text: str) -> str:
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f"# {title}\n\nCreated: {created_at}\n\n## Note\n\n{text.strip()}\n"
+
+
+def replace_markdown_title(markdown: str, title: str) -> str:
+    lines = markdown.splitlines()
+    if lines and lines[0].startswith("# "):
+        lines[0] = f"# {title}"
+        return "\n".join(lines) + ("\n" if markdown.endswith("\n") else "")
+    return f"# {title}\n\n{markdown}"

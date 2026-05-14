@@ -46,26 +46,38 @@ The API health endpoint is available at:
 GET /api/health
 ```
 
-The first resource APIs are:
+The auth flow is household-based. The first user becomes the admin and sets the
+shared master password. Later users join or log in with their email address and
+the same master password. Sessions use long-lived HTTP-only cookies.
+
+The first APIs are:
 
 ```text
-POST   /api/users
-GET    /api/users
-GET    /api/users/{user_id}
-PATCH  /api/users/{user_id}
-DELETE /api/users/{user_id}
+POST   /api/auth/check-email
+POST   /api/auth/setup-admin
+POST   /api/auth/join
+POST   /api/auth/login
+GET    /api/auth/session
+POST   /api/auth/logout
+
+POST   /api/users              admin session required
+GET    /api/users              session required
+GET    /api/users/{user_id}    session required
+PATCH  /api/users/{user_id}    admin session required
+DELETE /api/users/{user_id}    admin session required
 
 POST   /api/topics
-GET    /api/topics
-GET    /api/topics/{topic_id}
-PATCH  /api/topics/{topic_id}
-DELETE /api/topics/{topic_id}
+GET    /api/topics             session required
+GET    /api/topics/{topic_id}  session required
+DELETE /api/topics/{topic_id}  archives the topic
 
 POST   /api/notes
 POST   /api/notes/from-text
-GET    /api/notes
-GET    /api/notes/{note_id}
-GET    /api/notes/{note_id}/comments
+GET    /api/notes              session required
+GET    /api/notes/{note_id}    session required
+PATCH  /api/notes/{note_id}
+DELETE /api/notes/{note_id}
+GET    /api/notes/{note_id}/comments  session required
 ```
 
 FastAPI exposes interactive local API docs at:

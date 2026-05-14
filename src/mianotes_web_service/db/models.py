@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -35,8 +35,13 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    topics: Mapped[list[Topic]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    topics: Mapped[list[Topic]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="Topic.user_id",
+    )
     notes: Mapped[list[Note]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
@@ -48,8 +53,10 @@ class Topic(Base, TimestampMixin):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archived_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
 
-    user: Mapped[User] = relationship(back_populates="topics")
+    user: Mapped[User] = relationship(back_populates="topics", foreign_keys=[user_id])
     notes: Mapped[list[Note]] = relationship(back_populates="topic", cascade="all, delete-orphan")
 
 
@@ -95,3 +102,21 @@ class Comment(Base, TimestampMixin):
     comments_path: Mapped[str] = mapped_column(Text, nullable=False)
 
     note: Mapped[Note] = relationship(back_populates="comments")
+
+
+class AppSetting(Base, TimestampMixin):
+    __tablename__ = "app_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class SessionToken(Base):
+    __tablename__ = "session_tokens"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    user: Mapped[User] = relationship()

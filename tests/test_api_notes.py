@@ -42,12 +42,17 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
 
 def test_create_note_from_text_writes_files_and_db_records(client: TestClient, tmp_path: Path):
     user = client.post(
-        "/api/users",
-        json={"email": "note@example.com", "name": "Note User"},
-    ).json()
+        "/api/auth/setup-admin",
+        json={
+            "email": "note@example.com",
+            "name": "Note User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
     topic = client.post(
         "/api/topics",
-        json={"user_id": user["id"], "name": "Meeting Notes"},
+        json={"name": "Meeting Notes"},
     ).json()
 
     response = client.post(
@@ -90,19 +95,24 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     )
     assert comments_path.read_text(encoding="utf-8") == '{\n  "comments": []\n}\n'
 
-    listed = client.get("/api/notes", params={"user_id": user["id"]})
+    listed = client.get("/api/notes", params={"topic_id": topic["id"]})
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == note["id"]
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
     user = client.post(
-        "/api/users",
-        json={"email": "plain@example.com", "name": "Plain User"},
-    ).json()
+        "/api/auth/setup-admin",
+        json={
+            "email": "plain@example.com",
+            "name": "Plain User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
     topic = client.post(
         "/api/topics",
-        json={"user_id": user["id"], "name": "Inbox"},
+        json={"name": "Inbox"},
     ).json()
 
     response = client.post(
@@ -116,3 +126,67 @@ def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
 
     assert response.status_code == 201
     assert response.json()["title"] == "This note has no provided title, so the API infers one"
+
+
+def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
+    admin = client.post(
+        "/api/auth/setup-admin",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    topic = client.post("/api/topics", json={"name": "Family"}).json()
+    admin_note = client.post(
+        "/api/notes/from-text",
+        json={
+            "topic_id": topic["id"],
+            "title": "Admin Note",
+            "text": "Only the admin owns this note.",
+        },
+    ).json()
+
+    maria = client.post(
+        "/api/auth/join",
+        json={
+            "email": "maria@example.com",
+            "name": "Maria",
+            "password": "house-password",
+        },
+    ).json()["user"]
+    forbidden_update = client.patch(
+        f"/api/notes/{admin_note['id']}",
+        json={"title": "Maria Edit"},
+    )
+    assert forbidden_update.status_code == 403
+
+    maria_note = client.post(
+        "/api/notes/from-text",
+        json={
+            "topic_id": topic["id"],
+            "title": "Maria Note",
+            "text": "Maria can add a note to a shared topic.",
+        },
+    )
+    assert maria_note.status_code == 201
+    maria_note_body = maria_note.json()
+    assert maria_note_body["user"]["id"] == maria["id"]
+
+    client.post(
+        "/api/auth/login",
+        json={"user_id": admin["id"], "password": "house-password"},
+    )
+    admin_update = client.patch(
+        f"/api/notes/{maria_note_body['id']}",
+        json={"title": "Admin Updated Maria Note", "text": "Admin can help tidy this up."},
+    )
+    assert admin_update.status_code == 200
+    assert admin_update.json()["title"] == "Admin Updated Maria Note"
+    assert "Admin can help tidy this up." in admin_update.json()["text"]
+
+    deleted = client.delete(f"/api/notes/{maria_note_body['id']}")
+    assert deleted.status_code == 204
+    missing = client.get(f"/api/notes/{maria_note_body['id']}")
+    assert missing.status_code == 404

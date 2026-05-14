@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,12 +8,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
 
 
 @pytest.fixture
-def client() -> Generator[TestClient, None, None]:
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
+    get_settings.cache_clear()
+    monkeypatch.setenv("MIANOTES_DATA_DIR", str(tmp_path / "data"))
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -33,9 +37,23 @@ def client() -> Generator[TestClient, None, None]:
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+    get_settings.cache_clear()
 
 
 def test_user_crud(client: TestClient):
+    unauthenticated = TestClient(client.app).get("/api/users")
+    assert unauthenticated.status_code == 401
+
+    client.post(
+        "/api/auth/setup-admin",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+
     response = client.post("/api/users", json={"email": "ALICE@example.com", "name": "Alice"})
     assert response.status_code == 201
     user = response.json()
@@ -52,7 +70,7 @@ def test_user_crud(client: TestClient):
 
     listed = client.get("/api/users")
     assert listed.status_code == 200
-    assert [item["id"] for item in listed.json()] == [user["id"]]
+    assert user["id"] in [item["id"] for item in listed.json()]
 
     deleted = client.delete(f"/api/users/{user['id']}")
     assert deleted.status_code == 204
@@ -62,17 +80,25 @@ def test_user_crud(client: TestClient):
 
 
 def test_topic_crud_and_user_filter(client: TestClient):
-    user = client.post("/api/users", json={"email": "ben@example.com", "name": "Ben"}).json()
+    user = client.post(
+        "/api/auth/setup-admin",
+        json={
+            "email": "ben@example.com",
+            "name": "Ben",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
 
-    missing_user = client.post(
+    unauthenticated = TestClient(client.app).post(
         "/api/topics",
         json={"user_id": "missing", "name": "Product Research"},
     )
-    assert missing_user.status_code == 404
+    assert unauthenticated.status_code == 401
 
     created = client.post(
         "/api/topics",
-        json={"user_id": user["id"], "name": "Product Research"},
+        json={"name": "Product Research"},
     )
     assert created.status_code == 201
     topic = created.json()
@@ -84,17 +110,17 @@ def test_topic_crud_and_user_filter(client: TestClient):
     )
     assert duplicate.status_code == 409
 
-    updated = client.patch(f"/api/topics/{topic['id']}", json={"name": "Meeting Notes"})
-    assert updated.status_code == 200
-    assert updated.json()["slug"] == "meeting-notes"
-
     listed = client.get("/api/topics", params={"user_id": user["id"]})
     assert listed.status_code == 200
-    assert [item["id"] for item in listed.json()] == [topic["id"]]
+    assert topic["id"] in [item["id"] for item in listed.json()]
 
     deleted = client.delete(f"/api/topics/{topic['id']}")
     assert deleted.status_code == 204
 
     missing = client.get(f"/api/topics/{topic['id']}")
-    assert missing.status_code == 404
+    assert missing.status_code == 200
+    assert missing.json()["archived_at"] is not None
 
+    visible = client.get("/api/topics", params={"user_id": user["id"]})
+    assert visible.status_code == 200
+    assert topic["id"] not in [item["id"] for item in visible.json()]

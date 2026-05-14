@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.db.models import Topic, User
+from mianotes_web_service.api.dependencies import CurrentUser
+from mianotes_web_service.db.models import Topic
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import TopicCreate, TopicRead, TopicUpdate
+from mianotes_web_service.domain.schemas import TopicCreate, TopicRead
 from mianotes_web_service.services.storage import slugify
 
 router = APIRouter(prefix="/topics", tags=["topics"])
@@ -24,10 +26,8 @@ def _read_topic_or_404(session: Session, topic_id: str) -> Topic:
 
 
 @router.post("", response_model=TopicRead, status_code=status.HTTP_201_CREATED)
-def create_topic(payload: TopicCreate, session: SessionDep) -> Topic:
-    if session.get(User, payload.user_id) is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    topic = Topic(user_id=payload.user_id, name=payload.name, slug=slugify(payload.name))
+def create_topic(payload: TopicCreate, session: SessionDep, user: CurrentUser) -> Topic:
+    topic = Topic(user_id=user.id, name=payload.name, slug=slugify(payload.name))
     session.add(topic)
     try:
         session.commit()
@@ -44,39 +44,31 @@ def create_topic(payload: TopicCreate, session: SessionDep) -> Topic:
 @router.get("", response_model=list[TopicRead])
 def list_topics(
     session: SessionDep,
+    user: CurrentUser,
     user_id: Annotated[str | None, Query()] = None,
+    include_archived: Annotated[bool, Query()] = False,
 ) -> list[Topic]:
     statement = select(Topic).order_by(Topic.created_at.desc())
     if user_id is not None:
         statement = statement.where(Topic.user_id == user_id)
+    if not include_archived:
+        statement = statement.where(Topic.archived_at.is_(None))
     return list(session.scalars(statement))
 
 
 @router.get("/{topic_id}", response_model=TopicRead)
-def get_topic(topic_id: str, session: SessionDep) -> Topic:
+def get_topic(topic_id: str, session: SessionDep, user: CurrentUser) -> Topic:
     return _read_topic_or_404(session, topic_id)
 
 
-@router.patch("/{topic_id}", response_model=TopicRead)
-def update_topic(topic_id: str, payload: TopicUpdate, session: SessionDep) -> Topic:
-    topic = _read_topic_or_404(session, topic_id)
-    topic.name = payload.name
-    topic.slug = slugify(payload.name)
-    try:
-        session.commit()
-    except IntegrityError as exc:
-        session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A topic with this name already exists for this user",
-        ) from exc
-    session.refresh(topic)
-    return topic
-
-
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_topic(topic_id: str, session: SessionDep) -> None:
+def archive_topic(topic_id: str, session: SessionDep, user: CurrentUser) -> None:
     topic = _read_topic_or_404(session, topic_id)
-    session.delete(topic)
+    if not user.is_admin and topic.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot archive this topic",
+        )
+    topic.archived_at = datetime.now(UTC)
+    topic.archived_by_user_id = user.id
     session.commit()
-

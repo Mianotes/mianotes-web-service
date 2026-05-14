@@ -20,6 +20,7 @@ class UserRead(BaseModel):
     email: EmailStr
     name: str
     username: str
+    is_admin: bool
     created_at: datetime
     updated_at: datetime
 
@@ -27,7 +28,7 @@ class UserRead(BaseModel):
 
 
 class TopicCreate(BaseModel):
-    user_id: str
+    user_id: str | None = None
     name: str = Field(min_length=1, max_length=200)
 
 
@@ -40,6 +41,8 @@ class TopicRead(BaseModel):
     user_id: str
     name: str
     slug: str
+    archived_at: datetime | None = None
+    archived_by_user_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -47,10 +50,15 @@ class TopicRead(BaseModel):
 
 
 class NoteCreateFromText(BaseModel):
-    user_id: str
+    user_id: str | None = None
     topic_id: str
     text: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=300)
+
+
+class NoteUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    text: str | None = Field(default=None, min_length=1)
 
 
 class ApiAction(BaseModel):
@@ -82,5 +90,38 @@ class NoteListItem(BaseModel):
     note_path: str
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EmailCheck(BaseModel):
+    email: EmailStr
+
+
+class EmailCheckResult(BaseModel):
+    user_id: str | None
+    is_first_user: bool | None = None
+
+
+class AdminSetup(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=8)
+    password_confirmation: str = Field(min_length=8)
+
+
+class JoinRequest(BaseModel):
+    email: EmailStr
+    name: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1)
+
+
+class LoginRequest(BaseModel):
+    user_id: str
+    password: str = Field(min_length=1)
+
+
+class SessionRead(BaseModel):
+    user: UserRead
 
     model_config = {"from_attributes": True}

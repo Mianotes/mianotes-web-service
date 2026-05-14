@@ -7,11 +7,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from mianotes_web_service.api.dependencies import CurrentUser
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, User
+from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import NoteCreateFromText, NoteListItem, NoteRead
-from mianotes_web_service.services.storage import FilesystemStorage, infer_title, slugify
+from mianotes_web_service.domain.schemas import (
+    NoteCreateFromText,
+    NoteListItem,
+    NoteRead,
+    NoteUpdate,
+)
+from mianotes_web_service.services.storage import (
+    FilesystemStorage,
+    infer_title,
+    render_markdown_note,
+    replace_markdown_title,
+    slugify,
+)
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -80,17 +92,24 @@ def _note_response(note: Note, request: Request) -> NoteRead:
     )
 
 
+def _ensure_can_change_note(note: Note, user: CurrentUser) -> None:
+    if user.is_admin or note.user_id == user.id:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Cannot change this note",
+    )
+
+
 @router.post("/from-text", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
 def create_note_from_text(
     payload: NoteCreateFromText,
     session: SessionDep,
     request: Request,
+    user: CurrentUser,
 ) -> NoteRead:
-    user = session.get(User, payload.user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     topic = session.get(Topic, payload.topic_id)
-    if topic is None or topic.user_id != user.id:
+    if topic is None or topic.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
 
     title = payload.title or infer_title(payload.text)
@@ -120,13 +139,19 @@ def create_note_from_text(
 
 
 @router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
-def create_note(payload: NoteCreateFromText, session: SessionDep, request: Request) -> NoteRead:
-    return create_note_from_text(payload, session, request)
+def create_note(
+    payload: NoteCreateFromText,
+    session: SessionDep,
+    request: Request,
+    user: CurrentUser,
+) -> NoteRead:
+    return create_note_from_text(payload, session, request, user)
 
 
 @router.get("", response_model=list[NoteListItem])
 def list_notes(
     session: SessionDep,
+    user: CurrentUser,
     user_id: Annotated[str | None, Query()] = None,
     topic_id: Annotated[str | None, Query()] = None,
 ) -> list[Note]:
@@ -139,12 +164,62 @@ def list_notes(
 
 
 @router.get("/{note_id}", response_model=NoteRead)
-def get_note(note_id: str, session: SessionDep, request: Request) -> NoteRead:
+def get_note(
+    note_id: str,
+    session: SessionDep,
+    request: Request,
+    user: CurrentUser,
+) -> NoteRead:
     return _note_response(_read_note_or_404(session, note_id), request)
 
 
+@router.patch("/{note_id}", response_model=NoteRead)
+def update_note(
+    note_id: str,
+    payload: NoteUpdate,
+    session: SessionDep,
+    request: Request,
+    user: CurrentUser,
+) -> NoteRead:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+
+    next_title = payload.title or note.title
+    note_path = Path(note.note_path)
+    if payload.text is not None:
+        note_path.write_text(
+            render_markdown_note(title=next_title, text=payload.text),
+            encoding="utf-8",
+        )
+    elif payload.title is not None:
+        note_path.write_text(
+            replace_markdown_title(note_path.read_text(encoding="utf-8"), next_title),
+            encoding="utf-8",
+        )
+    note.title = next_title
+    session.commit()
+    return _note_response(_read_note_or_404(session, note.id), request)
+
+
+@router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note(note_id: str, session: SessionDep, user: CurrentUser) -> None:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    paths = [Path(note.note_path)]
+    paths.extend(Path(source.file_path) for source in note.source_files)
+    paths.extend(Path(comment.comments_path) for comment in note.comments)
+    session.delete(note)
+    session.commit()
+    for path in paths:
+        path.unlink(missing_ok=True)
+
+
 @router.get("/{note_id}/comments")
-def get_note_comments(note_id: str, session: SessionDep) -> dict[str, object]:
+def get_note_comments(
+    note_id: str,
+    session: SessionDep,
+    user: CurrentUser,
+) -> dict[str, object]:
     note = _read_note_or_404(session, note_id)
     if not note.comments:
         return {"comments": []}
