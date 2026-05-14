@@ -10,6 +10,11 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+
+
 class UserRead(BaseModel):
     id: str
     email: EmailStr
@@ -18,9 +23,15 @@ class UserRead(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    model_config = {"from_attributes": True}
+
 
 class TopicCreate(BaseModel):
     user_id: str
+    name: str = Field(min_length=1, max_length=200)
+
+
+class TopicUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
@@ -31,6 +42,8 @@ class TopicRead(BaseModel):
     slug: str
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class NoteCreateFromText(BaseModel):
@@ -57,4 +70,3 @@ class NoteRead(BaseModel):
     source_files: list[dict[str, object]]
     comments_url: str
     actions: dict[str, ApiAction]
-

@@ -36,6 +36,7 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 python -m venv .venv
 . .venv/bin/activate
 pip install -e ".[dev]"
+mianotes-web-service init-db
 mianotes-web-service --reload
 ```
 
@@ -43,6 +44,22 @@ The API health endpoint is available at:
 
 ```text
 GET /api/health
+```
+
+The first resource APIs are:
+
+```text
+POST   /api/users
+GET    /api/users
+GET    /api/users/{user_id}
+PATCH  /api/users/{user_id}
+DELETE /api/users/{user_id}
+
+POST   /api/topics
+GET    /api/topics
+GET    /api/topics/{topic_id}
+PATCH  /api/topics/{topic_id}
+DELETE /api/topics/{topic_id}
 ```
 
 FastAPI exposes interactive local API docs at:
