@@ -66,9 +66,10 @@ The first visitor creates the household:
 - If there are no admins and no master password, `POST /api/auth/check-email`
   returns `{"user_id": null, "is_first_user": true}`.
 - The frontend asks for the user's name and a master password.
-- `POST /api/auth/setup-admin` creates the first admin user, stores the master
-  password hash, creates a long-lived cookie session, and seeds the default
-  `Mianotes` topic with an onboarding note.
+- `POST /api/auth/join` lets the backend detect that this is the first household
+  user, create the admin user, store the master password hash, create a
+  long-lived cookie session, and seed the default `Mianotes` topic with an
+  onboarding note.
 
 When another household member visits:
 
@@ -403,7 +404,6 @@ Example shape:
 ### Users
 
 - `POST /api/auth/check-email`
-- `POST /api/auth/setup-admin`
 - `POST /api/auth/join`
 - `POST /api/auth/login`
 - `GET /api/auth/session`

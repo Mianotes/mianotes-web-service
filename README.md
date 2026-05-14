@@ -54,7 +54,6 @@ The first APIs are:
 
 ```text
 POST   /api/auth/check-email
-POST   /api/auth/setup-admin
 POST   /api/auth/join
 POST   /api/auth/login
 GET    /api/auth/session

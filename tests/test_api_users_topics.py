@@ -45,7 +45,7 @@ def test_user_crud(client: TestClient):
     assert unauthenticated.status_code == 401
 
     client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "admin@example.com",
             "name": "Admin",
@@ -81,7 +81,7 @@ def test_user_crud(client: TestClient):
 
 def test_topic_crud_and_user_filter(client: TestClient):
     user = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "ben@example.com",
             "name": "Ben",

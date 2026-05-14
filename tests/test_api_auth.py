@@ -40,7 +40,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
     get_settings.cache_clear()
 
 
-def test_email_check_setup_join_and_login_flow(client: TestClient):
+def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     first_check = client.post(
         "/api/auth/check-email",
         json={"email": "admin@example.com"},
@@ -49,7 +49,7 @@ def test_email_check_setup_join_and_login_flow(client: TestClient):
     assert first_check.json() == {"user_id": None, "is_first_user": True}
 
     setup = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "admin@example.com",
             "name": "Admin",

@@ -9,7 +9,6 @@ from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, User, new_id
 from mianotes_web_service.domain.schemas import (
-    AdminSetup,
     EmailCheck,
     JoinRequest,
     LoginRequest,
@@ -102,57 +101,53 @@ def check_email(payload: EmailCheck, session: SessionDep) -> dict[str, bool | st
     return {"user_id": None}
 
 
-@router.post("/setup-admin", response_model=SessionRead, status_code=status.HTTP_201_CREATED)
-def setup_admin(payload: AdminSetup, response: Response, session: SessionDep) -> SessionRead:
-    if _household_initialized(session):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Admin already exists")
-    if payload.password != payload.password_confirmation:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Passwords do not match",
-        )
-
-    email = str(payload.email).lower()
-    user = session.scalars(select(User).where(User.email == email)).one_or_none()
-    if user is None:
-        user = User(
-            email=email,
-            name=payload.name,
-            username=make_username(email),
-            is_admin=True,
-        )
-        session.add(user)
-    else:
-        user.name = payload.name
-        user.is_admin = True
-    set_master_password(session, payload.password)
-    session.flush()
-    _create_onboarding_note(session, user)
-    token = create_session_token(session, user)
-    session.commit()
-    _set_session_cookie(response, token.id)
-    session.refresh(user)
-    return SessionRead(user=user)
-
-
 @router.post("/join", response_model=SessionRead, status_code=status.HTTP_201_CREATED)
 def join(payload: JoinRequest, response: Response, session: SessionDep) -> SessionRead:
-    if not verify_master_password(session, payload.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
     email = str(payload.email).lower()
-    if session.scalars(select(User).where(User.email == email)).one_or_none() is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
 
-    user = User(email=email, name=payload.name, username=make_username(email), is_admin=False)
-    session.add(user)
-    try:
+    if not _household_initialized(session):
+        if payload.password_confirmation is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password confirmation is required for the first user",
+            )
+        if payload.password != payload.password_confirmation:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Passwords do not match",
+            )
+        user = session.scalars(select(User).where(User.email == email)).one_or_none()
+        if user is None:
+            user = User(
+                email=email,
+                name=payload.name,
+                username=make_username(email),
+                is_admin=True,
+            )
+            session.add(user)
+        else:
+            user.name = payload.name
+            user.is_admin = True
+        set_master_password(session, payload.password)
         session.flush()
-    except IntegrityError as exc:
-        session.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="User already exists",
-        ) from exc
+        _create_onboarding_note(session, user)
+    else:
+        if not verify_master_password(session, payload.password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
+        if session.scalars(select(User).where(User.email == email)).one_or_none() is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
+
+        user = User(email=email, name=payload.name, username=make_username(email), is_admin=False)
+        session.add(user)
+        try:
+            session.flush()
+        except IntegrityError as exc:
+            session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User already exists",
+            ) from exc
+
     token = create_session_token(session, user)
     session.commit()
     _set_session_cookie(response, token.id)

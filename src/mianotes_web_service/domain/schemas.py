@@ -105,17 +105,11 @@ class EmailCheckResult(BaseModel):
     is_first_user: bool | None = None
 
 
-class AdminSetup(BaseModel):
-    email: EmailStr
-    name: str = Field(min_length=1, max_length=200)
-    password: str = Field(min_length=8)
-    password_confirmation: str = Field(min_length=8)
-
-
 class JoinRequest(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=1)
+    password_confirmation: str | None = Field(default=None, min_length=1)
 
 
 class LoginRequest(BaseModel):

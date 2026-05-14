@@ -42,7 +42,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
 
 def test_create_note_from_text_writes_files_and_db_records(client: TestClient, tmp_path: Path):
     user = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "note@example.com",
             "name": "Note User",
@@ -112,7 +112,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
     user = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "plain@example.com",
             "name": "Plain User",
@@ -143,7 +143,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
     tmp_path: Path,
 ):
     user = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "upload@example.com",
             "name": "Upload User",
@@ -182,7 +182,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
     admin = client.post(
-        "/api/auth/setup-admin",
+        "/api/auth/join",
         json={
             "email": "admin@example.com",
             "name": "Admin",
