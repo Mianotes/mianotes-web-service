@@ -27,12 +27,6 @@ The web service app is the backend API for Mianotes. It is designed to run prima
 
 ## Repository
 
-The service lives in:
-
-```text
-/Users/federico/Desktop/Mianotes/code/mianotes-web-service
-```
-
 Remote:
 
 ```text
@@ -463,4 +457,3 @@ Recommended v1 architecture:
 - LiteParse integration service for document and image parsing.
 - Link ingestion service for URL fetching and text extraction.
 - Repository interfaces that can later support PostgreSQL.
-
