@@ -65,8 +65,11 @@ DELETE /api/topics/{topic_id}
 FastAPI exposes interactive local API docs at:
 
 ```text
-http://127.0.0.1:8000/docs
+http://127.0.0.1:8200/docs
 ```
+
+Mianotes services use the `8200` range by convention. The web service defaults to
+`8200`; use `8201`, `8202`, and so on for parallel local instances.
 
 ## Checks
 

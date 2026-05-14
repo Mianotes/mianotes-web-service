@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Mianotes Web Service"
     host: str = "127.0.0.1"
-    port: int = 8000
+    port: int = 8200
     data_dir: Path = Field(default=Path("data"))
     database_url: str = "sqlite:///mianotes.db"
 
@@ -32,4 +32,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
