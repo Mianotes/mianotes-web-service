@@ -56,6 +56,14 @@ The auth flow is household-based. The first user becomes the admin and sets the
 shared master password. Later users join or log in with their email address and
 the same master password. Sessions use long-lived HTTP-only cookies.
 
+Agents and automation scripts authenticate with bearer tokens:
+
+```text
+Authorization: Bearer mia_<token>
+```
+
+Raw API token values are returned only once, when they are created.
+
 The first APIs are:
 
 ```text
@@ -65,31 +73,35 @@ POST   /api/auth/login
 GET    /api/auth/session
 POST   /api/auth/logout
 
-POST   /api/users              admin session required
-GET    /api/users              session required
-GET    /api/users/{user_id}    session required
-PATCH  /api/users/{user_id}    admin session required
-DELETE /api/users/{user_id}    admin session required
+POST   /api/tokens             session or tokens:write token required
+GET    /api/tokens             session or tokens:read token required
+DELETE /api/tokens/{token_id}  session or tokens:write token required
 
-POST   /api/topics
-GET    /api/topics             session required
-GET    /api/topics/{topic_id}  session required
-DELETE /api/topics/{topic_id}  archives the topic
+POST   /api/users              admin session or admin token required
+GET    /api/users              session or users:read token required
+GET    /api/users/{user_id}    session or users:read token required
+PATCH  /api/users/{user_id}    admin session or admin token required
+DELETE /api/users/{user_id}    admin session or admin token required
 
-POST   /api/notes
-POST   /api/notes/from-text
-POST   /api/notes/from-file
-GET    /api/notes              session required
-GET    /api/notes/{note_id}    session required
-PATCH  /api/notes/{note_id}
-DELETE /api/notes/{note_id}
-GET    /api/notes/{note_id}/comments  session required
-POST   /api/notes/{note_id}/comments  session required
-PUT    /api/notes/{note_id}/tags      session required
-POST   /api/notes/{note_id}/share     owner/admin session required
+POST   /api/topics             session or topics:write token required
+GET    /api/topics             session or topics:read token required
+GET    /api/topics/{topic_id}  session or topics:read token required
+DELETE /api/topics/{topic_id}  session or topics:write token required
+
+POST   /api/notes              session or notes:write token required
+POST   /api/notes/from-text    session or notes:write token required
+POST   /api/notes/from-file    session or notes:write token required
+GET    /api/notes              session or notes:read token required
+GET    /api/notes/{note_id}    session or notes:read token required
+PATCH  /api/notes/{note_id}    session or notes:write token required
+DELETE /api/notes/{note_id}    session or notes:write token required
+GET    /api/notes/{note_id}/comments  session or notes:read token required
+POST   /api/notes/{note_id}/comments  session or comments:write token required
+PUT    /api/notes/{note_id}/tags      session or tags:write token required
+POST   /api/notes/{note_id}/share     session or share:write token required
 GET    /api/notes/shared/{token}      guest read access
 
-GET    /api/tags                 session required
+GET    /api/tags                 session or tags:read token required
 ```
 
 `PUT /api/notes/{note_id}/tags` replaces the note's full tag list. Notes can have up to 5 tags.

@@ -43,6 +43,10 @@ class User(Base, TimestampMixin):
         foreign_keys="Topic.user_id",
     )
     notes: Mapped[list[Note]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    api_tokens: Mapped[list[ApiToken]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class Topic(Base, TimestampMixin):
@@ -161,3 +165,19 @@ class SessionToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     user: Mapped[User] = relationship()
+
+
+class ApiToken(Base, TimestampMixin):
+    __tablename__ = "api_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    token_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    scopes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(back_populates="api_tokens")

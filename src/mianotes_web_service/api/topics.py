@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import CurrentUser
+from mianotes_web_service.api.dependencies import TopicsReadUser, TopicsWriteUser
 from mianotes_web_service.db.models import Topic
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import TopicCreate, TopicRead
@@ -26,7 +26,7 @@ def _read_topic_or_404(session: Session, topic_id: str) -> Topic:
 
 
 @router.post("", response_model=TopicRead, status_code=status.HTTP_201_CREATED)
-def create_topic(payload: TopicCreate, session: SessionDep, user: CurrentUser) -> Topic:
+def create_topic(payload: TopicCreate, session: SessionDep, user: TopicsWriteUser) -> Topic:
     topic = Topic(user_id=user.id, name=payload.name, slug=slugify(payload.name))
     session.add(topic)
     try:
@@ -44,7 +44,7 @@ def create_topic(payload: TopicCreate, session: SessionDep, user: CurrentUser) -
 @router.get("", response_model=list[TopicRead])
 def list_topics(
     session: SessionDep,
-    user: CurrentUser,
+    user: TopicsReadUser,
     user_id: Annotated[str | None, Query()] = None,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[Topic]:
@@ -57,12 +57,12 @@ def list_topics(
 
 
 @router.get("/{topic_id}", response_model=TopicRead)
-def get_topic(topic_id: str, session: SessionDep, user: CurrentUser) -> Topic:
+def get_topic(topic_id: str, session: SessionDep, user: TopicsReadUser) -> Topic:
     return _read_topic_or_404(session, topic_id)
 
 
 @router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
-def archive_topic(topic_id: str, session: SessionDep, user: CurrentUser) -> None:
+def archive_topic(topic_id: str, session: SessionDep, user: TopicsWriteUser) -> None:
     topic = _read_topic_or_404(session, topic_id)
     if not user.is_admin and topic.user_id != user.id:
         raise HTTPException(

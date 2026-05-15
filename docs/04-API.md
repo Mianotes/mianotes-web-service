@@ -21,6 +21,46 @@ Sessions use HTTP-only cookies. The backend decides whether a `join` request cre
 Browser sessions are for the web app. Agent access should use scoped API tokens
 instead of cookies.
 
+## API tokens
+
+Agents and automation scripts authenticate with bearer tokens:
+
+```text
+Authorization: Bearer mia_<token>
+```
+
+Token management endpoints:
+
+```text
+POST   /api/tokens
+GET    /api/tokens
+DELETE /api/tokens/{token_id}
+```
+
+`POST /api/tokens` returns the raw token only once. The database stores only a
+hash, prefix, owner, scope list, and lifecycle metadata.
+
+Supported scopes:
+
+```text
+admin
+users:read
+topics:read
+topics:write
+notes:read
+notes:write
+comments:write
+tags:read
+tags:write
+share:write
+tokens:read
+tokens:write
+```
+
+Browser sessions bypass scope checks because they represent an interactive
+household user. Bearer tokens must include the relevant scope, or `admin`, for
+each protected API.
+
 ## Users
 
 ```text
@@ -101,31 +141,6 @@ GET    /api/notes/shared/{token}/files/{source_file_id}
 ```
 
 Share links are random, revocable, and read-only. A valid share token grants access to one note, not the full household.
-
-## Future agent access
-
-Agents need programmatic credentials with explicit scope:
-
-```text
-POST   /api/tokens
-GET    /api/tokens
-DELETE /api/tokens/{token_id}
-```
-
-Candidate token scopes:
-
-```text
-notes:read
-notes:write
-topics:write
-comments:write
-tags:write
-share:write
-admin
-```
-
-The token system should store only token hashes server-side and show raw token
-values only once at creation time.
 
 ## Future MCP tools
 

@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import AdminUser, CurrentUser
+from mianotes_web_service.api.dependencies import AdminUser, UsersReadUser
 from mianotes_web_service.db.models import User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import UserCreate, UserRead, UserUpdate
@@ -42,12 +42,12 @@ def create_user(payload: UserCreate, session: SessionDep, user: AdminUser) -> Us
 
 
 @router.get("", response_model=list[UserRead])
-def list_users(session: SessionDep, user: CurrentUser) -> list[User]:
+def list_users(session: SessionDep, user: UsersReadUser) -> list[User]:
     return list(session.scalars(select(User).order_by(User.created_at.desc())))
 
 
 @router.get("/{user_id}", response_model=UserRead)
-def get_user(user_id: str, session: SessionDep, user: CurrentUser) -> User:
+def get_user(user_id: str, session: SessionDep, user: UsersReadUser) -> User:
     return _read_user_or_404(session, user_id)
 
 

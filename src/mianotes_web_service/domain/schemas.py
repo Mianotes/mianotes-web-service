@@ -170,3 +170,27 @@ class SessionRead(BaseModel):
     user: UserRead
 
     model_config = {"from_attributes": True}
+
+
+class ApiTokenCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    user_id: str | None = None
+    scopes: list[str] = Field(default_factory=lambda: ["notes:read"], min_length=1)
+    expires_at: datetime | None = None
+
+
+class ApiTokenRead(BaseModel):
+    id: str
+    user: UserRead
+    name: str
+    token_prefix: str
+    scopes: list[str]
+    created_at: datetime
+    updated_at: datetime
+    last_used_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class ApiTokenCreated(ApiTokenRead):
+    token: str

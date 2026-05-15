@@ -19,9 +19,15 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from mianotes_web_service.api.dependencies import CurrentUser
+from mianotes_web_service.api.dependencies import (
+    CommentsWriteUser,
+    NotesReadUser,
+    NotesWriteUser,
+    ShareWriteUser,
+    TagsWriteUser,
+)
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Tag, Topic, new_id
+from mianotes_web_service.db.models import Comment, Note, SourceFile, Tag, Topic, User, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     MAX_TAGS_PER_NOTE,
@@ -236,7 +242,7 @@ def _read_note_by_share_token(session: Session, token: str) -> Note:
     return note
 
 
-def _ensure_can_change_note(note: Note, user: CurrentUser) -> None:
+def _ensure_can_change_note(note: Note, user: User) -> None:
     if user.is_admin or note.user_id == user.id:
         return
     raise HTTPException(
@@ -250,7 +256,7 @@ def create_note_from_text(
     payload: NoteCreateFromText,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: NotesWriteUser,
 ) -> NoteRead:
     topic = session.get(Topic, payload.topic_id)
     if topic is None or topic.archived_at is not None:
@@ -295,7 +301,7 @@ def create_note_from_text(
 def create_note_from_file(
     request: Request,
     session: SessionDep,
-    user: CurrentUser,
+    user: NotesWriteUser,
     topic_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form()] = None,
@@ -357,7 +363,7 @@ def create_note(
     payload: NoteCreateFromText,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: NotesWriteUser,
 ) -> NoteRead:
     return create_note_from_text(payload, session, request, user)
 
@@ -365,7 +371,7 @@ def create_note(
 @router.get("", response_model=list[NoteListItem])
 def list_notes(
     session: SessionDep,
-    user: CurrentUser,
+    user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
     topic_id: Annotated[str | None, Query()] = None,
 ) -> list[Note]:
@@ -407,7 +413,7 @@ def get_note(
     note_id: str,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: NotesReadUser,
 ) -> NoteRead:
     return _note_response(_read_note_or_404(session, note_id), request)
 
@@ -417,7 +423,7 @@ def create_note_share(
     note_id: str,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: ShareWriteUser,
 ) -> dict[str, str]:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
@@ -432,7 +438,7 @@ def create_note_share(
 
 
 @router.delete("/{note_id}/share", status_code=status.HTTP_204_NO_CONTENT)
-def delete_note_share(note_id: str, session: SessionDep, user: CurrentUser) -> None:
+def delete_note_share(note_id: str, session: SessionDep, user: ShareWriteUser) -> None:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
     note.share_token_hash = None
@@ -446,7 +452,7 @@ def update_note_tags(
     payload: TagsUpdate,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: TagsWriteUser,
 ) -> NoteRead:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
@@ -461,7 +467,7 @@ def update_note(
     payload: NoteUpdate,
     session: SessionDep,
     request: Request,
-    user: CurrentUser,
+    user: NotesWriteUser,
 ) -> NoteRead:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
@@ -491,7 +497,7 @@ def update_note(
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_note(note_id: str, session: SessionDep, user: CurrentUser) -> None:
+def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
     paths = [Path(note.note_path)]
@@ -507,7 +513,7 @@ def delete_note(note_id: str, session: SessionDep, user: CurrentUser) -> None:
 def get_note_comments(
     note_id: str,
     session: SessionDep,
-    user: CurrentUser,
+    user: NotesReadUser,
 ) -> list[CommentRead]:
     note = _read_note_or_404(session, note_id)
     return [
@@ -522,7 +528,7 @@ def create_note_comment(
     note_id: str,
     payload: CommentCreate,
     session: SessionDep,
-    user: CurrentUser,
+    user: CommentsWriteUser,
 ) -> Comment:
     note = _read_note_or_404(session, note_id)
     comment = Comment(note_id=note.id, user_id=user.id, body=payload.body, comments_path="")
@@ -538,7 +544,7 @@ def update_note_comment(
     comment_id: str,
     payload: CommentUpdate,
     session: SessionDep,
-    user: CurrentUser,
+    user: CommentsWriteUser,
 ) -> Comment:
     _read_note_or_404(session, note_id)
     comment = session.get(Comment, comment_id)
@@ -560,7 +566,7 @@ def delete_note_comment(
     note_id: str,
     comment_id: str,
     session: SessionDep,
-    user: CurrentUser,
+    user: CommentsWriteUser,
 ) -> None:
     _read_note_or_404(session, note_id)
     comment = session.get(Comment, comment_id)

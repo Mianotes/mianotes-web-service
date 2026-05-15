@@ -53,4 +53,6 @@ local models for specific tasks.
 ## Agent access
 
 Agent credentials should be scoped and revocable. They should not use the
-browser household password or cookie session.
+browser household password or cookie session. Use `POST /api/tokens` from a
+browser session to create a token, then send it as `Authorization: Bearer
+mia_<token>` from agent clients.
