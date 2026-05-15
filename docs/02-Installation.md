@@ -2,7 +2,7 @@
 
 Mianotes Web Service is a FastAPI application. It uses SQLite by default and stores generated note files under `data/`.
 
-## Local Development
+## Local development
 
 ```bash
 python -m venv .venv
@@ -29,7 +29,7 @@ MIANOTES_DATA_DIR=data
 MIANOTES_DATABASE_URL=sqlite:///mianotes.db
 ```
 
-## First Run
+## First run
 
 The first user joins through `POST /api/auth/join`. The service detects that no household exists, creates the first admin, stores the master password hash, and seeds the default `Mianotes` topic.
 

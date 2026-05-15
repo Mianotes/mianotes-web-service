@@ -102,7 +102,7 @@ GET    /api/notes/shared/{token}/files/{source_file_id}
 
 Share links are random, revocable, and read-only. A valid share token grants access to one note, not the full household.
 
-## Future Agent Access
+## Future agent access
 
 Agents need programmatic credentials with explicit scope:
 
@@ -127,7 +127,7 @@ admin
 The token system should store only token hashes server-side and show raw token
 values only once at creation time.
 
-## Future MCP Tools
+## Future MCP tools
 
 The MCP server should expose Mianotes as tools AI agents can call:
 

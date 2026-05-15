@@ -1,4 +1,4 @@
-# Mianotes Web Service PRD
+# Mianotes web service PRD
 
 ## Overview
 
@@ -11,7 +11,7 @@ primarily on a local server, store note content on the filesystem, keep
 lightweight indexes in SQLite, and expose JSON REST APIs for the React web app,
 automation scripts, AI agents, and future MCP integrations.
 
-## Product Goals
+## Product goals
 
 - Convert human- or agent-provided content into clean Markdown notes.
 - Store notes and source files in a transparent filesystem layout.
@@ -28,7 +28,7 @@ automation scripts, AI agents, and future MCP integrations.
   and `mdformat` for final Markdown cleanup.
 - Keep the system simple enough for local self-hosting, but structured enough to scale.
 
-## Non-Goals For V1
+## Non-goals for v1
 
 - Full multi-database support at runtime.
 - YouTube transcript extraction.
@@ -49,7 +49,7 @@ https://github.com/Mianotes/mianotes-web-service
 
 Mianotes will be licensed under GPL-3.0.
 
-## Users, Agents, And Authentication
+## Users, agents, and authentication
 
 Mianotes is a shared local knowledge base for humans and AI agents. Once a
 principal has access to the local instance, it can browse shared notes and
@@ -73,7 +73,7 @@ model should evolve toward principals that can be humans, agents, or guests.
 For v1, humans use the household auth flow and agents should be introduced
 through API tokens.
 
-### Household Password Flow
+### Household password flow
 
 The first visitor creates the household:
 
@@ -100,7 +100,7 @@ When an existing user returns:
 
 Sessions are long-lived, browser-friendly, HTTP-only cookies.
 
-### Roles And Ownership
+### Roles and ownership
 
 - The first user is an admin.
 - Admin users can view, edit, remove, or archive any note or topic.
@@ -114,7 +114,7 @@ Sessions are long-lived, browser-friendly, HTTP-only cookies.
 Topic deletion is archive-only in v1. Archived topics are hidden by default.
 Redistributing notes from archived shared topics is planned for v2.
 
-### Agent And API Tokens
+### Agent and API tokens
 
 API tokens are required for agent and automation access. Token rules:
 
@@ -141,7 +141,7 @@ Mia must be implemented as backend capability. The web app can provide prompts
 and controls, but the web service owns permissions, state transitions, note
 updates, and persistence.
 
-## Storage Model
+## Storage model
 
 Mianotes uses the filesystem as the main storage layer for user-facing content.
 
@@ -155,7 +155,7 @@ Index storage:
 - SQLite in v1
 - Repository/adapter layer designed so PostgreSQL can be supported later
 
-### Filesystem Layout
+### Filesystem layout
 
 Generated notes are stored under:
 
@@ -171,7 +171,7 @@ Source files are stored in the same folder using the same note ID and their orig
 
 Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames. Using `note_id` as the filename keeps paths stable even when the user edits the note title.
 
-### Plain Text Inputs
+### Plain text inputs
 
 For plain text note creation, v1 should save a source text file alongside the generated note when it is useful for auditability and reprocessing:
 
@@ -181,7 +181,7 @@ For plain text note creation, v1 should save a source text file alongside the ge
 
 This keeps all note types consistent: every generated note can have a traceable source file when practical.
 
-## Database Model
+## Database model
 
 The database keeps indexes and relationships for fast lookup, sorting, and API responses. The source of truth for note body text remains the Markdown file.
 
@@ -315,7 +315,7 @@ Fields:
 - tag_id
 - created_at
 
-## Content Ingestion
+## Content ingestion
 
 Humans and agents can create notes from:
 
@@ -325,7 +325,7 @@ Humans and agents can create notes from:
 - Plain text
 - Audio files
 
-### Document And Image Parsing
+### Document and image parsing
 
 V1 should prefer common local tools that contributors can understand and run:
 
@@ -340,7 +340,7 @@ the only path for v1.
 The first upload endpoint stores files and creates `pending_parse` notes before
 the parser pipeline is wired in.
 
-### Link Inputs
+### Link inputs
 
 For v1, links should be fetched and converted into clean textual content when possible, then sent to OpenAI for note generation.
 
@@ -348,7 +348,7 @@ The original idea was to convert links to PDFs and process them through LitePars
 
 The app should preserve the original URL as source metadata.
 
-### YouTube Links
+### YouTube links
 
 YouTube transcript extraction is planned but not required for v1.
 
@@ -357,13 +357,13 @@ Future behavior:
 - If a transcript is available, use the transcript directly.
 - If no transcript is available, fall back to another supported ingestion method.
 
-### Audio Inputs
+### Audio inputs
 
 Audio parsing is not finalized.
 
 OpenAI should be evaluated for transcription support. V1 architecture should leave room for an audio transcription step before Markdown generation.
 
-## Note Creation Pipeline
+## Note creation pipeline
 
 Every note creation flow follows this high-level pipeline:
 
@@ -377,7 +377,7 @@ Every note creation flow follows this high-level pipeline:
 8. Insert database records for the note, tags, comments, and source file.
 9. Return a JSON representation of the note.
 
-## AI Requirements
+## AI requirements
 
 V1 uses OpenAI ChatGPT API for Mia-powered Markdown note generation and
 improvement.
@@ -400,7 +400,7 @@ Expected output sections may include:
 
 The exact prompt contract should be defined during implementation.
 
-### Mia Operations
+### Mia operations
 
 Mia should expose backend operations that can be called by the web app, REST API
 clients, and future MCP tools:
@@ -415,7 +415,7 @@ clients, and future MCP tools:
 Long-running Mia operations should use job/status records rather than blocking
 HTTP requests indefinitely.
 
-## Title Generation
+## Title generation
 
 Each note has a title.
 
@@ -428,7 +428,7 @@ For v1, OpenAI can perform title generation to avoid introducing a second model 
 
 Local small-model support, such as Ollama, should be researched separately. The current hardware target may have only 4 GB RAM, so model choice must be conservative.
 
-## API Requirements
+## API requirements
 
 All APIs return JSON.
 
@@ -457,7 +457,7 @@ Every returned note should include:
 - Share URL when enabled
 - API action metadata showing URLs and methods available for the note
 
-### API Action Metadata
+### API action metadata
 
 Each note response should include API action hints so the frontend can show developers how to call the API.
 
@@ -518,7 +518,7 @@ Candidate specialised endpoints:
 - `POST /api/notes/from-text`
 - `POST /api/notes/from-audio`
 
-### Source Files
+### Source files
 
 - `GET /api/notes/{note_id}/source-files`
 - `GET /api/source-files/{source_file_id}`
@@ -536,14 +536,14 @@ Comment endpoints read and write SQLite records.
 
 - `GET /api/tags`
 
-## Web App API Access
+## Web app API access
 
 The React web app calls the APIs with the long-lived cookie session created by
 the auth endpoints. AI agents and automation scripts should use scoped API
 tokens. Future MCP tools should wrap the same backend capabilities rather than
 duplicating business logic.
 
-## Performance Requirements
+## Performance requirements
 
 Although Mianotes is designed for local servers, performance should be considered from the start.
 
@@ -556,7 +556,7 @@ V1 should:
 - Use background jobs for long-running parsing and AI generation if synchronous requests become too slow.
 - Keep a repository/adapter boundary so SQLite can be replaced or supplemented by PostgreSQL later.
 
-## Open Questions
+## Open questions
 
 - Which Python web framework should be used?
 - Should note creation be synchronous in v1, or job-based from the start?
@@ -570,7 +570,7 @@ V1 should:
 - Which MCP tools should ship first?
 - Which Mia operations should be synchronous and which should be jobs?
 
-## Initial Technical Direction
+## Initial technical direction
 
 Recommended v1 architecture:
 

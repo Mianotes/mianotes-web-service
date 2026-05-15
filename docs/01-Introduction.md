@@ -6,7 +6,7 @@ The core idea is simple: Markdown files are the shared working memory. Humans ca
 
 Mia is the built-in AI agent for Mianotes. Mia helps convert messy inputs into durable notes, then improves those notes by structuring them, extracting key information, summarising content, and preparing them for reuse by humans or other agents.
 
-## Use Cases
+## Use cases
 
 - Give AI agents a local, structured place to maintain their own documentation.
 - Save meeting notes, homework, receipts, trip plans, research, and reference documents.
@@ -16,7 +16,7 @@ Mia is the built-in AI agent for Mianotes. Mia helps convert messy inputs into d
 - Share a read-only note link with someone outside the household or team.
 - Keep content transparent on disk instead of hiding it in a database blob.
 
-## Storage Model
+## Storage model
 
 Mianotes stores note content as Markdown files:
 
@@ -28,7 +28,7 @@ SQLite stores the index and metadata: users, topics, tags, notes, comments, sour
 
 The filename is the note ID, not the note title. This keeps paths stable when titles change and makes future filesystem search simple to join back to note metadata.
 
-## Humans And Agents
+## Humans and agents
 
 Mianotes treats humans and AI agents as collaborators in the same workspace. A human might upload a PDF and ask Mia to turn it into a clear project note. An agent might connect through the API, create a topic for a task, add notes as it works, and later update those notes with findings.
 

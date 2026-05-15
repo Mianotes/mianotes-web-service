@@ -33,7 +33,7 @@ MIANOTES_DATABASE_URL=sqlite:///mianotes.db
 
 The app is structured so a future PostgreSQL adapter can be added without changing the API contract.
 
-## Parser Pipeline
+## Parser pipeline
 
 The planned local parser stack is:
 
@@ -44,13 +44,13 @@ The planned local parser stack is:
 
 Hosted parsers can be added later behind the same parser adapter boundary.
 
-## Mia Provider
+## Mia provider
 
 Mia should start with OpenAI for v1. The agent layer should still be isolated
 behind a service boundary so a future install can choose different providers or
 local models for specific tasks.
 
-## Agent Access
+## Agent access
 
 Agent credentials should be scoped and revocable. They should not use the
 browser household password or cookie session.

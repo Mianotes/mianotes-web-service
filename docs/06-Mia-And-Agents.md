@@ -1,8 +1,8 @@
-# Mia And Agents
+# Mia and agents
 
 Mianotes is designed for collaboration between humans and AI agents.
 
-## The Problem
+## The problem
 
 AI agents often rely on remote models to extract, structure, and summarise information from files. Local models can help summarise text, but they do not solve the whole workflow: parsing files, organising outputs, maintaining durable notes, improving structure over time, and making that information available to other agents.
 
@@ -21,7 +21,7 @@ Mia is the built-in Mianotes agent. Mia helps users and other agents:
 
 Mia should be implemented as a backend service/agent layer, not as frontend-only behaviour. The web app can prompt Mia, but the backend owns the workflow, permissions, and persistence.
 
-## Human Users
+## Human users
 
 Humans use Mianotes through the web app. They can:
 
@@ -31,7 +31,7 @@ Humans use Mianotes through the web app. They can:
 - Ask Mia to improve notes.
 - Comment, tag, share, and export information.
 
-## Agent Users
+## Agent users
 
 AI agents use Mianotes programmatically. They can:
 
@@ -45,11 +45,11 @@ AI agents use Mianotes programmatically. They can:
 
 Agents should use scoped API tokens and MCP tools, not browser cookies.
 
-## Design Principle
+## Design principle
 
 The backend is the brain. The web app explains context and collects input, but the web service decides permissions, ownership, roles, parsing behaviour, share access, and agent capabilities.
 
-## Future MCP Surface
+## Future MCP surface
 
 The MCP server should let compatible agents use Mianotes as a toolset:
 

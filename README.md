@@ -1,4 +1,4 @@
-# Mianotes Web Service
+# Mianotes web service
 
 Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge
 repository for humans and AI agents. It turns documents, images, links, audio,
@@ -9,7 +9,7 @@ The service stores note content on the filesystem, keeps lightweight indexes in
 SQLite, and exposes JSON REST APIs for the Mianotes web app, automation scripts,
 and future agent integrations.
 
-## Current Status
+## Current status
 
 This repository is in early implementation. See [PRD.md](PRD.md) and
 [docs/](docs/README.md) for the current requirements and technical direction.

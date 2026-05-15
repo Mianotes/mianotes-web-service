@@ -22,7 +22,7 @@ Teams can use Mianotes as a small local knowledge base:
 - Use comments for discussion around a note.
 - Generate a share link when someone outside the team needs read-only access to a note.
 
-## AI Agents
+## AI agents
 
 AI agents can use Mianotes as their local documentation layer:
 
