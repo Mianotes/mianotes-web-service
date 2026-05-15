@@ -11,7 +11,7 @@ and future agent integrations.
 
 ## Current status
 
-This repository is in early implementation. See [PRD.md](PRD.md) and the
+This repository is in early implementation. See [SPEC.md](SPEC.md) and the
 documentation below for the current requirements and technical direction.
 
 ## Documentation

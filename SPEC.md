@@ -1,4 +1,4 @@
-# Mianotes web service PRD
+# Mianotes web service spec
 
 ## Overview
 
