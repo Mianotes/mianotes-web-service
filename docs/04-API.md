@@ -810,8 +810,8 @@ Admin session or bearer token with `admin`.
 
 ```json
 {
-  "email": "maria@example.com",
-  "name": "Maria"
+  "email": "emily.davis@example.com",
+  "name": "Emily Davis"
 }
 ```
 
@@ -909,8 +909,8 @@ Admin session or bearer token with `admin`.
 
 ```json
 {
-  "email": "maria@example.com",
-  "name": "Maria Rossi"
+  "email": "emily.davis@example.com",
+  "name": "Emily Davis"
 }
 ```
 
