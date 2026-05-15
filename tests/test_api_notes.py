@@ -280,6 +280,24 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert updated.status_code == 200
     assert [tag["slug"] for tag in updated.json()["tags"]] == ["research-edge-ai"]
 
+    too_many_tags = ["one", "two", "three", "four", "five", "six"]
+    rejected_update = client.put(
+        f"/api/notes/{note['id']}/tags",
+        json={"tags": too_many_tags},
+    )
+    assert rejected_update.status_code == 422
+
+    rejected_create = client.post(
+        "/api/notes/from-text",
+        json={
+            "topic_id": topic["id"],
+            "title": "Too many tags",
+            "text": "This note should not be created.",
+            "tags": too_many_tags,
+        },
+    )
+    assert rejected_create.status_code == 422
+
     comment = client.post(
         f"/api/notes/{note['id']}/comments",
         json={"body": "This is useful for the next call."},

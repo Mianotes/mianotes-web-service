@@ -92,6 +92,8 @@ GET    /api/notes/shared/{token}      guest read access
 GET    /api/tags                 session required
 ```
 
+`PUT /api/notes/{note_id}/tags` replaces the note's full tag list. Notes can have up to 5 tags.
+
 FastAPI exposes interactive local API docs at:
 
 ```text

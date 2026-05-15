@@ -78,6 +78,7 @@ PUT /api/notes/{note_id}/tags
 ```
 
 Tags are global to the household instance and can be attached to many notes.
+Use `PUT /api/notes/{note_id}/tags` to replace the full tag set for a note. Send fewer tags to remove tags, or an empty list to clear them. A note can have at most 5 tags.
 
 ## Comments
 

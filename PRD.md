@@ -295,7 +295,7 @@ Database fields:
 
 ### tags
 
-Tags are global to the household instance and can be attached to many notes.
+Tags are global to the household instance and can be attached to many notes. A note can have at most 5 tags.
 
 Fields:
 

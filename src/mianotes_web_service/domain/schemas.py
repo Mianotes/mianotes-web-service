@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field
 
+MAX_TAGS_PER_NOTE = 5
+
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -54,14 +56,14 @@ class NoteCreateFromText(BaseModel):
     topic_id: str
     text: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=300)
-    tags: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
 
 class NoteUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     text: str | None = Field(default=None, min_length=1)
     is_published: bool | None = None
-    tags: list[str] | None = None
+    tags: list[str] | None = Field(default=None, max_length=MAX_TAGS_PER_NOTE)
 
 
 class TagRead(BaseModel):
@@ -75,7 +77,7 @@ class TagRead(BaseModel):
 
 
 class TagsUpdate(BaseModel):
-    tags: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
 
 class CommentCreate(BaseModel):

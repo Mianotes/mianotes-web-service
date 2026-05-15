@@ -24,6 +24,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Comment, Note, SourceFile, Tag, Topic, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
+    MAX_TAGS_PER_NOTE,
     CommentCreate,
     CommentRead,
     CommentUpdate,
@@ -184,7 +185,7 @@ def _source_type_from_filename(filename: str) -> str:
 
 
 def _sync_note_tags(session: Session, note: Note, tag_names: list[str]) -> None:
-    tags: list[Tag] = []
+    normalized_names: list[tuple[str, str]] = []
     seen: set[str] = set()
     for name in tag_names:
         normalized = " ".join(name.strip().split())
@@ -194,6 +195,16 @@ def _sync_note_tags(session: Session, note: Note, tag_names: list[str]) -> None:
         if slug in seen:
             continue
         seen.add(slug)
+        normalized_names.append((normalized, slug))
+
+    if len(normalized_names) > MAX_TAGS_PER_NOTE:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"A note can have at most {MAX_TAGS_PER_NOTE} tags",
+        )
+
+    tags: list[Tag] = []
+    for normalized, slug in normalized_names:
         tag = session.scalars(select(Tag).where(Tag.slug == slug)).one_or_none()
         if tag is None:
             tag = Tag(name=normalized, slug=slug)
