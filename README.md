@@ -11,8 +11,17 @@ and future agent integrations.
 
 ## Current status
 
-This repository is in early implementation. See [PRD.md](PRD.md) and
-[docs/](docs/README.md) for the current requirements and technical direction.
+This repository is in early implementation. See [PRD.md](PRD.md) and the
+documentation below for the current requirements and technical direction.
+
+## Documentation
+
+- [Introduction](docs/01-Introduction.md)
+- [Installation](docs/02-Installation.md)
+- [Workflow](docs/03-Workflow.md)
+- [APIs](docs/04-API.md)
+- [Customisation](docs/05-Customisation.md)
+- [Mia and agents](docs/06-Mia-And-Agents.md)
 
 ## Stack
 
@@ -24,7 +33,9 @@ This repository is in early implementation. See [PRD.md](PRD.md) and
 - pytest for tests
 - Ruff for linting and formatting checks
 
-Runtime dependencies intentionally avoid optional compiled server extras so the service is easier to install on small ARM Linux boxes.
+Runtime dependencies include MarkItDown conversion extras so the service can
+handle common document, image, audio, HTML, archive, and text formats from one
+parser boundary. Some formats may need optional system tools such as `ffmpeg`.
 
 ## Architecture
 
@@ -34,7 +45,12 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 - SQLite index for users, topics, notes, source files, comments, tokens, and jobs
 - Repository layer designed for future PostgreSQL support
 - OpenAI ChatGPT API for Mia-powered note generation and improvement
-- Adapter-based local parser pipeline: plain text, Poppler `pdftotext`, Pandoc, Tesseract, and `mdformat`
+- MarkItDown-powered parser adapter for documents, images, audio, HTML, URLs, archives, and text formats
+
+URL ingestion downloads HTML with a browser-like user agent before handing the
+local file to MarkItDown. This avoids common bot-blocking behavior from sites
+that reject the default Python request user agent. Install `ffmpeg` separately
+when audio or video transcription support is needed.
 
 ## Development
 

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import shutil
-import subprocess
+import importlib
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 class ParserError(RuntimeError):
@@ -24,119 +26,76 @@ class ParsedDocument:
 
 class DocumentParser(Protocol):
     name: str
-    supported_extensions: frozenset[str]
 
     def parse(self, path: Path) -> ParsedDocument:
         pass
 
 
-def _require_command(command: str) -> str:
-    command_path = shutil.which(command)
-    if command_path is None:
-        raise ParserUnavailable(f"{command} is not installed")
-    return command_path
+DEFAULT_BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+)
 
 
-def _run_command(command: list[str], *, input_text: str | None = None) -> str:
-    completed = subprocess.run(
-        command,
-        input=input_text,
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    if completed.returncode != 0:
-        raise ParserError(completed.stderr.strip() or f"{command[0]} failed")
-    return completed.stdout
+def _markitdown_class():
+    try:
+        module = importlib.import_module("markitdown")
+    except ModuleNotFoundError as exc:
+        raise ParserUnavailable("markitdown is not installed") from exc
+    return module.MarkItDown
 
 
-class PlainTextParser:
-    name = "plain-text"
-    supported_extensions = frozenset({".md", ".markdown", ".txt"})
-
-    def parse(self, path: Path) -> ParsedDocument:
-        return ParsedDocument(
-            text=path.read_text(encoding="utf-8"),
-            parser=self.name,
-            source_path=path,
-        )
-
-
-class PdfTextParser:
-    name = "pdftotext"
-    supported_extensions = frozenset({".pdf"})
-
-    def parse(self, path: Path) -> ParsedDocument:
-        pdftotext = _require_command("pdftotext")
-        text = _run_command([pdftotext, str(path), "-"])
-        return ParsedDocument(text=text, parser=self.name, source_path=path)
-
-
-class PandocParser:
-    name = "pandoc"
-    supported_extensions = frozenset(
-        {
-            ".doc",
-            ".docx",
-            ".docm",
-            ".html",
-            ".htm",
-            ".odt",
-            ".rtf",
-            ".pptx",
-            ".csv",
-        }
-    )
-
-    def parse(self, path: Path) -> ParsedDocument:
-        pandoc = _require_command("pandoc")
-        text = _run_command([pandoc, str(path), "--to", "markdown", "--wrap", "none"])
-        return ParsedDocument(text=text, parser=self.name, source_path=path)
-
-
-class TesseractParser:
-    name = "tesseract"
-    supported_extensions = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff"})
-
-    def parse(self, path: Path) -> ParsedDocument:
-        tesseract = _require_command("tesseract")
-        text = _run_command([tesseract, str(path), "stdout"])
-        return ParsedDocument(text=text, parser=self.name, source_path=path)
-
-
-class MarkdownFormatter:
-    name = "mdformat"
-
-    def format(self, text: str) -> str:
-        mdformat = _require_command("mdformat")
-        return _run_command([mdformat, "-"], input_text=text)
-
-
-class ParserRegistry:
-    def __init__(self, parsers: list[DocumentParser] | None = None) -> None:
-        self.parsers = parsers or [
-            PlainTextParser(),
-            PdfTextParser(),
-            PandocParser(),
-            TesseractParser(),
-        ]
-
-    def parser_for(self, path: Path) -> DocumentParser:
-        extension = path.suffix.lower()
-        for parser in self.parsers:
-            if extension in parser.supported_extensions:
-                return parser
-        raise ParserError(f"Unsupported file type: {extension or 'unknown'}")
+class MarkItDownParser:
+    name = "markitdown"
 
     def parse(self, path: Path) -> ParsedDocument:
         if not path.is_file():
             raise ParserError("Source file not found")
-        return self.parser_for(path).parse(path)
+        converter = _markitdown_class()()
+        try:
+            result = converter.convert(str(path))
+        except Exception as exc:
+            raise ParserError(str(exc)) from exc
+        return ParsedDocument(text=result.text_content, parser=self.name, source_path=path)
+
+
+class ParserRegistry:
+    def __init__(self, parser: DocumentParser | None = None) -> None:
+        self.parser = parser or MarkItDownParser()
+
+    def parse(self, path: Path) -> ParsedDocument:
+        return self.parser.parse(path)
 
 
 def parse_document(path: Path) -> ParsedDocument:
     return ParserRegistry().parse(path)
 
 
-def format_markdown(text: str) -> str:
-    return MarkdownFormatter().format(text)
+def fetch_url_to_html(
+    url: str,
+    output_path: Path,
+    *,
+    user_agent: str = DEFAULT_BROWSER_USER_AGENT,
+    timeout: int = 30,
+) -> Path:
+    request = Request(url, headers={"User-Agent": user_agent})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            content = response.read()
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise ParserError(f"Could not fetch URL: {exc}") from exc
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(content)
+    return output_path
+
+
+def parse_url(
+    url: str,
+    *,
+    work_dir: Path | None = None,
+    user_agent: str = DEFAULT_BROWSER_USER_AGENT,
+) -> ParsedDocument:
+    if work_dir is None:
+        with tempfile.TemporaryDirectory(prefix="mianotes-url-") as temp_dir:
+            return parse_url(url, work_dir=Path(temp_dir), user_agent=user_agent)
+    html_path = fetch_url_to_html(url, work_dir / "page.html", user_agent=user_agent)
+    return parse_document(html_path)

@@ -24,9 +24,8 @@ automation scripts, AI agents, and future MCP integrations.
   summarises notes.
 - Start with SQLite while keeping the storage layer adaptable for PostgreSQL later.
 - Use OpenAI ChatGPT APIs for note generation in v1.
-- Prefer local parsing tools for v1 where practical: Poppler `pdftotext` for
-  PDFs, Pandoc for document/HTML/Markdown conversion, Tesseract for image OCR,
-  and `mdformat` for final Markdown cleanup.
+- Use Microsoft MarkItDown as the primary v1 parser for documents, images,
+  audio, HTML, links, archives, and text formats.
 - Keep the system simple enough for local self-hosting, but structured enough to scale.
 
 ## Non-goals for v1
@@ -351,20 +350,23 @@ Humans and agents can create notes from:
 
 ### Document and image parsing
 
-V1 should prefer common local tools that contributors can understand and run:
+V1 should use Microsoft MarkItDown as the primary parser adapter. MarkItDown
+supports common office documents, PDFs, images, audio, HTML, text formats,
+archives, YouTube URLs, EPubs, and related formats.
 
-- Poppler `pdftotext` for PDFs with selectable text.
-- Pandoc for DOCX, HTML, Markdown, and related document conversion.
-- Tesseract for image OCR.
-- `mdformat` to clean generated Markdown before saving.
+For normal uploads, Mianotes should pass the local source file to MarkItDown.
+For URL inputs, Mianotes should fetch the HTML first with a browser-like user
+agent, save it locally, and then pass that local HTML file to MarkItDown. This
+avoids common bot-blocking behavior from sites that reject default Python
+request headers.
+
+`ffmpeg` should be treated as an optional system dependency for audio and video
+sources. HTML, document, and text conversion should not require it.
 
 LiteParse remains a possible future hosted parsing adapter, but it should not be
-the only path for v1.
-
-Parsing should be exposed internally through an adapter registry. Plain text and
-Markdown parsing can be handled directly; `pdftotext`, Pandoc, Tesseract, and
-`mdformat` should be command-backed adapters with explicit unavailable errors
-when the local binary is missing.
+the only path for v1. Parsing should stay behind an internal adapter registry so
+specialist local or hosted parsers can be added later without changing the note
+API contract.
 
 The first upload endpoint stores files and creates `pending_parse` notes before
 the parser pipeline is wired in.
@@ -623,7 +625,7 @@ Recommended v1 architecture:
 - SQLite as the default database.
 - Filesystem storage service for notes and source files.
 - OpenAI integration service for Mia-powered note generation and improvement.
-- Parser adapter layer for Poppler, Pandoc, Tesseract, `mdformat`, and future hosted parsers.
+- MarkItDown parser adapter layer with room for future specialist or hosted parsers.
 - Link ingestion service for URL fetching and text extraction.
 - Scoped token authentication for AI agents and automation scripts.
 - MCP server exposing note, topic, search, and Mia operations as tools.
