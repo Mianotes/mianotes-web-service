@@ -35,14 +35,17 @@ The app is structured so a future PostgreSQL adapter can be added without changi
 
 ## Parser pipeline
 
-The planned local parser stack is:
+The parser stack is adapter-based. The registry currently implements plain text
+and Markdown parsing directly, with command-backed adapters for:
 
 - Poppler `pdftotext` for PDFs with selectable text.
 - Pandoc for DOCX, HTML, Markdown, and related document conversion.
 - Tesseract for image OCR.
 - `mdformat` for Markdown cleanup.
 
-Hosted parsers can be added later behind the same parser adapter boundary.
+Command-backed adapters report a clear unavailable error if the binary is not
+installed. Hosted parsers can be added later behind the same parser adapter
+boundary.
 
 ## Mia provider
 

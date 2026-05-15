@@ -361,6 +361,11 @@ V1 should prefer common local tools that contributors can understand and run:
 LiteParse remains a possible future hosted parsing adapter, but it should not be
 the only path for v1.
 
+Parsing should be exposed internally through an adapter registry. Plain text and
+Markdown parsing can be handled directly; `pdftotext`, Pandoc, Tesseract, and
+`mdformat` should be command-backed adapters with explicit unavailable errors
+when the local binary is missing.
+
 The first upload endpoint stores files and creates `pending_parse` notes before
 the parser pipeline is wired in.
 

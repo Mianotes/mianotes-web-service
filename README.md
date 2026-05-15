@@ -31,10 +31,10 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 - Filesystem-first note storage
 - Markdown notes under `/data/<username>/<topic>/<note_id>.md`
 - Database-backed note comments
-- SQLite index for users, topics, notes, source files, and comments
+- SQLite index for users, topics, notes, source files, comments, tokens, and jobs
 - Repository layer designed for future PostgreSQL support
 - OpenAI ChatGPT API for Mia-powered note generation and improvement
-- Planned local parser pipeline: Poppler `pdftotext`, Pandoc, Tesseract, and `mdformat`
+- Adapter-based local parser pipeline: plain text, Poppler `pdftotext`, Pandoc, Tesseract, and `mdformat`
 
 ## Development
 
