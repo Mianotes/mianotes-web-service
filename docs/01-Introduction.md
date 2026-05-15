@@ -1,8 +1,6 @@
 # Introduction
 
-Mianotes is a local-first knowledge app that turns text, files, links, images, and audio into organised Markdown notes.
-
-It is designed for small groups such as families, home labs, classrooms, and small teams. Everyone with access to the local instance can browse the shared knowledge base, while ownership still matters for editing, archiving, and accountability.
+Mianotes is a local-first knowledge repository for humans and AI agents. It turns files, links, images, audio, and text into organised Markdown notes that agents can query, improve, and maintain through APIs and MCP, while humans collaborate through a web app.
 
 ## Use Cases
 

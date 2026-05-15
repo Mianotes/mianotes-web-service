@@ -1,4 +1,4 @@
-# Mianotes Documentation
+# Mianotes Web Services Documentation
 
 - [Introduction](introduction.md)
 - [Installation](installation.md)
