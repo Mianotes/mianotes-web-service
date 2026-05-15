@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -36,6 +38,8 @@ from mianotes_web_service.domain.schemas import (
     CommentUpdate,
     MiaJobRead,
     NoteCreateFromText,
+    NoteCreateFromUrl,
+    NoteIngestionRead,
     NoteListItem,
     NoteRead,
     NoteUpdate,
@@ -270,11 +274,22 @@ def _mia_job_response(job) -> MiaJobRead:
     )
 
 
+def _note_ingestion_response(note: Note, job, request: Request) -> NoteIngestionRead:
+    note_read = _note_response(note, request)
+    return NoteIngestionRead(**note_read.model_dump(), job=_mia_job_response(job))
+
+
+def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: str) -> None:
+    request.app.state.job_runner.enqueue(background_tasks, job_id)
+
+
 def _create_mia_note_job(
     note_id: str,
     job_type: str,
     session: SessionDep,
     user: NotesWriteUser,
+    request: Request,
+    background_tasks: BackgroundTasks,
 ) -> MiaJobRead:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
@@ -287,6 +302,8 @@ def _create_mia_note_job(
     )
     session.commit()
     session.refresh(job)
+    if job_type == "summarise":
+        _enqueue_job(request, background_tasks, job.id)
     return _mia_job_response(job)
 
 
@@ -336,9 +353,10 @@ def create_note_from_text(
     return _note_response(_read_note_or_404(session, note.id), request)
 
 
-@router.post("/from-file", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
+@router.post("/from-file", response_model=NoteIngestionRead, status_code=status.HTTP_201_CREATED)
 def create_note_from_file(
     request: Request,
+    background_tasks: BackgroundTasks,
     session: SessionDep,
     user: NotesWriteUser,
     topic_id: Annotated[str, Form()],
@@ -384,17 +402,98 @@ def create_note_from_file(
     )
     session.add(note)
     session.flush()
+    source_file = None
     if paths.source_path is not None:
-        session.add(
-            SourceFile(
-                note_id=note.id,
-                file_path=str(paths.source_path),
-                original_filename=file.filename,
-                content_type=file.content_type,
-            )
+        source_file = SourceFile(
+            note_id=note.id,
+            file_path=str(paths.source_path),
+            original_filename=file.filename,
+            content_type=file.content_type,
         )
+        session.add(source_file)
+        session.flush()
+    if source_file is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    job = create_job(
+        session,
+        user,
+        job_type="parse_file",
+        note_id=note.id,
+        input_payload={
+            "note_id": note.id,
+            "source_file_id": source_file.id,
+            "operation": "parse_file",
+        },
+    )
     session.commit()
-    return _note_response(_read_note_or_404(session, note.id), request)
+    session.refresh(job)
+    _enqueue_job(request, background_tasks, job.id)
+    return _note_ingestion_response(_read_note_or_404(session, note.id), job, request)
+
+
+@router.post("/from-url", response_model=NoteIngestionRead, status_code=status.HTTP_201_CREATED)
+def create_note_from_url(
+    payload: NoteCreateFromUrl,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> NoteIngestionRead:
+    topic = session.get(Topic, payload.topic_id)
+    if topic is None or topic.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+
+    url = str(payload.url)
+    parsed_url = urlparse(url)
+    title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
+    note_id = new_id()
+    storage = FilesystemStorage(get_settings().data_dir)
+    paths = storage.write_url_note_placeholder(
+        username=user.username,
+        topic=topic.slug,
+        title=title,
+        filename=note_id,
+        url=url,
+    )
+    if paths.source_path is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    note = Note(
+        id=note_id,
+        user_id=user.id,
+        topic_id=topic.id,
+        title=title,
+        status="pending_parse",
+        source_type="link",
+        note_path=str(paths.note_path),
+    )
+    session.add(note)
+    session.flush()
+    source_file = SourceFile(
+        note_id=note.id,
+        file_path=str(paths.source_path),
+        original_filename=url[:500],
+        content_type="text/html",
+    )
+    session.add(source_file)
+    session.flush()
+    _sync_note_tags(session, note, payload.tags)
+    job = create_job(
+        session,
+        user,
+        job_type="parse_url",
+        note_id=note.id,
+        input_payload={
+            "note_id": note.id,
+            "source_file_id": source_file.id,
+            "operation": "parse_url",
+            "url": url,
+        },
+    )
+    session.commit()
+    session.refresh(job)
+    _enqueue_job(request, background_tasks, job.id)
+    return _note_ingestion_response(_read_note_or_404(session, note.id), job, request)
 
 
 @router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -540,8 +639,14 @@ def update_note(
     response_model=MiaJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def summarise_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "summarise", session, user)
+def summarise_note(
+    note_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "summarise", session, user, request, background_tasks)
 
 
 @router.post(
@@ -549,18 +654,36 @@ def summarise_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> M
     response_model=MiaJobRead,
     status_code=status.HTTP_202_ACCEPTED,
 )
-def structure_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "structure", session, user)
+def structure_note(
+    note_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "structure", session, user, request, background_tasks)
 
 
 @router.post("/{note_id}/extract", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
-def extract_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "extract", session, user)
+def extract_note(
+    note_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "extract", session, user, request, background_tasks)
 
 
 @router.post("/{note_id}/rewrite", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
-def rewrite_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "rewrite", session, user)
+def rewrite_note(
+    note_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "rewrite", session, user, request, background_tasks)
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)

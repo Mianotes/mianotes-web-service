@@ -63,4 +63,10 @@ The MCP server lets compatible agents use Mianotes as a toolset:
 - Add comment
 - Set tags
 - Create topic
+- Create notes from URLs
 - Create Mia summarise, structure, extract, and rewrite jobs
+
+The first executable Mia operation is `summarise`. It creates a durable job,
+runs through the backend job runner, calls OpenAI when an API key is configured,
+and writes the generated Markdown back to the note. The other Mia operations are
+queued as durable stubs until their prompts and edit semantics are finalised.

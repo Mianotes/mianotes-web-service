@@ -264,7 +264,8 @@ Notes must include timestamps so they can be sorted in API responses and in the 
 The API should return `text` by reading the Markdown file from `note_path`.
 
 `status` starts as `ready` for text notes and `pending_parse` for uploaded files
-until the parser and AI pipeline has generated the final Markdown.
+or links until the parser job has generated the final Markdown. Parser jobs can
+move notes through `parsing`, `ready`, or `failed`.
 
 ### source_files
 
@@ -368,12 +369,13 @@ the only path for v1. Parsing should stay behind an internal adapter registry so
 specialist local or hosted parsers can be added later without changing the note
 API contract.
 
-The first upload endpoint stores files and creates `pending_parse` notes before
-the parser pipeline is wired in.
+Upload and URL endpoints store the source, create `pending_parse` notes, and
+queue durable parser jobs. The first parser implementation uses MarkItDown.
 
 ### Link inputs
 
-For v1, links should be fetched and converted into clean textual content when possible, then sent to OpenAI for note generation.
+For v1, links should be fetched and converted into clean textual content when
+possible. The source HTML should be preserved beside the generated note.
 
 The original idea was to convert links to PDFs and process them through LiteParse. That may be useful later for uniformity, but v1 should avoid unnecessary PDF generation if direct text extraction gives reliable results.
 
@@ -445,6 +447,11 @@ clients, and future MCP tools:
 
 Long-running Mia operations should use job/status records rather than blocking
 HTTP requests indefinitely.
+
+For the backend MVP, `summarise` is the first executable Mia operation. It
+creates a durable job, calls OpenAI when an API key is configured, writes the
+generated Markdown back to the note, and increments the note revision. Other Mia
+operations can remain queued stubs until their prompt contracts are finalised.
 
 ## Title generation
 
@@ -555,7 +562,7 @@ Note creation should support multiple input types, either via one endpoint with 
 Candidate specialised endpoints:
 
 - `POST /api/notes/from-file`
-- `POST /api/notes/from-link`
+- `POST /api/notes/from-url`
 - `POST /api/notes/from-text`
 - `POST /api/notes/from-audio`
 

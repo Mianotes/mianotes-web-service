@@ -111,6 +111,28 @@ class FilesystemStorage:
                 shutil.copyfileobj(source_stream, destination)
         return paths
 
+    def write_url_note_placeholder(
+        self,
+        *,
+        username: str,
+        topic: str,
+        title: str,
+        filename: str,
+        url: str,
+    ) -> NotePaths:
+        paths = self.note_paths(
+            username=username,
+            topic=topic,
+            filename=filename,
+            source_extension=".source.html",
+        )
+        paths.directory.mkdir(parents=True, exist_ok=True)
+        paths.note_path.write_text(
+            render_pending_url_note(title=title, url=url),
+            encoding="utf-8",
+        )
+        return paths
+
 
 def infer_title(text: str, fallback: str = "Untitled Note") -> str:
     compact = " ".join(text.strip().split())
@@ -134,6 +156,19 @@ def render_pending_upload_note(title: str, original_filename: str) -> str:
         f"{original_filename}\n\n"
         "## Note\n\n"
         "This uploaded file has been stored and is waiting for the parsing pipeline.\n"
+    )
+
+
+def render_pending_url_note(title: str, url: str) -> str:
+    created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        f"# {title}\n\n"
+        f"Created: {created_at}\n\n"
+        "Status: Pending parsing\n\n"
+        "## Source\n\n"
+        f"{url}\n\n"
+        "## Note\n\n"
+        "This link has been queued and is waiting for the parsing pipeline.\n"
     )
 
 

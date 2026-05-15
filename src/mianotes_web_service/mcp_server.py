@@ -71,6 +71,20 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         },
     },
     {
+        "name": "create_note_from_url",
+        "description": "Create a Mianotes note from a URL and queue parsing.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["topic_id", "url"],
+            "properties": {
+                "topic_id": {"type": "string"},
+                "url": {"type": "string"},
+                "title": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
         "name": "update_note",
         "description": "Update a Mianotes note title, text, published state, or tags.",
         "inputSchema": {
@@ -212,6 +226,13 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
             if key in arguments
         }
         return _request("POST", "/api/notes/from-text", body=body)
+    if name == "create_note_from_url":
+        body = {
+            key: arguments[key]
+            for key in ("topic_id", "url", "title", "tags")
+            if key in arguments
+        }
+        return _request("POST", "/api/notes/from-url", body=body)
     if name == "update_note":
         note_id = arguments["note_id"]
         body = {

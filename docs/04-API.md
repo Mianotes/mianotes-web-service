@@ -132,7 +132,7 @@ The API currently uses FastAPI error responses.
 | `user_id` | string | ID of the user who created the note. |
 | `topic_id` | string | ID of the topic containing the note. |
 | `title` | string | Note title. |
-| `status` | string | Note status. Current values include `ready` and `pending_parse`. |
+| `status` | string | Note status. Current values include `ready`, `pending_parse`, `parsing`, and `failed`. |
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
@@ -1138,8 +1138,10 @@ Returns a full `Note`.
 
 ## Create note from file
 
-Uploads a source file and creates a `pending_parse` note. The parser pipeline is
-not wired into note generation yet.
+Uploads a source file, creates a `pending_parse` note, stores the original
+source file, and queues a background `parse_file` job. The job uses MarkItDown
+to convert the source file into Markdown and updates the note when parsing
+succeeds.
 
 ### Endpoint
 
@@ -1182,7 +1184,43 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 ### Response
 
-Returns a full `Note` with `status` set to `pending_parse`.
+Returns a full `Note` with `status` set to `pending_parse`, plus the queued
+parse `Job`.
+
+```json
+{
+  "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "title": "Receipt",
+  "status": "pending_parse",
+  "source_type": "pdf",
+  "text": "# Receipt\n\nCreated: 2026-05-15T10:35:00Z\n\nStatus: Pending parsing...",
+  "source_files": [
+    {
+      "id": "83c3b0d9-49a4-49cb-99b0-b20a553ef4bb",
+      "file_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/uploads/4a95f146-9d27-4c79-b7d8-34739aef8998.source.pdf",
+      "original_filename": "receipt.pdf",
+      "content_type": "application/pdf",
+      "url": "http://127.0.0.1:8200/data/u_2d9f6b1a/uploads/4a95f146-9d27-4c79-b7d8-34739aef8998.source.pdf"
+    }
+  ],
+  "job": {
+    "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
+    "job_type": "parse_file",
+    "status": "queued",
+    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+    "input": {
+      "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+      "source_file_id": "83c3b0d9-49a4-49cb-99b0-b20a553ef4bb",
+      "operation": "parse_file"
+    },
+    "result": {},
+    "error": null
+  }
+}
+```
+
+The response also includes the normal `Note` fields documented earlier in this
+file.
 
 ### Error responses
 
@@ -1193,6 +1231,85 @@ Returns a full `Note` with `status` set to `pending_parse`.
 | `404` | Topic does not exist or is archived. |
 | `415` | Unsupported file type. |
 | `422` | File or form field validation failed. |
+
+## Create note from URL
+
+Creates a `pending_parse` note from a URL and queues a background `parse_url`
+job. The job downloads the HTML using a browser-like user agent, stores the HTML
+source file beside the note, passes it to MarkItDown, and updates the note when
+parsing succeeds.
+
+### Endpoint
+
+`POST /api/notes/from-url`
+
+### Authentication
+
+Session cookie or bearer token with `notes:write` or `admin`.
+
+### Request
+
+```json
+{
+  "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "url": "https://example.com/articles/mianotes",
+  "title": "Mianotes article",
+  "tags": ["research", "links"]
+}
+```
+
+### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `topic_id` | string | Yes | Topic ID for the note. |
+| `url` | string | Yes | URL to fetch and convert. |
+| `title` | string \| null | No | Optional note title. If omitted, the API infers one from the URL path or host. |
+| `tags` | string[] | No | Tags to attach. Maximum 5 tags per note. |
+
+### Response
+
+Returns a full `Note` with `status` set to `pending_parse`, plus the queued
+`parse_url` job.
+
+```json
+{
+  "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "title": "Mianotes article",
+  "status": "pending_parse",
+  "source_type": "link",
+  "source_files": [
+    {
+      "id": "83c3b0d9-49a4-49cb-99b0-b20a553ef4bb",
+      "original_filename": "https://example.com/articles/mianotes",
+      "content_type": "text/html"
+    }
+  ],
+  "job": {
+    "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
+    "job_type": "parse_url",
+    "status": "queued",
+    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+    "input": {
+      "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+      "source_file_id": "83c3b0d9-49a4-49cb-99b0-b20a553ef4bb",
+      "operation": "parse_url",
+      "url": "https://example.com/articles/mianotes"
+    },
+    "result": {},
+    "error": null
+  }
+}
+```
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Token lacks `notes:write`. |
+| `404` | Topic does not exist or is archived. |
+| `422` | Request validation failed, including an invalid URL or more than 5 tags. |
 
 ## List notes
 
@@ -1336,7 +1453,10 @@ Admins can delete any note. Normal users can delete only notes they created.
 
 ## Create Mia note job
 
-Creates a queued Mia job for a note. These endpoints do not call OpenAI yet.
+Creates a Mia job for a note. `summarise` is executed by the background job
+runner and calls OpenAI when an API key is configured. `structure`, `extract`,
+and `rewrite` currently create durable queued jobs and will be wired to concrete
+Mia operations later.
 
 ### Endpoints
 
@@ -1393,6 +1513,10 @@ Returns a `Job`.
   "finished_at": null
 }
 ```
+
+Poll `GET /api/jobs/{job_id}` to watch the job move through `queued`,
+`running`, `succeeded`, or `failed`. When `summarise` succeeds, the backend
+writes the generated Markdown back to the note and increments the note revision.
 
 ### Error responses
 

@@ -10,6 +10,7 @@ def test_mcp_initialize_and_tool_list():
     assert listed is not None
     tool_names = {tool["name"] for tool in listed["result"]["tools"]}
     assert "search_notes" in tool_names
+    assert "create_note_from_url" in tool_names
     assert "summarise_note" in tool_names
     assert "rewrite_note" in tool_names
 

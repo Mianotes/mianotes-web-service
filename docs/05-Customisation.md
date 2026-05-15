@@ -55,6 +55,10 @@ Mia should start with OpenAI for v1. The agent layer should still be isolated
 behind a service boundary so a future install can choose different providers or
 local models for specific tasks.
 
+Set `MIANOTES_OPENAI_API_KEY` or `OPENAI_API_KEY` to enable Mia jobs that call
+OpenAI. `MIANOTES_OPENAI_MODEL` defaults to `gpt-4o-mini`; `OPENAI_MODEL` is
+also supported for local developer convenience.
+
 ## Agent access
 
 Agent credentials should be scoped and revocable. They should not use the

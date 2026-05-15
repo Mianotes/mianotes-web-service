@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, HttpUrl
 
 MAX_TAGS_PER_NOTE = 5
 
@@ -56,6 +56,13 @@ class NoteCreateFromText(BaseModel):
     user_id: str | None = None
     topic_id: str
     text: str = Field(min_length=1)
+    title: str | None = Field(default=None, max_length=300)
+    tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
+
+
+class NoteCreateFromUrl(BaseModel):
+    topic_id: str
+    url: HttpUrl
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
@@ -220,3 +227,7 @@ class MiaJobRead(BaseModel):
     updated_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
+
+
+class NoteIngestionRead(NoteRead):
+    job: MiaJobRead

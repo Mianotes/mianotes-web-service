@@ -62,6 +62,9 @@ mianotes-web-service init-db
 mianotes-web-service --reload
 ```
 
+Set `MIANOTES_OPENAI_API_KEY` or `OPENAI_API_KEY` to enable Mia operations that
+call OpenAI. `MIANOTES_OPENAI_MODEL` defaults to `gpt-4o-mini`.
+
 The API health endpoint is available at:
 
 ```text
@@ -110,6 +113,7 @@ DELETE /api/topics/{topic_id}  session or topics:write token required
 POST   /api/notes              session or notes:write token required
 POST   /api/notes/from-text    session or notes:write token required
 POST   /api/notes/from-file    session or notes:write token required
+POST   /api/notes/from-url     session or notes:write token required
 GET    /api/notes              session or notes:read token required
 GET    /api/notes/{note_id}    session or notes:read token required
 PATCH  /api/notes/{note_id}    session or notes:write token required
@@ -129,6 +133,8 @@ GET    /api/search?q=term        session or notes:read token required
 ```
 
 `PUT /api/notes/{note_id}/tags` replaces the note's full tag list. Notes can have up to 5 tags.
+`POST /api/notes/from-file` and `POST /api/notes/from-url` return a note plus a queued parse job.
+`POST /api/notes/{note_id}/summarise` creates a background OpenAI summarise job when an API key is configured.
 `GET /api/search` uses ripgrep to search saved Markdown files and returns note metadata with each match.
 
 FastAPI exposes interactive local API docs at:

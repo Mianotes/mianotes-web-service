@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     port: int = 8200
     data_dir: Path = Field(default=Path("data"))
     database_url: str = "sqlite:///mianotes.db"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(
         env_file=".env",

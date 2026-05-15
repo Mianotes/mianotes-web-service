@@ -168,6 +168,9 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["title"] == "Receipt"
     assert note["status"] == "pending_parse"
     assert note["source_type"] == "pdf"
+    assert note["job"]["job_type"] == "parse_file"
+    assert note["job"]["status"] == "queued"
+    assert note["job"]["note_id"] == note["id"]
     assert "waiting for the parsing pipeline" in note["text"]
     assert note["note_url"].endswith(f"/data/43916aabf99c29b8/uploads/{note['id']}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
@@ -181,6 +184,52 @@ def test_create_note_from_file_stores_source_and_pending_note(
     )
     assert note_path.read_text(encoding="utf-8").startswith("# Receipt")
     assert source_path.read_bytes() == b"%PDF-1.4 test content"
+
+
+def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Path):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "url@example.com",
+            "name": "URL User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    topic = client.post("/api/topics", json={"name": "Links"}).json()
+
+    response = client.post(
+        "/api/notes/from-url",
+        json={
+            "topic_id": topic["id"],
+            "url": "https://example.com/articles/mianotes",
+            "tags": ["research"],
+        },
+    )
+
+    assert response.status_code == 201
+    note = response.json()
+    assert note["user"]["id"] == user["id"]
+    assert note["topic"]["id"] == topic["id"]
+    assert note["title"] == "mianotes"
+    assert note["status"] == "pending_parse"
+    assert note["source_type"] == "link"
+    assert note["job"]["job_type"] == "parse_url"
+    assert note["job"]["status"] == "queued"
+    assert note["job"]["input"]["url"] == "https://example.com/articles/mianotes"
+    assert [tag["slug"] for tag in note["tags"]] == ["research"]
+    assert "waiting for the parsing pipeline" in note["text"]
+
+    note_path = tmp_path / "data" / "09592df946423e42" / "links" / f"{note['id']}.md"
+    source_path = (
+        tmp_path / "data" / "09592df946423e42" / "links" / f"{note['id']}.source.html"
+    )
+    assert note_path.read_text(encoding="utf-8").startswith("# mianotes")
+    assert note["source_files"][0]["original_filename"] == "https://example.com/articles/mianotes"
+    assert note["source_files"][0]["url"].endswith(
+        f"/data/09592df946423e42/links/{note['id']}.source.html"
+    )
+    assert not source_path.exists()
 
 
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
