@@ -72,15 +72,17 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["user"]["id"] == user["id"]
     assert note["topic"]["id"] == topic["id"]
     assert note["status"] == "ready"
+    assert note["source_type"] == "text"
+    assert note["revision_number"] == 1
+    assert note["is_published"] is False
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
     assert note["note_url"].endswith(f"/data/926c16eeec762774/meeting-notes/{note['id']}.md")
     assert note["source_files"][0]["url"].endswith(
         f"/data/926c16eeec762774/meeting-notes/{note['id']}.source.txt"
     )
-    assert note["comments_url"].endswith(
-        f"/data/926c16eeec762774/meeting-notes/{note['id']}.comments.json"
-    )
+    assert note["comments_count"] == 0
+    assert note["comments_url"].endswith(f"/api/notes/{note['id']}/comments")
 
     note_path = tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / f"{note['id']}.md"
     source_path = (
@@ -90,24 +92,24 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
         / "meeting-notes"
         / f"{note['id']}.source.txt"
     )
-    comments_path = (
-        tmp_path
-        / "data"
-        / "926c16eeec762774"
-        / "meeting-notes"
-        / f"{note['id']}.comments.json"
-    )
     assert note_path.read_text(encoding="utf-8").startswith("# Kickoff Notes")
     assert (
         source_path.read_text(encoding="utf-8")
         == "We agreed to build Mianotes with Markdown notes."
     )
-    assert comments_path.read_text(encoding="utf-8") == '{\n  "comments": []\n}\n'
+    assert not (
+        tmp_path
+        / "data"
+        / "926c16eeec762774"
+        / "meeting-notes"
+        / f"{note['id']}.comments.json"
+    ).exists()
 
     listed = client.get("/api/notes", params={"topic_id": topic["id"]})
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == note["id"]
     assert listed.json()[0]["status"] == "ready"
+    assert listed.json()[0]["source_type"] == "text"
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
@@ -165,6 +167,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["topic"]["id"] == topic["id"]
     assert note["title"] == "Receipt"
     assert note["status"] == "pending_parse"
+    assert note["source_type"] == "pdf"
     assert "waiting for the parsing pipeline" in note["text"]
     assert note["note_url"].endswith(f"/data/43916aabf99c29b8/uploads/{note['id']}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
@@ -242,3 +245,65 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
     assert deleted.status_code == 204
     missing = client.get(f"/api/notes/{maria_note_body['id']}")
     assert missing.status_code == 404
+
+
+def test_note_tags_comments_and_share_link(client: TestClient):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "share@example.com",
+            "name": "Share User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    topic = client.post("/api/topics", json={"name": "Collaboration"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "topic_id": topic["id"],
+            "title": "Shared Research",
+            "text": "Useful research note.",
+            "tags": ["Research", "summer-2026"],
+        },
+    ).json()
+
+    assert {tag["slug"] for tag in note["tags"]} == {"research", "summer-2026"}
+    listed_tags = client.get("/api/tags")
+    assert listed_tags.status_code == 200
+    assert {tag["slug"] for tag in listed_tags.json()} == {"research", "summer-2026"}
+
+    updated = client.put(
+        f"/api/notes/{note['id']}/tags",
+        json={"tags": ["research-edge-ai"]},
+    )
+    assert updated.status_code == 200
+    assert [tag["slug"] for tag in updated.json()["tags"]] == ["research-edge-ai"]
+
+    comment = client.post(
+        f"/api/notes/{note['id']}/comments",
+        json={"body": "This is useful for the next call."},
+    )
+    assert comment.status_code == 201
+    comment_body = comment.json()
+    assert comment_body["body"] == "This is useful for the next call."
+    assert comment_body["user"]["id"] == user["id"]
+
+    comments = client.get(f"/api/notes/{note['id']}/comments")
+    assert comments.status_code == 200
+    assert [item["body"] for item in comments.json()] == ["This is useful for the next call."]
+
+    shared = client.post(f"/api/notes/{note['id']}/share")
+    assert shared.status_code == 200
+    share_url = shared.json()["share_url"]
+    assert "/api/notes/shared/" in share_url
+
+    guest_note = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
+    assert guest_note.status_code == 200
+    assert guest_note.json()["id"] == note["id"]
+    assert guest_note.json()["share_url"] == share_url
+
+    disabled = client.delete(f"/api/notes/{note['id']}/share")
+    assert disabled.status_code == 204
+    guest_missing = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
+    assert guest_missing.status_code == 404

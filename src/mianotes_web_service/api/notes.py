@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -14,18 +15,28 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import CurrentUser
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Topic, new_id
+from mianotes_web_service.db.models import Comment, Note, SourceFile, Tag, Topic, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
+    CommentCreate,
+    CommentRead,
+    CommentUpdate,
     NoteCreateFromText,
     NoteListItem,
     NoteRead,
     NoteUpdate,
+    TagsUpdate,
+)
+from mianotes_web_service.services.share import (
+    generate_share_token,
+    get_share_secret,
+    hash_share_token,
 )
 from mianotes_web_service.services.storage import (
     FilesystemStorage,
@@ -55,13 +66,37 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".tiff",
     ".txt",
 }
+SOURCE_TYPE_BY_EXTENSION = {
+    ".csv": "spreadsheet",
+    ".doc": "document",
+    ".docx": "document",
+    ".htm": "html",
+    ".html": "html",
+    ".jpeg": "image",
+    ".jpg": "image",
+    ".md": "markdown",
+    ".markdown": "markdown",
+    ".odt": "document",
+    ".pdf": "pdf",
+    ".png": "image",
+    ".rtf": "document",
+    ".tif": "image",
+    ".tiff": "image",
+    ".txt": "text",
+}
 
 
 def _read_note_or_404(session: Session, note_id: str) -> Note:
     statement = (
         select(Note)
         .where(Note.id == note_id)
-        .options(joinedload(Note.user), joinedload(Note.topic), joinedload(Note.source_files))
+        .options(
+            joinedload(Note.user),
+            joinedload(Note.topic),
+            joinedload(Note.source_files),
+            joinedload(Note.comments).joinedload(Comment.user),
+            joinedload(Note.tags),
+        )
     )
     note = session.scalars(statement).unique().one_or_none()
     if note is None:
@@ -79,7 +114,15 @@ def _file_url(request: Request, path: str | Path) -> str:
     return str(request.url_for("get_data_file", file_path=str(public_path)))
 
 
-def _note_response(note: Note, request: Request) -> NoteRead:
+def _share_url(request: Request, note: Note, token: str | None = None) -> str | None:
+    if token:
+        return str(request.url_for("get_shared_note", token=token))
+    if note.shared_at is not None:
+        return str(request.url_for("get_shared_note", token="<share-token>"))
+    return None
+
+
+def _note_response(note: Note, request: Request, share_token: str | None = None) -> NoteRead:
     text = Path(note.note_path).read_text(encoding="utf-8")
     source_files = [
         {
@@ -87,13 +130,20 @@ def _note_response(note: Note, request: Request) -> NoteRead:
             "file_path": source_file.file_path,
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
-            "url": _file_url(request, source_file.file_path),
+            "url": (
+                str(
+                    request.url_for(
+                        "get_shared_source_file",
+                        token=share_token,
+                        source_file_id=source_file.id,
+                    )
+                )
+                if share_token
+                else _file_url(request, source_file.file_path)
+            ),
         }
         for source_file in note.source_files
     ]
-    comments_path = ""
-    if note.comments:
-        comments_path = note.comments[0].comments_path
     return NoteRead(
         id=note.id,
         user=note.user,
@@ -102,10 +152,18 @@ def _note_response(note: Note, request: Request) -> NoteRead:
         updated_at=note.updated_at,
         title=note.title,
         status=note.status,
+        source_type=note.source_type,
+        revision_number=note.revision_number,
+        is_published=note.is_published,
+        published_at=note.published_at,
+        shared_at=note.shared_at,
         text=text,
         note_url=_file_url(request, note.note_path),
         source_files=source_files,
-        comments_url=_file_url(request, comments_path) if comments_path else "",
+        comments_count=len([comment for comment in note.comments if comment.body]),
+        comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
+        tags=note.tags,
+        share_url=_share_url(request, note, share_token),
         actions={
             "self": {"method": "GET", "url": str(request.url_for("get_note", note_id=note.id))},
             "update": {"method": "PATCH", "url": str(request.url_for("get_note", note_id=note.id))},
@@ -119,6 +177,52 @@ def _note_response(note: Note, request: Request) -> NoteRead:
             },
         },
     )
+
+
+def _source_type_from_filename(filename: str) -> str:
+    return SOURCE_TYPE_BY_EXTENSION.get(Path(filename).suffix.lower(), "file")
+
+
+def _sync_note_tags(session: Session, note: Note, tag_names: list[str]) -> None:
+    tags: list[Tag] = []
+    seen: set[str] = set()
+    for name in tag_names:
+        normalized = " ".join(name.strip().split())
+        if not normalized:
+            continue
+        slug = slugify(normalized)
+        if slug in seen:
+            continue
+        seen.add(slug)
+        tag = session.scalars(select(Tag).where(Tag.slug == slug)).one_or_none()
+        if tag is None:
+            tag = Tag(name=normalized, slug=slug)
+            session.add(tag)
+            session.flush()
+        tags.append(tag)
+    note.tags = tags
+
+
+def _read_note_by_share_token(session: Session, token: str) -> Note:
+    secret = get_share_secret(session)
+    if secret is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared note not found")
+    token_hash = hash_share_token(secret, token)
+    statement = (
+        select(Note)
+        .where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
+        .options(
+            joinedload(Note.user),
+            joinedload(Note.topic),
+            joinedload(Note.source_files),
+            joinedload(Note.comments).joinedload(Comment.user),
+            joinedload(Note.tags),
+        )
+    )
+    note = session.scalars(statement).unique().one_or_none()
+    if note is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared note not found")
+    return note
 
 
 def _ensure_can_change_note(note: Note, user: CurrentUser) -> None:
@@ -157,6 +261,7 @@ def create_note_from_text(
         user_id=user.id,
         topic_id=topic.id,
         title=title,
+        source_type="text",
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -170,7 +275,7 @@ def create_note_from_text(
                 content_type="text/plain",
             )
         )
-    session.add(Comment(note_id=note.id, comments_path=str(paths.comments_path)))
+    _sync_note_tags(session, note, payload.tags)
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
 
@@ -218,6 +323,7 @@ def create_note_from_file(
         topic_id=topic.id,
         title=note_title,
         status="pending_parse",
+        source_type=_source_type_from_filename(file.filename),
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -231,7 +337,6 @@ def create_note_from_file(
                 content_type=file.content_type,
             )
         )
-    session.add(Comment(note_id=note.id, comments_path=str(paths.comments_path)))
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
 
@@ -261,6 +366,31 @@ def list_notes(
     return list(session.scalars(statement))
 
 
+@router.get("/shared/{token}", response_model=NoteRead, name="get_shared_note")
+def get_shared_note(token: str, session: SessionDep, request: Request) -> NoteRead:
+    note = _read_note_by_share_token(session, token)
+    return _note_response(note, request, share_token=token)
+
+
+@router.get("/shared/{token}/files/{source_file_id}", name="get_shared_source_file")
+def get_shared_source_file(
+    token: str,
+    source_file_id: str,
+    session: SessionDep,
+) -> FileResponse:
+    note = _read_note_by_share_token(session, token)
+    source_file = next(
+        (candidate for candidate in note.source_files if candidate.id == source_file_id),
+        None,
+    )
+    if source_file is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    target = Path(source_file.file_path)
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(target)
+
+
 @router.get("/{note_id}", response_model=NoteRead)
 def get_note(
     note_id: str,
@@ -269,6 +399,49 @@ def get_note(
     user: CurrentUser,
 ) -> NoteRead:
     return _note_response(_read_note_or_404(session, note_id), request)
+
+
+@router.post("/{note_id}/share")
+def create_note_share(
+    note_id: str,
+    session: SessionDep,
+    request: Request,
+    user: CurrentUser,
+) -> dict[str, str]:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    secret = get_share_secret(session, create=True)
+    if secret is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    token = generate_share_token()
+    note.share_token_hash = hash_share_token(secret, token)
+    note.shared_at = datetime.now(UTC)
+    session.commit()
+    return {"share_url": str(request.url_for("get_shared_note", token=token))}
+
+
+@router.delete("/{note_id}/share", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note_share(note_id: str, session: SessionDep, user: CurrentUser) -> None:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    note.share_token_hash = None
+    note.shared_at = None
+    session.commit()
+
+
+@router.put("/{note_id}/tags", response_model=NoteRead)
+def update_note_tags(
+    note_id: str,
+    payload: TagsUpdate,
+    session: SessionDep,
+    request: Request,
+    user: CurrentUser,
+) -> NoteRead:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    _sync_note_tags(session, note, payload.tags)
+    session.commit()
+    return _note_response(_read_note_or_404(session, note.id), request)
 
 
 @router.patch("/{note_id}", response_model=NoteRead)
@@ -289,12 +462,19 @@ def update_note(
             render_markdown_note(title=next_title, text=payload.text),
             encoding="utf-8",
         )
+        note.revision_number += 1
     elif payload.title is not None:
         note_path.write_text(
             replace_markdown_title(note_path.read_text(encoding="utf-8"), next_title),
             encoding="utf-8",
         )
+        note.revision_number += 1
     note.title = next_title
+    if payload.is_published is not None:
+        note.is_published = payload.is_published
+        note.published_at = datetime.now(UTC) if payload.is_published else None
+    if payload.tags is not None:
+        _sync_note_tags(session, note, payload.tags)
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
 
@@ -305,7 +485,7 @@ def delete_note(note_id: str, session: SessionDep, user: CurrentUser) -> None:
     _ensure_can_change_note(note, user)
     paths = [Path(note.note_path)]
     paths.extend(Path(source.file_path) for source in note.source_files)
-    paths.extend(Path(comment.comments_path) for comment in note.comments)
+    paths.extend(Path(comment.comments_path) for comment in note.comments if comment.comments_path)
     session.delete(note)
     session.commit()
     for path in paths:
@@ -317,8 +497,68 @@ def get_note_comments(
     note_id: str,
     session: SessionDep,
     user: CurrentUser,
-) -> dict[str, object]:
+) -> list[CommentRead]:
     note = _read_note_or_404(session, note_id)
-    if not note.comments:
-        return {"comments": []}
-    return {"comments_path": note.comments[0].comments_path}
+    return [
+        CommentRead.model_validate(comment)
+        for comment in sorted(note.comments, key=lambda item: item.created_at)
+        if comment.body
+    ]
+
+
+@router.post("/{note_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
+def create_note_comment(
+    note_id: str,
+    payload: CommentCreate,
+    session: SessionDep,
+    user: CurrentUser,
+) -> Comment:
+    note = _read_note_or_404(session, note_id)
+    comment = Comment(note_id=note.id, user_id=user.id, body=payload.body, comments_path="")
+    session.add(comment)
+    session.commit()
+    session.refresh(comment)
+    return comment
+
+
+@router.patch("/{note_id}/comments/{comment_id}", response_model=CommentRead)
+def update_note_comment(
+    note_id: str,
+    comment_id: str,
+    payload: CommentUpdate,
+    session: SessionDep,
+    user: CurrentUser,
+) -> Comment:
+    _read_note_or_404(session, note_id)
+    comment = session.get(Comment, comment_id)
+    if comment is None or comment.note_id != note_id or not comment.body:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    if not user.is_admin and comment.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change this comment",
+        )
+    comment.body = payload.body
+    session.commit()
+    session.refresh(comment)
+    return comment
+
+
+@router.delete("/{note_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_note_comment(
+    note_id: str,
+    comment_id: str,
+    session: SessionDep,
+    user: CurrentUser,
+) -> None:
+    _read_note_or_404(session, note_id)
+    comment = session.get(Comment, comment_id)
+    if comment is None or comment.note_id != note_id or not comment.body:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+    if not user.is_admin and comment.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change this comment",
+        )
+    session.delete(comment)
+    session.commit()

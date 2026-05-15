@@ -90,8 +90,8 @@ Sessions are long-lived, browser-friendly, HTTP-only cookies.
 - The first user is an admin.
 - Admin users can view, edit, remove, or archive any note or topic.
 - Normal users can view all notes and topics.
-- Normal users can create topics.
-- Normal users can archive topics they created.
+- Normal users can create household-visible topics.
+- Normal users can archive only topics they created.
 - Normal users can create notes in any non-archived topic.
 - Normal users can edit and remove only notes they created.
 
@@ -117,7 +117,6 @@ Primary content storage:
 
 - Markdown files for generated notes
 - Original source files for uploads
-- JSON sidecar files for note comments
 
 Index storage:
 
@@ -136,12 +135,6 @@ Source files are stored in the same folder using the same note ID and their orig
 
 ```text
 /data/<username>/<topic>/<note_id>.source.<original-extension>
-```
-
-Comments are stored as JSON metadata sidecars:
-
-```text
-/data/<username>/<topic>/<note_id>.comments.json
 ```
 
 Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames. Using `note_id` as the filename keeps paths stable even when the user edits the note title.
@@ -198,7 +191,9 @@ Fields:
 - created_at
 - updated_at
 
-Topics belong to users. One note belongs to exactly one topic.
+Topics are visible to the household. `user_id` records who created the topic and
+who is allowed to archive it alongside admins. One note belongs to exactly one
+topic.
 
 ### notes
 
@@ -216,6 +211,12 @@ Fields:
 - topic_id
 - title
 - status
+- source_type
+- revision_number
+- is_published
+- published_at
+- share_token_hash
+- shared_at
 - note_path
 - created_at
 - updated_at
@@ -249,17 +250,38 @@ Source files belong to notes. The API response for a note should include source 
 
 ### comments
 
-Comments are metadata for a note and are stored as JSON files on disk.
+Comments are metadata for a note and are stored in SQLite.
 
 Database fields:
 
 - id
 - note_id
-- comments_path
+- user_id
+- body
 - created_at
 - updated_at
 
-The JSON sidecar file contains the actual comment data.
+### tags
+
+Tags are global to the household instance and can be attached to many notes.
+
+Fields:
+
+- id
+- name
+- slug
+- created_at
+- updated_at
+
+### note_tags
+
+Many-to-many relationship table between notes and tags.
+
+Fields:
+
+- note_id
+- tag_id
+- created_at
 
 ## Content Ingestion
 
@@ -320,9 +342,8 @@ Every note creation flow follows this high-level pipeline:
 5. Generate a Markdown note.
 6. Generate or infer a note title.
 7. Save the Markdown file under `/data/<username>/<topic>/<note_id>.md`.
-8. Save comments sidecar as `/data/<username>/<topic>/<note_id>.comments.json`.
-9. Insert database records for the note and source file.
-10. Return a JSON representation of the note.
+8. Insert database records for the note, tags, comments, and source file.
+9. Return a JSON representation of the note.
 
 ## AI Requirements
 
@@ -375,11 +396,17 @@ Every returned note should include:
 - Created timestamp
 - Updated timestamp
 - Title
+- Status
+- Source type
+- Revision number
+- Published state
 - Markdown text
 - Full URL to the Markdown file
 - Source file metadata
 - Full URL to source files
 - Comments metadata
+- Tags
+- Share URL when enabled
 - API action metadata showing URLs and methods available for the note
 
 ### API Action Metadata
@@ -428,6 +455,11 @@ Example shape:
 - `GET /api/notes/{note_id}`
 - `PATCH /api/notes/{note_id}`
 - `DELETE /api/notes/{note_id}`
+- `PUT /api/notes/{note_id}/tags`
+- `POST /api/notes/{note_id}/share`
+- `DELETE /api/notes/{note_id}/share`
+- `GET /api/notes/shared/{token}`
+- `GET /api/notes/shared/{token}/files/{source_file_id}`
 
 Note creation should support multiple input types, either via one endpoint with an `input_type` field or separate endpoints.
 
@@ -450,7 +482,11 @@ Candidate specialised endpoints:
 - `PATCH /api/notes/{note_id}/comments/{comment_id}`
 - `DELETE /api/notes/{note_id}/comments/{comment_id}`
 
-Comment endpoints read and write the note sidecar JSON file.
+Comment endpoints read and write SQLite records.
+
+### Tags
+
+- `GET /api/tags`
 
 ## Web App API Access
 

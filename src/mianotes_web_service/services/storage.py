@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import shutil
 from dataclasses import dataclass
@@ -82,10 +81,6 @@ class FilesystemStorage:
         paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")
         if paths.source_path is not None:
             paths.source_path.write_text(text, encoding="utf-8")
-        paths.comments_path.write_text(
-            json.dumps({"comments": []}, indent=2) + "\n",
-            encoding="utf-8",
-        )
         return paths
 
     def write_uploaded_file_note(
@@ -114,10 +109,6 @@ class FilesystemStorage:
         if paths.source_path is not None:
             with paths.source_path.open("wb") as destination:
                 shutil.copyfileobj(source_stream, destination)
-        paths.comments_path.write_text(
-            json.dumps({"comments": []}, indent=2) + "\n",
-            encoding="utf-8",
-        )
         return paths
 
 

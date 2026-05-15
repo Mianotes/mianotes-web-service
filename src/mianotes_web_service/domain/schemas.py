@@ -54,11 +54,47 @@ class NoteCreateFromText(BaseModel):
     topic_id: str
     text: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=300)
+    tags: list[str] = Field(default_factory=list)
 
 
 class NoteUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     text: str | None = Field(default=None, min_length=1)
+    is_published: bool | None = None
+    tags: list[str] | None = None
+
+
+class TagRead(BaseModel):
+    id: str
+    name: str
+    slug: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TagsUpdate(BaseModel):
+    tags: list[str] = Field(default_factory=list)
+
+
+class CommentCreate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class CommentUpdate(BaseModel):
+    body: str = Field(min_length=1)
+
+
+class CommentRead(BaseModel):
+    id: str
+    note_id: str
+    user: UserRead | None = None
+    body: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class ApiAction(BaseModel):
@@ -74,10 +110,18 @@ class NoteRead(BaseModel):
     updated_at: datetime
     title: str
     status: str
+    source_type: str
+    revision_number: int
+    is_published: bool
+    published_at: datetime | None = None
+    shared_at: datetime | None = None
     text: str
     note_url: str
     source_files: list[dict[str, object]]
+    comments_count: int
     comments_url: str
+    tags: list[TagRead]
+    share_url: str | None = None
     actions: dict[str, ApiAction]
 
     model_config = {"from_attributes": True}
@@ -89,6 +133,9 @@ class NoteListItem(BaseModel):
     topic_id: str
     title: str
     status: str
+    source_type: str
+    revision_number: int
+    is_published: bool
     note_path: str
     created_at: datetime
     updated_at: datetime

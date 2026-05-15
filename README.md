@@ -6,7 +6,8 @@ The service stores note content on the filesystem, keeps lightweight indexes in 
 
 ## Current Status
 
-This repository is in early implementation. See [PRD.md](PRD.md) for the current requirements and technical direction.
+This repository is in early implementation. See [PRD.md](PRD.md) and
+[docs/](docs/README.md) for the current requirements and technical direction.
 
 ## Stack
 
@@ -24,7 +25,7 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 
 - Filesystem-first note storage
 - Markdown notes under `/data/<username>/<topic>/<note_id>.md`
-- JSON sidecar files for note comments
+- Database-backed note comments
 - SQLite index for users, topics, notes, source files, and comments
 - Repository layer designed for future PostgreSQL support
 - OpenAI ChatGPT API for v1 note generation
@@ -78,6 +79,12 @@ GET    /api/notes/{note_id}    session required
 PATCH  /api/notes/{note_id}
 DELETE /api/notes/{note_id}
 GET    /api/notes/{note_id}/comments  session required
+POST   /api/notes/{note_id}/comments  session required
+PUT    /api/notes/{note_id}/tags      session required
+POST   /api/notes/{note_id}/share     owner/admin session required
+GET    /api/notes/shared/{token}      guest read access
+
+GET    /api/tags                 session required
 ```
 
 FastAPI exposes interactive local API docs at:
