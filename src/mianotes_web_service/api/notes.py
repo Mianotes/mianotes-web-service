@@ -34,12 +34,14 @@ from mianotes_web_service.domain.schemas import (
     CommentCreate,
     CommentRead,
     CommentUpdate,
+    MiaJobRead,
     NoteCreateFromText,
     NoteListItem,
     NoteRead,
     NoteUpdate,
     TagsUpdate,
 )
+from mianotes_web_service.services.jobs import create_job, decode_job_payload
 from mianotes_web_service.services.share import (
     generate_share_token,
     get_share_secret,
@@ -249,6 +251,43 @@ def _ensure_can_change_note(note: Note, user: User) -> None:
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Cannot change this note",
     )
+
+
+def _mia_job_response(job) -> MiaJobRead:
+    return MiaJobRead(
+        id=job.id,
+        user=job.user,
+        note_id=job.note_id,
+        job_type=job.job_type,
+        status=job.status,
+        input=decode_job_payload(job.input_json),
+        result=decode_job_payload(job.result_json),
+        error=job.error,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        started_at=job.started_at,
+        finished_at=job.finished_at,
+    )
+
+
+def _create_mia_note_job(
+    note_id: str,
+    job_type: str,
+    session: SessionDep,
+    user: NotesWriteUser,
+) -> MiaJobRead:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    job = create_job(
+        session,
+        user,
+        job_type=job_type,
+        note_id=note.id,
+        input_payload={"note_id": note.id, "operation": job_type},
+    )
+    session.commit()
+    session.refresh(job)
+    return _mia_job_response(job)
 
 
 @router.post("/from-text", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -494,6 +533,34 @@ def update_note(
         _sync_note_tags(session, note, payload.tags)
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
+
+
+@router.post(
+    "/{note_id}/summarise",
+    response_model=MiaJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def summarise_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "summarise", session, user)
+
+
+@router.post(
+    "/{note_id}/structure",
+    response_model=MiaJobRead,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def structure_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "structure", session, user)
+
+
+@router.post("/{note_id}/extract", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
+def extract_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "extract", session, user)
+
+
+@router.post("/{note_id}/rewrite", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
+def rewrite_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> MiaJobRead:
+    return _create_mia_note_job(note_id, "rewrite", session, user)
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)

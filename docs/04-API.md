@@ -98,8 +98,7 @@ DELETE /api/notes/{note_id}
 
 Notes include metadata such as `status`, `source_type`, `revision_number`, `is_published`, `created_at`, and `updated_at`.
 
-Planned Mia/agent operations should build on the note API instead of bypassing
-it:
+Mia operation stubs create queued jobs. They do not call OpenAI yet:
 
 ```text
 POST /api/notes/{note_id}/summarise
@@ -108,7 +107,7 @@ POST /api/notes/{note_id}/extract
 POST /api/notes/{note_id}/rewrite
 ```
 
-These operations can be asynchronous once parsing and model calls are wired in.
+These operations return `202 Accepted` with a job record.
 
 ## Jobs
 

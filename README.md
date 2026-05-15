@@ -98,6 +98,10 @@ GET    /api/notes              session or notes:read token required
 GET    /api/notes/{note_id}    session or notes:read token required
 PATCH  /api/notes/{note_id}    session or notes:write token required
 DELETE /api/notes/{note_id}    session or notes:write token required
+POST   /api/notes/{note_id}/summarise  session or notes:write token required
+POST   /api/notes/{note_id}/structure  session or notes:write token required
+POST   /api/notes/{note_id}/extract    session or notes:write token required
+POST   /api/notes/{note_id}/rewrite    session or notes:write token required
 GET    /api/notes/{note_id}/comments  session or notes:read token required
 POST   /api/notes/{note_id}/comments  session or comments:write token required
 PUT    /api/notes/{note_id}/tags      session or tags:write token required

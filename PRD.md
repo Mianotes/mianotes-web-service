@@ -532,6 +532,10 @@ Example shape:
 - `GET /api/notes/{note_id}`
 - `PATCH /api/notes/{note_id}`
 - `DELETE /api/notes/{note_id}`
+- `POST /api/notes/{note_id}/summarise`
+- `POST /api/notes/{note_id}/structure`
+- `POST /api/notes/{note_id}/extract`
+- `POST /api/notes/{note_id}/rewrite`
 - `PUT /api/notes/{note_id}/tags`
 - `POST /api/notes/{note_id}/share`
 - `DELETE /api/notes/{note_id}/share`

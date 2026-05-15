@@ -86,6 +86,35 @@ def test_jobs_can_be_read_by_owner(app_client: tuple[TestClient, sessionmaker[Se
     assert fetched.json()["job_type"] == "summarise"
 
 
+def test_mia_operation_stubs_create_queued_jobs(
+    app_client: tuple[TestClient, sessionmaker[Session]],
+):
+    client, _ = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    topic = client.post("/api/topics", json={"name": "Mia"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={"topic_id": topic["id"], "text": "Mia should improve this note."},
+    ).json()
+
+    for operation in ["summarise", "structure", "extract", "rewrite"]:
+        created = client.post(f"/api/notes/{note['id']}/{operation}")
+        assert created.status_code == 202
+        body = created.json()
+        assert body["job_type"] == operation
+        assert body["status"] == "queued"
+        assert body["note_id"] == note["id"]
+        assert body["input"] == {"note_id": note["id"], "operation": operation}
+
+
 def test_job_status_helpers(app_client: tuple[TestClient, sessionmaker[Session]]):
     client, testing_session = app_client
     client.post(
