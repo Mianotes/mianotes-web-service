@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from .auth import router as auth_router
 from .files import router as files_router
+from .jobs import router as jobs_router
 from .notes import router as notes_router
 from .search import router as search_router
 from .tags import router as tags_router
@@ -19,6 +20,7 @@ api_router.include_router(users_router, prefix="/api")
 api_router.include_router(topics_router, prefix="/api")
 api_router.include_router(tags_router, prefix="/api")
 api_router.include_router(tokens_router, prefix="/api")
+api_router.include_router(jobs_router, prefix="/api")
 api_router.include_router(notes_router, prefix="/api")
 api_router.include_router(search_router, prefix="/api")
 api_router.include_router(files_router)

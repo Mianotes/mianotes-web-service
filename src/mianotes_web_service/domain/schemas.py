@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -201,3 +202,21 @@ class ApiTokenRead(BaseModel):
 
 class ApiTokenCreated(ApiTokenRead):
     token: str
+
+
+JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+
+
+class MiaJobRead(BaseModel):
+    id: str
+    user: UserRead
+    note_id: str | None = None
+    job_type: str
+    status: JobStatus
+    input: dict[str, object]
+    result: dict[str, object]
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None

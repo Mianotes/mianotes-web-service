@@ -47,6 +47,7 @@ class User(Base, TimestampMixin):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    jobs: Mapped[list[MiaJob]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class Topic(Base, TimestampMixin):
@@ -94,6 +95,7 @@ class Note(Base, TimestampMixin):
         secondary="note_tags",
         back_populates="notes",
     )
+    jobs: Mapped[list[MiaJob]] = relationship(back_populates="note", cascade="all, delete-orphan")
 
 
 class SourceFile(Base):
@@ -181,3 +183,21 @@ class ApiToken(Base, TimestampMixin):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="api_tokens")
+
+
+class MiaJob(Base, TimestampMixin):
+    __tablename__ = "mia_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    note_id: Mapped[str | None] = mapped_column(ForeignKey("notes.id"), index=True)
+    job_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), index=True, default="queued", nullable=False)
+    input_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    result_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(back_populates="jobs")
+    note: Mapped[Note | None] = relationship(back_populates="jobs")

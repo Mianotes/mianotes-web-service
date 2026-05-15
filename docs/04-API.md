@@ -110,6 +110,18 @@ POST /api/notes/{note_id}/rewrite
 
 These operations can be asynchronous once parsing and model calls are wired in.
 
+## Jobs
+
+```text
+GET /api/jobs
+GET /api/jobs/{job_id}
+```
+
+Mia jobs are durable SQLite records. Jobs currently support these statuses:
+`queued`, `running`, `succeeded`, `failed`, and `cancelled`. Job records can
+link to a note and store JSON input/result payloads so asynchronous parser and
+Mia operations have a stable status surface before model calls are wired in.
+
 ## Tags
 
 ```text

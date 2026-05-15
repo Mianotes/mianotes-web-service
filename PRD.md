@@ -16,6 +16,7 @@ automation scripts, AI agents, and future MCP integrations.
 - Convert human- or agent-provided content into clean Markdown notes.
 - Store notes and source files in a transparent filesystem layout.
 - Keep an indexed record of users, topics, notes, source files, and comments.
+- Keep durable Mia job records for asynchronous parsing and note improvement operations.
 - Support a shared local household auth flow for the React app.
 - Support scoped API tokens for AI agents and automation scripts.
 - Provide an MCP surface so AI agents can manage their own docs through tools.
@@ -319,6 +320,25 @@ Fields:
 - tag_id
 - created_at
 
+### mia_jobs
+
+Durable status records for parser and Mia operations.
+
+Fields:
+
+- id
+- user_id
+- note_id
+- job_type
+- status
+- input_json
+- result_json
+- error
+- started_at
+- finished_at
+- created_at
+- updated_at
+
 ## Content ingestion
 
 Humans and agents can create notes from:
@@ -490,6 +510,8 @@ Example shape:
 - `POST /api/tokens`
 - `GET /api/tokens`
 - `DELETE /api/tokens/{token_id}`
+- `GET /api/jobs`
+- `GET /api/jobs/{job_id}`
 - `POST /api/users`
 - `GET /api/users`
 - `GET /api/users/{user_id}`

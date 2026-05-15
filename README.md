@@ -77,6 +77,9 @@ POST   /api/tokens             session or tokens:write token required
 GET    /api/tokens             session or tokens:read token required
 DELETE /api/tokens/{token_id}  session or tokens:write token required
 
+GET    /api/jobs               session or notes:read token required
+GET    /api/jobs/{job_id}      session or notes:read token required
+
 POST   /api/users              admin session or admin token required
 GET    /api/users              session or users:read token required
 GET    /api/users/{user_id}    session or users:read token required
