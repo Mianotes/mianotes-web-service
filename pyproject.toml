@@ -25,6 +25,7 @@ dev = [
 
 [project.scripts]
 mianotes-web-service = "mianotes_web_service.main:main"
+mianotes-mcp = "mianotes_web_service.mcp_server:main"
 
 [build-system]
 requires = ["hatchling"]

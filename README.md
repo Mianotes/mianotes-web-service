@@ -124,6 +124,18 @@ http://127.0.0.1:8200/docs
 Mianotes services use the `8200` range by convention. The web service defaults to
 `8200`; use `8201`, `8202`, and so on for parallel local instances.
 
+Mianotes also ships a stdio MCP server for AI agents:
+
+```bash
+MIANOTES_API_URL=http://127.0.0.1:8200 \
+MIANOTES_API_TOKEN=mia_your_token \
+python -m mianotes_web_service.mcp_server
+```
+
+The MCP server calls the same REST API with the provided bearer token, so normal
+scope checks still apply. Fresh package installs also expose the `mianotes-mcp`
+console script.
+
 ## Checks
 
 ```bash

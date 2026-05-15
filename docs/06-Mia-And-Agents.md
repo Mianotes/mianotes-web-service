@@ -43,15 +43,17 @@ AI agents use Mianotes programmatically. They can:
 - Query notes through search.
 - Ask Mia to improve or extract content.
 
-Agents should use scoped API tokens and MCP tools, not browser cookies.
+Agents should use scoped API tokens and MCP tools, not browser cookies. The
+stdio MCP server is started with `MIANOTES_API_URL` and `MIANOTES_API_TOKEN`,
+then calls the same REST API as any other agent client.
 
 ## Design principle
 
 The backend is the brain. The web app explains context and collects input, but the web service decides permissions, ownership, roles, parsing behaviour, share access, and agent capabilities.
 
-## Future MCP surface
+## MCP surface
 
-The MCP server should let compatible agents use Mianotes as a toolset:
+The MCP server lets compatible agents use Mianotes as a toolset:
 
 - Search notes
 - Read note
@@ -61,4 +63,4 @@ The MCP server should let compatible agents use Mianotes as a toolset:
 - Add comment
 - Set tags
 - Create topic
-- Ask Mia to summarise, structure, extract, or rewrite
+- Create Mia summarise, structure, extract, and rewrite jobs

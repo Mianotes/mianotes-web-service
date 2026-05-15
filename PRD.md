@@ -19,7 +19,7 @@ automation scripts, AI agents, and future MCP integrations.
 - Keep durable Mia job records for asynchronous parsing and note improvement operations.
 - Support a shared local household auth flow for the React app.
 - Support scoped API tokens for AI agents and automation scripts.
-- Provide an MCP surface so AI agents can manage their own docs through tools.
+- Provide a stdio MCP surface so AI agents can manage their own docs through tools.
 - Provide Mia, a built-in AI agent that improves, structures, extracts, and
   summarises notes.
 - Start with SQLite while keeping the storage layer adaptable for PostgreSQL later.
@@ -608,7 +608,6 @@ V1 should:
 - What naming strategy should be used to prevent filename collisions?
 - What minimum hardware target should guide local model research?
 - What is the first scoped-token model for AI agents?
-- Which MCP tools should ship first?
 - Which Mia operations should be synchronous and which should be jobs?
 
 ## Initial technical direction

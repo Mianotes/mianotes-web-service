@@ -164,9 +164,19 @@ GET    /api/notes/shared/{token}/files/{source_file_id}
 
 Share links are random, revocable, and read-only. A valid share token grants access to one note, not the full household.
 
-## Future MCP tools
+## MCP tools
 
-The MCP server should expose Mianotes as tools AI agents can call:
+Run the stdio MCP server with an API token:
+
+```bash
+MIANOTES_API_URL=http://127.0.0.1:8200 \
+MIANOTES_API_TOKEN=mia_your_token \
+python -m mianotes_web_service.mcp_server
+```
+
+The MCP server calls the REST API using the bearer token, so API scopes still
+apply. Fresh package installs also expose the `mianotes-mcp` console script. It
+exposes these tools:
 
 ```text
 list_topics
@@ -179,5 +189,8 @@ add_comment
 set_tags
 share_note
 search_notes
-ask_mia
+summarise_note
+structure_note
+extract_note
+rewrite_note
 ```
