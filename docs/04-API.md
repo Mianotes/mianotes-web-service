@@ -63,9 +63,9 @@ The API currently uses FastAPI error responses.
 ```json
 {
   "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-  "email": "federico@example.com",
-  "name": "Federico",
-  "username": "u_7f3a9c2b",
+  "email": "matt@example.com",
+  "name": "Matt",
+  "username": "u_2d9f6b1a",
   "is_admin": true,
   "created_at": "2026-05-15T10:30:00Z",
   "updated_at": "2026-05-15T10:30:00Z"
@@ -120,7 +120,7 @@ The API currently uses FastAPI error responses.
   "source_type": "text",
   "revision_number": 1,
   "is_published": false,
-  "note_path": "/home/arduino/mianotes-web-service/data/u_7f3a9c2b/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+  "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
   "created_at": "2026-05-15T10:35:00Z",
   "updated_at": "2026-05-15T10:35:00Z"
 }
@@ -150,9 +150,9 @@ comments metadata, sharing metadata, and API action hints.
   "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -177,13 +177,13 @@ comments metadata, sharing metadata, and API action hints.
   "published_at": null,
   "shared_at": null,
   "text": "# Kickoff notes\n\nWe agreed to build Mianotes...",
-  "note_url": "http://127.0.0.1:8200/data/u_7f3a9c2b/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+  "note_url": "http://127.0.0.1:8200/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
   "source_files": [
     {
       "id": "b5e20df8-bd95-45f0-a4f6-a2ee2db3f7b6",
       "original_filename": "kickoff.source.txt",
       "content_type": "text/plain",
-      "url": "http://127.0.0.1:8200/data/u_7f3a9c2b/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.source.txt"
+      "url": "http://127.0.0.1:8200/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.source.txt"
     }
   ],
   "comments_count": 0,
@@ -270,9 +270,9 @@ comments metadata, sharing metadata, and API action hints.
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -299,9 +299,9 @@ comments metadata, sharing metadata, and API action hints.
   "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -394,7 +394,7 @@ None.
 
 ```json
 {
-  "email": "federico@example.com"
+  "email": "matt@example.com"
 }
 ```
 
@@ -455,8 +455,8 @@ None.
 
 ```json
 {
-  "email": "federico@example.com",
-  "name": "Federico",
+  "email": "matt@example.com",
+  "name": "Matt",
   "password": "house-password",
   "password_confirmation": "house-password"
 }
@@ -477,9 +477,9 @@ None.
 {
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -538,9 +538,9 @@ None.
 {
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -575,9 +575,9 @@ Session cookie or bearer token.
 {
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -663,9 +663,9 @@ tokens:write
   "id": "1c9a26a9-d144-4f3e-91a7-a1121cfe0d4f",
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -735,9 +735,9 @@ Session cookie or bearer token with `tokens:read` or `admin`.
     "id": "1c9a26a9-d144-4f3e-91a7-a1121cfe0d4f",
     "user": {
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-      "email": "federico@example.com",
-      "name": "Federico",
-      "username": "u_7f3a9c2b",
+      "email": "matt@example.com",
+      "name": "Matt",
+      "username": "u_2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"
@@ -853,9 +853,9 @@ Session cookie or bearer token with `users:read` or `admin`.
 [
   {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -1226,7 +1226,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "source_type": "text",
     "revision_number": 1,
     "is_published": false,
-    "note_path": "/home/arduino/mianotes-web-service/data/u_7f3a9c2b/school/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+    "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/school/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
     "created_at": "2026-05-15T10:35:00Z",
     "updated_at": "2026-05-15T10:35:00Z"
   }
@@ -1371,9 +1371,9 @@ Returns a `Job`.
   "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
   "user": {
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "federico@example.com",
-    "name": "Federico",
-    "username": "u_7f3a9c2b",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -1588,9 +1588,9 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
     "user": {
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-      "email": "federico@example.com",
-      "name": "Federico",
-      "username": "u_7f3a9c2b",
+      "email": "matt@example.com",
+      "name": "Matt",
+      "username": "u_2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"
@@ -1731,7 +1731,7 @@ GET /api/search?q=product%20launch&limit=10
       "source_type": "text",
       "revision_number": 1,
       "is_published": false,
-      "note_path": "/home/arduino/mianotes-web-service/data/u_7f3a9c2b/work/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+      "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/work/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
       "created_at": "2026-05-15T10:35:00Z",
       "updated_at": "2026-05-15T10:35:00Z"
     },
@@ -1788,9 +1788,9 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
     "user": {
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-      "email": "federico@example.com",
-      "name": "Federico",
-      "username": "u_7f3a9c2b",
+      "email": "matt@example.com",
+      "name": "Matt",
+      "username": "u_2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"
