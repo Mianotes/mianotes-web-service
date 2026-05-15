@@ -1,8 +1,13 @@
 # Mianotes Web Service
 
-Mianotes Web Service is the Python backend for Mianotes, an AI-powered local-first app that turns documents, images, links, audio, and text into organised Markdown notes.
+Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge
+repository for humans and AI agents. It turns documents, images, links, audio,
+and text into organised Markdown notes that can be improved by Mia and managed
+programmatically through APIs and, later, MCP.
 
-The service stores note content on the filesystem, keeps lightweight indexes in SQLite, and exposes JSON REST APIs for the Mianotes web app and developer integrations.
+The service stores note content on the filesystem, keeps lightweight indexes in
+SQLite, and exposes JSON REST APIs for the Mianotes web app, automation scripts,
+and future agent integrations.
 
 ## Current Status
 
@@ -28,7 +33,7 @@ Runtime dependencies intentionally avoid optional compiled server extras so the 
 - Database-backed note comments
 - SQLite index for users, topics, notes, source files, and comments
 - Repository layer designed for future PostgreSQL support
-- OpenAI ChatGPT API for v1 note generation
+- OpenAI ChatGPT API for Mia-powered note generation and improvement
 - Planned local parser pipeline: Poppler `pdftotext`, Pandoc, Tesseract, and `mdformat`
 
 ## Development

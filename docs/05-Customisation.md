@@ -43,3 +43,14 @@ The planned local parser stack is:
 - `mdformat` for Markdown cleanup.
 
 Hosted parsers can be added later behind the same parser adapter boundary.
+
+## Mia Provider
+
+Mia should start with OpenAI for v1. The agent layer should still be isolated
+behind a service boundary so a future install can choose different providers or
+local models for specific tasks.
+
+## Agent Access
+
+Agent credentials should be scoped and revocable. They should not use the
+browser household password or cookie session.
