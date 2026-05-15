@@ -131,6 +131,17 @@ DELETE /api/notes/{note_id}/comments/{comment_id}
 
 Comments are stored in SQLite, not sidecar JSON files.
 
+## Search
+
+```text
+GET /api/search?q=<query>
+```
+
+Search uses ripgrep against Markdown files under the configured data directory.
+The endpoint returns each matching excerpt with line and column metadata, plus
+the indexed note metadata from SQLite. It requires a browser session or a bearer
+token with `notes:read`.
+
 ## Sharing
 
 ```text

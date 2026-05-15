@@ -102,9 +102,11 @@ POST   /api/notes/{note_id}/share     session or share:write token required
 GET    /api/notes/shared/{token}      guest read access
 
 GET    /api/tags                 session or tags:read token required
+GET    /api/search?q=term        session or notes:read token required
 ```
 
 `PUT /api/notes/{note_id}/tags` replaces the note's full tag list. Notes can have up to 5 tags.
+`GET /api/search` uses ripgrep to search saved Markdown files and returns note metadata with each match.
 
 FastAPI exposes interactive local API docs at:
 

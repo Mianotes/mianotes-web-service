@@ -145,6 +145,13 @@ class NoteListItem(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SearchResult(BaseModel):
+    note: NoteListItem
+    line_number: int
+    column: int
+    excerpt: str
+
+
 class EmailCheck(BaseModel):
     email: EmailStr
 

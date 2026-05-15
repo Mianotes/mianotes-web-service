@@ -515,6 +515,7 @@ Example shape:
 - `DELETE /api/notes/{note_id}/share`
 - `GET /api/notes/shared/{token}`
 - `GET /api/notes/shared/{token}/files/{source_file_id}`
+- `GET /api/search?q={query}`
 
 Note creation should support multiple input types, either via one endpoint with an `input_type` field or separate endpoints.
 
@@ -560,6 +561,8 @@ V1 should:
 - Avoid scanning the filesystem for normal list views.
 - Read Markdown files only when full note content is needed.
 - Store stable file paths in the database.
+- Use ripgrep for explicit Markdown search requests and join file matches back
+  to indexed note metadata.
 - Use background jobs for long-running parsing and AI generation if synchronous requests become too slow.
 - Keep a repository/adapter boundary so SQLite can be replaced or supplemented by PostgreSQL later.
 
