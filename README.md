@@ -7,9 +7,11 @@ It turns documents, images, links, audio, and text into organised Markdown notes
 that can be searched, shared, improved by Mia, and managed programmatically by
 other agents.
 
-The service is designed for small local instances: families, developers,
-researchers, students, and small teams that want durable knowledge stored in
-plain files without giving up useful APIs.
+The service is designed for small groups of people: small teams, families,
+developers, researchers, and students who want durable knowledge stored in plain
+files without giving up useful APIs. Because Mianotes uses the filesystem as its
+main storage layer, anyone can install as many instances as they want. It is
+local, private, and extremely portable.
 
 ## Current status
 
