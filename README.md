@@ -9,9 +9,11 @@ other agents.
 
 The service is designed for small groups of people: small teams, families,
 developers, researchers, and students who want durable knowledge stored in plain
-files without giving up useful APIs. Because Mianotes uses the filesystem as its
-main storage layer, anyone can install as many instances as they want. It is
-local, private, and extremely portable.
+files that agents and tools can use directly. Because Mianotes uses the
+filesystem as its main storage layer, anyone can install as many instances as
+they want. It is local, private, and extremely portable.
+
+![Mianotes overview](docs/assets/mianotes_intro.png)
 
 ## Current status
 
@@ -28,8 +30,7 @@ technical source of truth is [SPEC.md](SPEC.md).
 - Exposes JSON REST APIs for the web app and external automation.
 - Provides a stdio MCP server so compatible AI agents can use Mianotes as a
   local knowledge tool.
-- Supports OpenAI and local OpenAI-compatible LLMs for Mia-powered note
-  operations.
+- Supports local LLMs, or OpenAI, for Mia-powered note operations.
 
 ## Documentation
 
@@ -52,7 +53,7 @@ technical source of truth is [SPEC.md](SPEC.md).
 - Alembic
 - SQLite
 - MarkItDown
-- OpenAI or local OpenAI-compatible LLMs
+- Local LLMs, or OpenAI
 - pytest
 - Ruff
 
