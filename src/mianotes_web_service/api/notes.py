@@ -29,7 +29,7 @@ from mianotes_web_service.api.dependencies import (
     TagsWriteUser,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, SourceFile, Tag, Topic, User, new_id
+from mianotes_web_service.db.models import Comment, Note, Project, SourceFile, Tag, User, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     MAX_TAGS_PER_NOTE,
@@ -105,7 +105,7 @@ def _read_note_or_404(session: Session, note_id: str) -> Note:
         .where(Note.id == note_id)
         .options(
             joinedload(Note.user),
-            joinedload(Note.topic),
+            joinedload(Note.project),
             joinedload(Note.source_files),
             joinedload(Note.comments).joinedload(Comment.user),
             joinedload(Note.tags),
@@ -160,7 +160,7 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
     return NoteRead(
         id=note.id,
         user=note.user,
-        topic=note.topic,
+        project=note.project,
         created_at=note.created_at,
         updated_at=note.updated_at,
         title=note.title,
@@ -236,7 +236,7 @@ def _read_note_by_share_token(session: Session, token: str) -> Note:
         .where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
         .options(
             joinedload(Note.user),
-            joinedload(Note.topic),
+            joinedload(Note.project),
             joinedload(Note.source_files),
             joinedload(Note.comments).joinedload(Comment.user),
             joinedload(Note.tags),
@@ -322,16 +322,16 @@ def create_note_from_text(
     request: Request,
     user: NotesWriteUser,
 ) -> NoteRead:
-    topic = session.get(Topic, payload.topic_id)
-    if topic is None or topic.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    project = session.get(Project, payload.project_id)
+    if project is None or project.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     title = payload.title or infer_title(payload.text)
     note_id = new_id()
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_text_note(
         username=user.username,
-        topic=topic.slug,
+        project=project.slug,
         title=title,
         text=payload.text,
         filename=note_id,
@@ -340,7 +340,7 @@ def create_note_from_text(
     note = Note(
         id=note_id,
         user_id=user.id,
-        topic_id=topic.id,
+        project_id=project.id,
         title=title,
         source_type="text",
         note_path=str(paths.note_path),
@@ -367,13 +367,13 @@ def create_note_from_file(
     background_tasks: BackgroundTasks,
     session: SessionDep,
     user: NotesWriteUser,
-    topic_id: Annotated[str, Form()],
+    project_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     title: Annotated[str | None, Form()] = None,
 ) -> NoteRead:
-    topic = session.get(Topic, topic_id)
-    if topic is None or topic.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    project = session.get(Project, project_id)
+    if project is None or project.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -392,7 +392,7 @@ def create_note_from_file(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_uploaded_file_note(
         username=user.username,
-        topic=topic.slug,
+        project=project.slug,
         title=note_title,
         filename=note_id,
         original_filename=file.filename,
@@ -402,7 +402,7 @@ def create_note_from_file(
     note = Note(
         id=note_id,
         user_id=user.id,
-        topic_id=topic.id,
+        project_id=project.id,
         title=note_title,
         status="pending_parse",
         source_type=_source_type_from_filename(file.filename),
@@ -447,9 +447,9 @@ def create_note_from_url(
     session: SessionDep,
     user: NotesWriteUser,
 ) -> NoteIngestionRead:
-    topic = session.get(Topic, payload.topic_id)
-    if topic is None or topic.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    project = session.get(Project, payload.project_id)
+    if project is None or project.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     url = str(payload.url)
     parsed_url = urlparse(url)
@@ -458,7 +458,7 @@ def create_note_from_url(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_url_note_placeholder(
         username=user.username,
-        topic=topic.slug,
+        project=project.slug,
         title=title,
         filename=note_id,
         url=url,
@@ -469,7 +469,7 @@ def create_note_from_url(
     note = Note(
         id=note_id,
         user_id=user.id,
-        topic_id=topic.id,
+        project_id=project.id,
         title=title,
         status="pending_parse",
         source_type="link",
@@ -519,13 +519,13 @@ def list_notes(
     session: SessionDep,
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
-    topic_id: Annotated[str | None, Query()] = None,
+    project_id: Annotated[str | None, Query()] = None,
 ) -> list[Note]:
     statement = select(Note).order_by(Note.created_at.desc())
     if user_id is not None:
         statement = statement.where(Note.user_id == user_id)
-    if topic_id is not None:
-        statement = statement.where(Note.topic_id == topic_id)
+    if project_id is not None:
+        statement = statement.where(Note.project_id == project_id)
     return list(session.scalars(statement))
 
 

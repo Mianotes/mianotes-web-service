@@ -56,13 +56,13 @@ def _join_admin(client: TestClient) -> dict[str, object]:
 
 def test_api_token_auth_scope_and_revocation(client: TestClient):
     _join_admin(client)
-    topic = client.post("/api/topics", json={"name": "Agents"}).json()
+    project = client.post("/api/projects", json={"name": "Agents"}).json()
 
     created = client.post(
         "/api/tokens",
         json={
             "name": "Read only agent",
-            "scopes": ["notes:read", "topics:read", "tokens:read"],
+            "scopes": ["notes:read", "projects:read", "tokens:read"],
         },
     )
     assert created.status_code == 201
@@ -78,10 +78,10 @@ def test_api_token_auth_scope_and_revocation(client: TestClient):
     agent_client = TestClient(client.app)
     headers = {"Authorization": f"Bearer {raw_token}"}
 
-    topics = agent_client.get("/api/topics", headers=headers)
-    assert topics.status_code == 200
+    projects = agent_client.get("/api/projects", headers=headers)
+    assert projects.status_code == 200
 
-    denied_write = agent_client.post("/api/topics", json={"name": "Denied"}, headers=headers)
+    denied_write = agent_client.post("/api/projects", json={"name": "Denied"}, headers=headers)
     assert denied_write.status_code == 403
 
     notes = agent_client.get("/api/notes", headers=headers)
@@ -89,7 +89,7 @@ def test_api_token_auth_scope_and_revocation(client: TestClient):
 
     created_note = agent_client.post(
         "/api/notes/from-text",
-        json={"topic_id": topic["id"], "text": "Token should not write notes."},
+        json={"project_id": project["id"], "text": "Token should not write notes."},
         headers=headers,
     )
     assert created_note.status_code == 403
@@ -97,7 +97,7 @@ def test_api_token_auth_scope_and_revocation(client: TestClient):
     revoked = client.delete(f"/api/tokens/{created_body['id']}")
     assert revoked.status_code == 204
 
-    after_revoke = agent_client.get("/api/topics", headers=headers)
+    after_revoke = agent_client.get("/api/projects", headers=headers)
     assert after_revoke.status_code == 401
 
 

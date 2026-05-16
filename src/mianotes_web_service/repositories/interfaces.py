@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from mianotes_web_service.db.models import Note, Topic, User
+from mianotes_web_service.db.models import Note, Project, User
 
 
 class UserRepository(Protocol):
@@ -11,9 +11,9 @@ class UserRepository(Protocol):
     def get_by_email(self, email: str) -> User | None: ...
 
 
-class TopicRepository(Protocol):
-    def add(self, topic: Topic) -> Topic: ...
-    def get(self, topic_id: str) -> Topic | None: ...
+class ProjectRepository(Protocol):
+    def add(self, project: Project) -> Project: ...
+    def get(self, project_id: str) -> Project | None: ...
 
 
 class NoteRepository(Protocol):

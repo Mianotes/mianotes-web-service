@@ -17,8 +17,8 @@ Mianotes services use the `8200` range:
 By default, generated notes and source files live under `data/`.
 
 ```text
-data/<username>/<topic>/<note_id>.md
-data/<username>/<topic>/<note_id>.source.<ext>
+data/<username>/<project>/<note_id>.md
+data/<username>/<project>/<note_id>.source.<ext>
 ```
 
 Set `MIANOTES_DATA_DIR` to change the storage location.

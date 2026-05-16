@@ -33,19 +33,19 @@ class FilesystemStorage:
     def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
 
-    def topic_dir(self, username: str, topic: str) -> Path:
-        return self.data_dir / slugify(username, "user") / slugify(topic, "topic")
+    def project_dir(self, username: str, project: str) -> Path:
+        return self.data_dir / slugify(username, "user") / slugify(project, "project")
 
     def note_paths(
         self,
         *,
         username: str,
-        topic: str,
+        project: str,
         filename: str,
         source_extension: str | None = None,
         source_suffix: str = "",
     ) -> NotePaths:
-        base_dir = self.topic_dir(username, topic)
+        base_dir = self.project_dir(username, project)
         stem = slugify(Path(filename).stem)
         note_path = base_dir / f"{stem}.md"
         comments_path = base_dir / f"{stem}.comments.json"
@@ -66,14 +66,14 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        topic: str,
+        project: str,
         title: str,
         text: str,
         filename: str | None = None,
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
-            topic=topic,
+            project=project,
             filename=filename or title,
             source_extension=".source.txt",
         )
@@ -87,7 +87,7 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        topic: str,
+        project: str,
         title: str,
         filename: str,
         original_filename: str,
@@ -96,7 +96,7 @@ class FilesystemStorage:
         extension = Path(original_filename).suffix or ".bin"
         paths = self.note_paths(
             username=username,
-            topic=topic,
+            project=project,
             filename=filename,
             source_extension=extension,
             source_suffix=".source",
@@ -115,14 +115,14 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        topic: str,
+        project: str,
         title: str,
         filename: str,
         url: str,
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
-            topic=topic,
+            project=project,
             filename=filename,
             source_extension=".source.html",
         )

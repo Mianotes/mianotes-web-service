@@ -79,7 +79,7 @@ def test_user_crud(client: TestClient):
     assert missing.status_code == 404
 
 
-def test_topic_crud_and_user_filter(client: TestClient):
+def test_project_crud_and_user_filter(client: TestClient):
     user = client.post(
         "/api/auth/join",
         json={
@@ -91,36 +91,36 @@ def test_topic_crud_and_user_filter(client: TestClient):
     ).json()["user"]
 
     unauthenticated = TestClient(client.app).post(
-        "/api/topics",
+        "/api/projects",
         json={"user_id": "missing", "name": "Product Research"},
     )
     assert unauthenticated.status_code == 401
 
     created = client.post(
-        "/api/topics",
+        "/api/projects",
         json={"name": "Product Research"},
     )
     assert created.status_code == 201
-    topic = created.json()
-    assert topic["slug"] == "product-research"
+    project = created.json()
+    assert project["slug"] == "product-research"
 
     duplicate = client.post(
-        "/api/topics",
+        "/api/projects",
         json={"user_id": user["id"], "name": "Product Research"},
     )
     assert duplicate.status_code == 409
 
-    listed = client.get("/api/topics", params={"user_id": user["id"]})
+    listed = client.get("/api/projects", params={"user_id": user["id"]})
     assert listed.status_code == 200
-    assert topic["id"] in [item["id"] for item in listed.json()]
+    assert project["id"] in [item["id"] for item in listed.json()]
 
-    deleted = client.delete(f"/api/topics/{topic['id']}")
+    deleted = client.delete(f"/api/projects/{project['id']}")
     assert deleted.status_code == 204
 
-    missing = client.get(f"/api/topics/{topic['id']}")
+    missing = client.get(f"/api/projects/{project['id']}")
     assert missing.status_code == 200
     assert missing.json()["archived_at"] is not None
 
-    visible = client.get("/api/topics", params={"user_id": user["id"]})
+    visible = client.get("/api/projects", params={"user_id": user["id"]})
     assert visible.status_code == 200
-    assert topic["id"] not in [item["id"] for item in visible.json()]
+    assert project["id"] not in [item["id"] for item in visible.json()]

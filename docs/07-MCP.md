@@ -34,8 +34,8 @@ trusted local automation.
 
 The current MCP surface includes tools for:
 
-- Listing topics
-- Creating topics
+- Listing projects
+- Creating projects
 - Listing notes
 - Reading notes
 - Creating notes from text

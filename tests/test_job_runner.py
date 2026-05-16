@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from mianotes_web_service.db.models import Base, Note, SourceFile, Topic, User
+from mianotes_web_service.db.models import Base, Note, Project, SourceFile, User
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.job_runner import InProcessJobRunner
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
@@ -28,7 +28,7 @@ def _seed_note(
     *,
     source_path: Path | None = None,
 ) -> tuple[str, str]:
-    note_path = tmp_path / "data" / "user" / "topic" / "note.md"
+    note_path = tmp_path / "data" / "user" / "project" / "note.md"
     note_path.parent.mkdir(parents=True)
     note_path.write_text("# Pending\n\nWaiting.", encoding="utf-8")
     if source_path is not None:
@@ -39,12 +39,12 @@ def _seed_note(
         user = User(email="runner@example.com", name="Runner", username="runner", is_admin=True)
         session.add(user)
         session.flush()
-        topic = Topic(user_id=user.id, name="Topic", slug="topic")
-        session.add(topic)
+        project = Project(user_id=user.id, name="Project", slug="project")
+        session.add(project)
         session.flush()
         note = Note(
             user_id=user.id,
-            topic_id=topic.id,
+            project_id=project.id,
             title="Runner Note",
             status="pending_parse",
             source_type="document",
@@ -72,7 +72,7 @@ def test_job_runner_parses_file_and_updates_note(
     monkeypatch,
 ):
     testing_session = _session_factory()
-    source_path = tmp_path / "data" / "user" / "topic" / "note.source.txt"
+    source_path = tmp_path / "data" / "user" / "project" / "note.source.txt"
     note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
 
     def fake_parse_document(path: Path) -> ParsedDocument:

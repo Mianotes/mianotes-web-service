@@ -55,10 +55,10 @@ def test_jobs_can_be_read_by_owner(app_client: tuple[TestClient, sessionmaker[Se
             "password_confirmation": "house-password",
         },
     )
-    topic = client.post("/api/topics", json={"name": "Jobs"}).json()
+    project = client.post("/api/projects", json={"name": "Jobs"}).json()
     note = client.post(
         "/api/notes/from-text",
-        json={"topic_id": topic["id"], "text": "A note for Mia jobs."},
+        json={"project_id": project["id"], "text": "A note for Mia jobs."},
     ).json()
 
     with testing_session() as session:
@@ -99,10 +99,10 @@ def test_mia_operation_stubs_create_queued_jobs(
             "password_confirmation": "house-password",
         },
     )
-    topic = client.post("/api/topics", json={"name": "Mia"}).json()
+    project = client.post("/api/projects", json={"name": "Mia"}).json()
     note = client.post(
         "/api/notes/from-text",
-        json={"topic_id": topic["id"], "text": "Mia should improve this note."},
+        json={"project_id": project["id"], "text": "Mia should improve this note."},
     ).json()
 
     for operation in ["summarise", "structure", "extract", "rewrite"]:

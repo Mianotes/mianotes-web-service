@@ -37,10 +37,10 @@ class User(Base, TimestampMixin):
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    topics: Mapped[list[Topic]] = relationship(
+    projects: Mapped[list[Project]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
-        foreign_keys="Topic.user_id",
+        foreign_keys="Project.user_id",
     )
     notes: Mapped[list[Note]] = relationship(back_populates="user", cascade="all, delete-orphan")
     api_tokens: Mapped[list[ApiToken]] = relationship(
@@ -50,9 +50,9 @@ class User(Base, TimestampMixin):
     jobs: Mapped[list[MiaJob]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
-class Topic(Base, TimestampMixin):
-    __tablename__ = "topics"
-    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_topics_user_slug"),)
+class Project(Base, TimestampMixin):
+    __tablename__ = "projects"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_projects_user_slug"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
@@ -61,8 +61,8 @@ class Topic(Base, TimestampMixin):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
 
-    user: Mapped[User] = relationship(back_populates="topics", foreign_keys=[user_id])
-    notes: Mapped[list[Note]] = relationship(back_populates="topic", cascade="all, delete-orphan")
+    user: Mapped[User] = relationship(back_populates="projects", foreign_keys=[user_id])
+    notes: Mapped[list[Note]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class Note(Base, TimestampMixin):
@@ -70,7 +70,7 @@ class Note(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
-    topic_id: Mapped[str] = mapped_column(ForeignKey("topics.id"), index=True, nullable=False)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(300), nullable=False)
     status: Mapped[str] = mapped_column(String(50), default="ready", nullable=False)
     source_type: Mapped[str] = mapped_column(String(50), default="text", nullable=False)
@@ -82,7 +82,7 @@ class Note(Base, TimestampMixin):
     note_path: Mapped[str] = mapped_column(Text, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="notes")
-    topic: Mapped[Topic] = relationship(back_populates="notes")
+    project: Mapped[Project] = relationship(back_populates="notes")
     source_files: Mapped[list[SourceFile]] = relationship(
         back_populates="note",
         cascade="all, delete-orphan",

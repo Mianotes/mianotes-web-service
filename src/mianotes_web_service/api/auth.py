@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Note, SourceFile, Topic, User, new_id
+from mianotes_web_service.db.models import Note, Project, SourceFile, User, new_id
 from mianotes_web_service.domain.schemas import (
     EmailCheck,
     JoinRequest,
@@ -37,14 +37,14 @@ def _set_session_cookie(response: Response, token: str) -> None:
 
 
 def _create_onboarding_note(session: Session, user: User) -> None:
-    existing_topic = session.scalars(
-        select(Topic).where(Topic.user_id == user.id, Topic.slug == "mianotes")
+    existing_project = session.scalars(
+        select(Project).where(Project.user_id == user.id, Project.slug == "mianotes")
     ).one_or_none()
-    if existing_topic is not None:
+    if existing_project is not None:
         return
 
-    topic = Topic(user_id=user.id, name="Mianotes", slug="mianotes")
-    session.add(topic)
+    project = Project(user_id=user.id, name="Mianotes", slug="mianotes")
+    session.add(project)
     session.flush()
     text = (
         "Welcome to Mianotes. Add text, links, documents, images, and audio to turn "
@@ -55,7 +55,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     note_id = new_id()
     paths = storage.write_text_note(
         username=user.username,
-        topic=topic.slug,
+        project=project.slug,
         title="How to use Mianotes",
         text=text,
         filename=note_id,
@@ -63,7 +63,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     note = Note(
         id=note_id,
         user_id=user.id,
-        topic_id=topic.id,
+        project_id=project.id,
         title="How to use Mianotes",
         note_path=str(paths.note_path),
     )

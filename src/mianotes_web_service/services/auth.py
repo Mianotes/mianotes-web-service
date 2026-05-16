@@ -20,8 +20,8 @@ ALLOWED_API_TOKEN_SCOPES = frozenset(
     {
         "admin",
         "users:read",
-        "topics:read",
-        "topics:write",
+        "projects:read",
+        "projects:write",
         "notes:read",
         "notes:write",
         "comments:write",

@@ -75,6 +75,6 @@ mianotes-web-service --host 0.0.0.0 --port 8200
 
 ## First run
 
-The first user joins through `POST /api/auth/join`. The service detects that no household exists, creates the first admin, stores the master password hash, and seeds the default `Mianotes` topic.
+The first user joins through `POST /api/auth/join`. The service detects that no household exists, creates the first admin, stores the master password hash, and seeds the default `Mianotes` project.
 
 The frontend can call `POST /api/auth/check-email` first. If the response contains `is_first_user: true`, it should explain that the first password becomes the shared household password.

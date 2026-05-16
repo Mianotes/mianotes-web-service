@@ -1,8 +1,6 @@
 # Mianotes web service
 
-Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge repository for humans and AI agents.
-
-It turns documents, images, links, audio, and text into organised Markdown notes that can be searched, shared, improved by Mia, and managed programmatically by other agents.
+Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge repository for humans and AI agents. It turns documents, images, links, audio, and text into organised Markdown notes that can be searched, shared, improved by Mia, and managed programmatically by other agents.
 
 ![Mianotes overview](docs/assets/mianotes_intro.png)
 
@@ -11,7 +9,7 @@ The service is designed for small groups of people: small teams, families, devel
 ## What it does
 
 - Stores note text as Markdown on the filesystem.
-- Keeps users, topics, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
+- Keeps users, projects, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
 - Converts uploaded files and URLs through a MarkItDown-based parser layer.
 - Supports browser sessions and scoped API tokens for agents.
 - Exposes JSON REST APIs for the web app and external automation.

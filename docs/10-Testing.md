@@ -8,7 +8,7 @@ Run checks from the repository root.
 pytest
 ```
 
-The test suite covers the current API behavior, auth flow, notes, topics, tags,
+The test suite covers the current API behavior, auth flow, notes, projects, tags,
 search, MCP helpers, parser adapter behavior, and Mia job stubs.
 
 ## Linting

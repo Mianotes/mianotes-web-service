@@ -30,16 +30,16 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class TopicCreate(BaseModel):
+class ProjectCreate(BaseModel):
     user_id: str | None = None
     name: str = Field(min_length=1, max_length=200)
 
 
-class TopicUpdate(BaseModel):
+class ProjectUpdate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
 
 
-class TopicRead(BaseModel):
+class ProjectRead(BaseModel):
     id: str
     user_id: str
     name: str
@@ -54,14 +54,14 @@ class TopicRead(BaseModel):
 
 class NoteCreateFromText(BaseModel):
     user_id: str | None = None
-    topic_id: str
+    project_id: str
     text: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
 
 class NoteCreateFromUrl(BaseModel):
-    topic_id: str
+    project_id: str
     url: HttpUrl
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
@@ -115,7 +115,7 @@ class ApiAction(BaseModel):
 class NoteRead(BaseModel):
     id: str
     user: UserRead
-    topic: TopicRead
+    project: ProjectRead
     created_at: datetime
     updated_at: datetime
     title: str
@@ -140,7 +140,7 @@ class NoteRead(BaseModel):
 class NoteListItem(BaseModel):
     id: str
     user_id: str
-    topic_id: str
+    project_id: str
     title: str
     status: str
     source_type: str

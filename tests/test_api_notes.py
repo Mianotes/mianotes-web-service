@@ -50,8 +50,8 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post(
-        "/api/topics",
+    project = client.post(
+        "/api/projects",
         json={"name": "Meeting Notes"},
     ).json()
 
@@ -59,7 +59,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
         "/api/notes/from-text",
         json={
             "user_id": user["id"],
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "title": "Kickoff Notes",
             "text": "We agreed to build Mianotes with Markdown notes.",
         },
@@ -70,7 +70,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["id"]
     assert note["title"] == "Kickoff Notes"
     assert note["user"]["id"] == user["id"]
-    assert note["topic"]["id"] == topic["id"]
+    assert note["project"]["id"] == project["id"]
     assert note["status"] == "ready"
     assert note["source_type"] == "text"
     assert note["revision_number"] == 1
@@ -105,7 +105,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
         / f"{note['id']}.comments.json"
     ).exists()
 
-    listed = client.get("/api/notes", params={"topic_id": topic["id"]})
+    listed = client.get("/api/notes", params={"project_id": project["id"]})
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == note["id"]
     assert listed.json()[0]["status"] == "ready"
@@ -122,8 +122,8 @@ def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post(
-        "/api/topics",
+    project = client.post(
+        "/api/projects",
         json={"name": "Inbox"},
     ).json()
 
@@ -131,7 +131,7 @@ def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
         "/api/notes",
         json={
             "user_id": user["id"],
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "text": "This note has no provided title, so the API infers one.",
         },
     )
@@ -153,18 +153,18 @@ def test_create_note_from_file_stores_source_and_pending_note(
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post("/api/topics", json={"name": "Uploads"}).json()
+    project = client.post("/api/projects", json={"name": "Uploads"}).json()
 
     response = client.post(
         "/api/notes/from-file",
-        data={"topic_id": topic["id"], "title": "Receipt"},
+        data={"project_id": project["id"], "title": "Receipt"},
         files={"file": ("receipt.pdf", b"%PDF-1.4 test content", "application/pdf")},
     )
 
     assert response.status_code == 201
     note = response.json()
     assert note["user"]["id"] == user["id"]
-    assert note["topic"]["id"] == topic["id"]
+    assert note["project"]["id"] == project["id"]
     assert note["title"] == "Receipt"
     assert note["status"] == "pending_parse"
     assert note["note_id"] == note["id"]
@@ -201,12 +201,12 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post("/api/topics", json={"name": "Links"}).json()
+    project = client.post("/api/projects", json={"name": "Links"}).json()
 
     response = client.post(
         "/api/notes/from-url",
         json={
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "url": "https://example.com/articles/mianotes",
             "tags": ["research"],
         },
@@ -215,7 +215,7 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert response.status_code == 201
     note = response.json()
     assert note["user"]["id"] == user["id"]
-    assert note["topic"]["id"] == topic["id"]
+    assert note["project"]["id"] == project["id"]
     assert note["title"] == "mianotes"
     assert note["status"] == "pending_parse"
     assert note["note_id"] == note["id"]
@@ -252,11 +252,11 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post("/api/topics", json={"name": "Family"}).json()
+    project = client.post("/api/projects", json={"name": "Family"}).json()
     admin_note = client.post(
         "/api/notes/from-text",
         json={
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "title": "Admin Note",
             "text": "Only the admin owns this note.",
         },
@@ -279,9 +279,9 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
     maria_note = client.post(
         "/api/notes/from-text",
         json={
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "title": "Maria Note",
-            "text": "Maria can add a note to a shared topic.",
+            "text": "Maria can add a note to a shared project.",
         },
     )
     assert maria_note.status_code == 201
@@ -316,11 +316,11 @@ def test_note_tags_comments_and_share_link(client: TestClient):
             "password_confirmation": "house-password",
         },
     ).json()["user"]
-    topic = client.post("/api/topics", json={"name": "Collaboration"}).json()
+    project = client.post("/api/projects", json={"name": "Collaboration"}).json()
     note = client.post(
         "/api/notes/from-text",
         json={
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "title": "Shared Research",
             "text": "Useful research note.",
             "tags": ["Research", "summer-2026"],
@@ -349,7 +349,7 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     rejected_create = client.post(
         "/api/notes/from-text",
         json={
-            "topic_id": topic["id"],
+            "project_id": project["id"],
             "title": "Too many tags",
             "text": "This note should not be created.",
             "tags": too_many_tags,

@@ -82,7 +82,7 @@ The API currently uses FastAPI error responses.
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
-### Topic
+### Project
 
 ```json
 {
@@ -99,12 +99,12 @@ The API currently uses FastAPI error responses.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | Unique topic ID. |
-| `user_id` | string | ID of the user who created the topic. |
-| `name` | string | Topic display name. |
-| `slug` | string | Filesystem-safe topic slug. |
-| `archived_at` | string \| null | ISO 8601 timestamp when the topic was archived. |
-| `archived_by_user_id` | string \| null | ID of the user who archived the topic. |
+| `id` | string | Unique project ID. |
+| `user_id` | string | ID of the user who created the project. |
+| `name` | string | Project display name. |
+| `slug` | string | Filesystem-safe project slug. |
+| `archived_at` | string \| null | ISO 8601 timestamp when the project was archived. |
+| `archived_by_user_id` | string \| null | ID of the user who archived the project. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
@@ -114,7 +114,7 @@ The API currently uses FastAPI error responses.
 {
   "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-  "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
   "title": "Kickoff notes",
   "status": "ready",
   "source_type": "text",
@@ -130,7 +130,7 @@ The API currently uses FastAPI error responses.
 |---|---|---|
 | `id` | string | Unique note ID. |
 | `user_id` | string | ID of the user who created the note. |
-| `topic_id` | string | ID of the topic containing the note. |
+| `project_id` | string | ID of the project containing the note. |
 | `title` | string | Note title. |
 | `status` | string | Note status. Current values include `ready`, `pending_parse`, `parsing`, and `failed`. |
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
@@ -142,7 +142,7 @@ The API currently uses FastAPI error responses.
 
 ### Note
 
-Full note responses include the note content, owner, topic, source files, tags,
+Full note responses include the note content, owner, project, source files, tags,
 comments metadata, sharing metadata, and API action hints.
 
 ```json
@@ -157,7 +157,7 @@ comments metadata, sharing metadata, and API action hints.
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
   },
-  "topic": {
+  "project": {
     "id": "f054964b-419b-419a-87df-de668025b0e3",
     "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "name": "Holidays Mallorca",
@@ -223,7 +223,7 @@ comments metadata, sharing metadata, and API action hints.
 |---|---|---|
 | `id` | string | Unique note ID. |
 | `user` | object | User who created the note. |
-| `topic` | object | Topic containing the note. |
+| `project` | object | Project containing the note. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 | `title` | string | Note title. |
@@ -625,7 +625,7 @@ Session cookie or bearer token with `tokens:write` or `admin`.
 {
   "name": "Research agent",
   "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-  "scopes": ["notes:read", "notes:write", "topics:read"],
+  "scopes": ["notes:read", "notes:write", "projects:read"],
   "expires_at": null
 }
 ```
@@ -644,8 +644,8 @@ Supported scopes:
 ```text
 admin
 users:read
-topics:read
-topics:write
+projects:read
+projects:write
 notes:read
 notes:write
 comments:write
@@ -672,7 +672,7 @@ tokens:write
   },
   "name": "Research agent",
   "token_prefix": "mia_w1x2y3z4",
-  "scopes": ["notes:read", "notes:write", "topics:read"],
+  "scopes": ["notes:read", "notes:write", "projects:read"],
   "created_at": "2026-05-15T11:00:00Z",
   "updated_at": "2026-05-15T11:00:00Z",
   "last_used_at": null,
@@ -959,17 +959,17 @@ Admin session or bearer token with `admin`.
 | `403` | Admin access required. |
 | `404` | User does not exist. |
 
-## Create topic
+## Create project
 
-Creates a household-visible topic owned by the current user.
+Creates a household-visible project owned by the current user.
 
 ### Endpoint
 
-`POST /api/topics`
+`POST /api/projects`
 
 ### Authentication
 
-Session cookie or bearer token with `topics:write` or `admin`.
+Session cookie or bearer token with `projects:write` or `admin`.
 
 ### Request
 
@@ -983,40 +983,40 @@ Session cookie or bearer token with `topics:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `name` | string | Yes | Topic name. |
-| `user_id` | string \| null | No | Accepted by schema but currently ignored; the topic owner is always the current user. |
+| `name` | string | Yes | Project name. |
+| `user_id` | string \| null | No | Accepted by schema but currently ignored; the project owner is always the current user. |
 
 ### Response
 
-Returns a `Topic`.
+Returns a `Project`.
 
 ### Error responses
 
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `topics:write`. |
-| `409` | Current user already has a topic with this name. |
+| `403` | Token lacks `projects:write`. |
+| `409` | Current user already has a project with this name. |
 | `422` | Request validation failed. |
 
-## List topics
+## List projects
 
-Lists topics, optionally filtered by owner.
+Lists projects, optionally filtered by owner.
 
 ### Endpoint
 
-`GET /api/topics`
+`GET /api/projects`
 
 ### Authentication
 
-Session cookie or bearer token with `topics:read` or `admin`.
+Session cookie or bearer token with `projects:read` or `admin`.
 
 ### Query parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
-| `user_id` | string | No | Return topics created by a specific user. |
-| `include_archived` | boolean | No | Include archived topics. Defaults to `false`. |
+| `user_id` | string | No | Return projects created by a specific user. |
+| `include_archived` | boolean | No | Include archived projects. Defaults to `false`. |
 
 ### Response
 
@@ -1035,46 +1035,46 @@ Session cookie or bearer token with `topics:read` or `admin`.
 ]
 ```
 
-## Get topic
+## Get project
 
-Returns one topic.
+Returns one project.
 
 ### Endpoint
 
-`GET /api/topics/{topic_id}`
+`GET /api/projects/{project_id}`
 
 ### Authentication
 
-Session cookie or bearer token with `topics:read` or `admin`.
+Session cookie or bearer token with `projects:read` or `admin`.
 
 ### Response
 
-Returns a `Topic`.
+Returns a `Project`.
 
 ### Error responses
 
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `topics:read`. |
-| `404` | Topic does not exist. |
+| `403` | Token lacks `projects:read`. |
+| `404` | Project does not exist. |
 
-## Archive topic
+## Archive project
 
-Archives a topic. Archived topics are hidden from list responses unless
+Archives a project. Archived projects are hidden from list responses unless
 `include_archived=true`.
 
 ### Endpoint
 
-`DELETE /api/topics/{topic_id}`
+`DELETE /api/projects/{project_id}`
 
 ### Authentication
 
-Session cookie or bearer token with `topics:write` or `admin`.
+Session cookie or bearer token with `projects:write` or `admin`.
 
 ### Authorization
 
-Admins can archive any topic. Normal users can archive only topics they created.
+Admins can archive any project. Normal users can archive only projects they created.
 
 ### Response
 
@@ -1085,8 +1085,8 @@ Admins can archive any topic. Normal users can archive only topics they created.
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `topics:write`, or user does not own the topic. |
-| `404` | Topic does not exist. |
+| `403` | Token lacks `projects:write`, or user does not own the project. |
+| `404` | Project does not exist. |
 
 ## Create note from text
 
@@ -1106,7 +1106,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 ```json
 {
-  "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
   "title": "Kickoff notes",
   "text": "We agreed to build Mianotes as a filesystem-first AI note app.",
   "tags": ["research", "planning"]
@@ -1117,7 +1117,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `topic_id` | string | Yes | Topic ID for the note. |
+| `project_id` | string | Yes | Project ID for the note. |
 | `text` | string | Yes | Source text. |
 | `title` | string \| null | No | Optional title. If omitted, the API infers one from the text. |
 | `tags` | string[] | No | Tags to attach. Maximum 5 tags per note. |
@@ -1133,7 +1133,7 @@ Returns a full `Note`.
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Topic does not exist or is archived. |
+| `404` | Project does not exist or is archived. |
 | `422` | Request validation failed, including more than 5 tags. |
 
 ## Create note from file
@@ -1157,7 +1157,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `topic_id` | string | Yes | Topic ID for the note. |
+| `project_id` | string | Yes | Project ID for the note. |
 | `file` | file | Yes | Source file to upload. |
 | `title` | string | No | Optional note title. If omitted, the API infers one from the filename. |
 
@@ -1237,7 +1237,7 @@ Clients should poll `job_api_url` until the job reaches `succeeded`, then call
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Topic does not exist or is archived. |
+| `404` | Project does not exist or is archived. |
 | `415` | Unsupported file type. |
 | `422` | File or form field validation failed. |
 
@@ -1260,7 +1260,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 ```json
 {
-  "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
   "url": "https://example.com/articles/mianotes",
   "title": "Mianotes article",
   "tags": ["research", "links"]
@@ -1271,7 +1271,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `topic_id` | string | Yes | Topic ID for the note. |
+| `project_id` | string | Yes | Project ID for the note. |
 | `url` | string | Yes | URL to fetch and convert. |
 | `title` | string \| null | No | Optional note title. If omitted, the API infers one from the URL path or host. |
 | `tags` | string[] | No | Tags to attach. Maximum 5 tags per note. |
@@ -1326,7 +1326,7 @@ Clients should poll `job_api_url` until the job reaches `succeeded`, then call
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Topic does not exist or is archived. |
+| `404` | Project does not exist or is archived. |
 | `422` | Request validation failed, including an invalid URL or more than 5 tags. |
 
 ## List notes
@@ -1346,7 +1346,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
 | `user_id` | string | No | Return notes created by a specific user. |
-| `topic_id` | string | No | Return notes in a specific topic. |
+| `project_id` | string | No | Return notes in a specific project. |
 
 ### Response
 
@@ -1355,7 +1355,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
   {
     "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
     "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+    "project_id": "f054964b-419b-419a-87df-de668025b0e3",
     "title": "Kickoff notes",
     "status": "ready",
     "source_type": "text",
@@ -1869,7 +1869,7 @@ GET /api/search?q=product%20launch&limit=10
     "note": {
       "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
       "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-      "topic_id": "f054964b-419b-419a-87df-de668025b0e3",
+      "project_id": "f054964b-419b-419a-87df-de668025b0e3",
       "title": "Product launch meeting notes",
       "status": "ready",
       "source_type": "text",

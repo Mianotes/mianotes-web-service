@@ -17,8 +17,8 @@ storage and a small relational index.
 Generated notes and source files live under the configured data directory:
 
 ```text
-data/<username>/<topic>/<note_id>.md
-data/<username>/<topic>/<note_id>.source.<ext>
+data/<username>/<project>/<note_id>.md
+data/<username>/<project>/<note_id>.source.<ext>
 ```
 
 The filename is the note ID, not the note title. This keeps paths stable when a
@@ -30,7 +30,7 @@ metadata.
 SQLite is the default database. The schema tracks:
 
 - Users
-- Topics
+- Projects
 - Notes
 - Source files
 - Comments
@@ -102,4 +102,4 @@ Saved Markdown files are searched with ripgrep. The search service joins file
 matches back to note metadata before returning JSON results.
 
 This keeps the Markdown files as the source of note text while still giving API
-clients structured note IDs, titles, users, topics, tags, and timestamps.
+clients structured note IDs, titles, users, projects, tags, and timestamps.

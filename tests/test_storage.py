@@ -21,7 +21,7 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
 
     paths = storage.note_paths(
         username="abc123",
-        topic="Meeting Notes",
+        project="Meeting Notes",
         filename="Kickoff Plan.pdf",
         source_extension=".pdf",
     )
