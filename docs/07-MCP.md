@@ -49,6 +49,27 @@ The current MCP surface includes tools for:
 - Creating Mia extract jobs
 - Creating Mia rewrite jobs
 
+## Ingestion results
+
+`create_note_from_url` returns the same ingestion response as the REST API. It
+does not wait for the page to be converted before returning. The response
+includes:
+
+- `note_id`
+- `job_id`
+- `job_status`
+- `note_api_url`
+- `job_api_url`
+- The nested note object
+- The nested job object
+
+Agents should poll `job_api_url` until the job reaches `succeeded`, then call
+`get_note` with `note_id` to retrieve the finished Markdown content.
+
+The MCP server does not currently expose binary file upload. File ingestion is
+available through `POST /api/notes/from-file`; an MCP file-ingestion tool can be
+added later if agent clients need to pass local files through the MCP surface.
+
 ## Design notes
 
 The MCP server is intentionally thin. It does not bypass the API, read the

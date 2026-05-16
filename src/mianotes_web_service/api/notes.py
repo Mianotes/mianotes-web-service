@@ -276,7 +276,15 @@ def _mia_job_response(job) -> MiaJobRead:
 
 def _note_ingestion_response(note: Note, job, request: Request) -> NoteIngestionRead:
     note_read = _note_response(note, request)
-    return NoteIngestionRead(**note_read.model_dump(), job=_mia_job_response(job))
+    return NoteIngestionRead(
+        **note_read.model_dump(),
+        note_id=note.id,
+        job_id=job.id,
+        job_status=job.status,
+        note_api_url=str(request.url_for("get_note", note_id=note.id)),
+        job_api_url=str(request.url_for("get_job", job_id=job.id)),
+        job=_mia_job_response(job),
+    )
 
 
 def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: str) -> None:

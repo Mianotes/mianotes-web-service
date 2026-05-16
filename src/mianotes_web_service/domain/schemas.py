@@ -230,4 +230,9 @@ class MiaJobRead(BaseModel):
 
 
 class NoteIngestionRead(NoteRead):
+    note_id: str
+    job_id: str
+    job_status: JobStatus
+    note_api_url: str
+    job_api_url: str
     job: MiaJobRead

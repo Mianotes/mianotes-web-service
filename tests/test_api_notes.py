@@ -167,10 +167,15 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["topic"]["id"] == topic["id"]
     assert note["title"] == "Receipt"
     assert note["status"] == "pending_parse"
+    assert note["note_id"] == note["id"]
     assert note["source_type"] == "pdf"
+    assert note["job_id"] == note["job"]["id"]
+    assert note["job_status"] == "queued"
     assert note["job"]["job_type"] == "parse_file"
     assert note["job"]["status"] == "queued"
     assert note["job"]["note_id"] == note["id"]
+    assert note["note_api_url"].endswith(f"/api/notes/{note['id']}")
+    assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert "waiting for the parsing pipeline" in note["text"]
     assert note["note_url"].endswith(f"/data/43916aabf99c29b8/uploads/{note['id']}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
@@ -213,10 +218,15 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert note["topic"]["id"] == topic["id"]
     assert note["title"] == "mianotes"
     assert note["status"] == "pending_parse"
+    assert note["note_id"] == note["id"]
     assert note["source_type"] == "link"
+    assert note["job_id"] == note["job"]["id"]
+    assert note["job_status"] == "queued"
     assert note["job"]["job_type"] == "parse_url"
     assert note["job"]["status"] == "queued"
     assert note["job"]["input"]["url"] == "https://example.com/articles/mianotes"
+    assert note["note_api_url"].endswith(f"/api/notes/{note['id']}")
+    assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert [tag["slug"] for tag in note["tags"]] == ["research"]
     assert "waiting for the parsing pipeline" in note["text"]
 

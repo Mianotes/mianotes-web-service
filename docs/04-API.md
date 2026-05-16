@@ -1190,6 +1190,11 @@ parse `Job`.
 ```json
 {
   "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "job_id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
+  "job_status": "queued",
+  "note_api_url": "http://127.0.0.1:8200/api/notes/4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "job_api_url": "http://127.0.0.1:8200/api/jobs/dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
   "title": "Receipt",
   "status": "pending_parse",
   "source_type": "pdf",
@@ -1221,6 +1226,10 @@ parse `Job`.
 
 The response also includes the normal `Note` fields documented earlier in this
 file.
+
+The Markdown conversion happens in the background after the response is sent.
+Clients should poll `job_api_url` until the job reaches `succeeded`, then call
+`note_api_url` to read the finished Markdown note content.
 
 ### Error responses
 
@@ -1275,6 +1284,11 @@ Returns a full `Note` with `status` set to `pending_parse`, plus the queued
 ```json
 {
   "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "job_id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
+  "job_status": "queued",
+  "note_api_url": "http://127.0.0.1:8200/api/notes/4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "job_api_url": "http://127.0.0.1:8200/api/jobs/dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
   "title": "Mianotes article",
   "status": "pending_parse",
   "source_type": "link",
@@ -1301,6 +1315,10 @@ Returns a full `Note` with `status` set to `pending_parse`, plus the queued
   }
 }
 ```
+
+The Markdown conversion happens in the background after the response is sent.
+Clients should poll `job_api_url` until the job reaches `succeeded`, then call
+`note_api_url` to read the finished Markdown note content.
 
 ### Error responses
 
