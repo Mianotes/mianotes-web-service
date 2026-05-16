@@ -1,21 +1,19 @@
 # Installation
 
-Mianotes Web Service is a FastAPI application. It uses SQLite by default and stores generated note files under `data/`.
+Mianotes Web Service is a FastAPI application. It uses SQLite by default and
+stores generated note files under `data/`.
 
-## Local development
+For contributor setup, see [Development](09-Development.md). For test commands,
+see [Testing](10-Testing.md).
+
+## Install
+
+Install from the repository:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-pip install -e ".[dev]"
-mianotes-web-service init-db
-mianotes-web-service --reload
-```
-
-The default API URL is:
-
-```text
-http://127.0.0.1:8200
+pip install -e .
 ```
 
 ## Configuration
@@ -33,6 +31,39 @@ MIANOTES_OPENAI_MODEL=gpt-4o-mini
 
 Mia also accepts `OPENAI_API_KEY` and `OPENAI_MODEL` for compatibility with
 standard OpenAI tooling. The `MIANOTES_` variables take precedence.
+
+## Manual run
+
+Manual run is the default path for local installs, quick testing, and people who
+want to try Mianotes without installing a service.
+
+```bash
+mianotes-web-service init-db
+mianotes-web-service --host 0.0.0.0 --port 8200
+```
+
+The default API URL is:
+
+```text
+http://127.0.0.1:8200
+```
+
+## systemd service
+
+Use systemd for always-on local boxes such as Senseibox.
+
+After installing a service file:
+
+```bash
+systemctl enable mianotes-web-service
+systemctl start mianotes-web-service
+```
+
+The service should run:
+
+```bash
+mianotes-web-service --host 0.0.0.0 --port 8200
+```
 
 ## First run
 

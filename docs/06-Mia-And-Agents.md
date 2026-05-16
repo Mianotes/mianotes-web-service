@@ -53,18 +53,8 @@ The backend is the brain. The web app explains context and collects input, but t
 
 ## MCP surface
 
-The MCP server lets compatible agents use Mianotes as a toolset:
-
-- Search notes
-- Read note
-- Create note
-- Update note
-- Add source file
-- Add comment
-- Set tags
-- Create topic
-- Create notes from URLs
-- Create Mia summarise, structure, extract, and rewrite jobs
+The MCP server lets compatible agents use Mianotes as a toolset. See
+[MCP](07-MCP.md) for setup, authentication, and the current tool list.
 
 The first executable Mia operation is `summarise`. It creates a durable job,
 runs through the backend job runner, calls OpenAI when an API key is configured,

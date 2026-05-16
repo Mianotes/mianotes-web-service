@@ -1,18 +1,32 @@
 # Mianotes web service
 
 Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge
-repository for humans and AI agents. It turns documents, images, links, audio,
-and text into organised Markdown notes that can be improved by Mia and managed
-programmatically through APIs and, later, MCP.
+repository for humans and AI agents.
 
-The service stores note content on the filesystem, keeps lightweight indexes in
-SQLite, and exposes JSON REST APIs for the Mianotes web app, automation scripts,
-and future agent integrations.
+It turns documents, images, links, audio, and text into organised Markdown notes
+that can be searched, shared, improved by Mia, and managed programmatically by
+other agents.
+
+The service is designed for small local instances: families, developers,
+researchers, students, and small teams that want durable knowledge stored in
+plain files without giving up useful APIs.
 
 ## Current status
 
-This repository is in early implementation. See [SPEC.md](SPEC.md) and the
-documentation below for the current requirements and technical direction.
+This repository is in early MVP implementation. The current product and
+technical source of truth is [SPEC.md](SPEC.md).
+
+## What it does
+
+- Stores note text as Markdown on the filesystem.
+- Keeps users, topics, notes, tags, comments, source files, jobs, sessions, and
+  API tokens indexed in SQLite.
+- Converts uploaded files and URLs through a MarkItDown-based parser layer.
+- Supports household browser sessions and scoped API tokens for agents.
+- Exposes JSON REST APIs for the web app and external automation.
+- Provides a stdio MCP server so compatible AI agents can use Mianotes as a
+  local knowledge tool.
+- Uses OpenAI for Mia-powered note operations when an API key is configured.
 
 ## Documentation
 
@@ -22,149 +36,22 @@ documentation below for the current requirements and technical direction.
 - [APIs](docs/04-API.md)
 - [Customisation](docs/05-Customisation.md)
 - [Mia and agents](docs/06-Mia-And-Agents.md)
+- [MCP](docs/07-MCP.md)
+- [Architecture](docs/08-Architecture.md)
+- [Development](docs/09-Development.md)
+- [Testing](docs/10-Testing.md)
 
-## Stack
+## Technology
 
-- FastAPI for the HTTP API
-- Pydantic for request and response validation
-- SQLAlchemy for the database layer
-- Alembic for migrations
-- SQLite as the default local database
-- pytest for tests
-- Ruff for linting and formatting checks
-
-Runtime dependencies include MarkItDown conversion extras so the service can
-handle common document, image, audio, HTML, archive, and text formats from one
-parser boundary. Some formats may need optional system tools such as `ffmpeg`.
-
-## Architecture
-
-- Filesystem-first note storage
-- Markdown notes under `/data/<username>/<topic>/<note_id>.md`
-- Database-backed note comments
-- SQLite index for users, topics, notes, source files, comments, tokens, and jobs
-- Repository layer designed for future PostgreSQL support
-- OpenAI ChatGPT API for Mia-powered note generation and improvement
-- MarkItDown-powered parser adapter for documents, images, audio, HTML, URLs, archives, and text formats
-
-URL ingestion downloads HTML with a browser-like user agent before handing the
-local file to MarkItDown. This avoids common bot-blocking behavior from sites
-that reject the default Python request user agent. Install `ffmpeg` separately
-when audio or video transcription support is needed.
-
-## Development
-
-```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev]"
-mianotes-web-service init-db
-mianotes-web-service --reload
-```
-
-Set `MIANOTES_OPENAI_API_KEY` or `OPENAI_API_KEY` to enable Mia operations that
-call OpenAI. `MIANOTES_OPENAI_MODEL` defaults to `gpt-4o-mini`.
-
-The API health endpoint is available at:
-
-```text
-GET /api/health
-```
-
-The auth flow is household-based. The first user becomes the admin and sets the
-shared master password. Later users join or log in with their email address and
-the same master password. Sessions use long-lived HTTP-only cookies.
-
-Agents and automation scripts authenticate with bearer tokens:
-
-```text
-Authorization: Bearer mia_<token>
-```
-
-Raw API token values are returned only once, when they are created.
-
-The first APIs are:
-
-```text
-POST   /api/auth/check-email
-POST   /api/auth/join
-POST   /api/auth/login
-GET    /api/auth/session
-POST   /api/auth/logout
-
-POST   /api/tokens             session or tokens:write token required
-GET    /api/tokens             session or tokens:read token required
-DELETE /api/tokens/{token_id}  session or tokens:write token required
-
-GET    /api/jobs               session or notes:read token required
-GET    /api/jobs/{job_id}      session or notes:read token required
-
-POST   /api/users              admin session or admin token required
-GET    /api/users              session or users:read token required
-GET    /api/users/{user_id}    session or users:read token required
-PATCH  /api/users/{user_id}    admin session or admin token required
-DELETE /api/users/{user_id}    admin session or admin token required
-
-POST   /api/topics             session or topics:write token required
-GET    /api/topics             session or topics:read token required
-GET    /api/topics/{topic_id}  session or topics:read token required
-DELETE /api/topics/{topic_id}  session or topics:write token required
-
-POST   /api/notes              session or notes:write token required
-POST   /api/notes/from-text    session or notes:write token required
-POST   /api/notes/from-file    session or notes:write token required
-POST   /api/notes/from-url     session or notes:write token required
-GET    /api/notes              session or notes:read token required
-GET    /api/notes/{note_id}    session or notes:read token required
-PATCH  /api/notes/{note_id}    session or notes:write token required
-DELETE /api/notes/{note_id}    session or notes:write token required
-POST   /api/notes/{note_id}/summarise  session or notes:write token required
-POST   /api/notes/{note_id}/structure  session or notes:write token required
-POST   /api/notes/{note_id}/extract    session or notes:write token required
-POST   /api/notes/{note_id}/rewrite    session or notes:write token required
-GET    /api/notes/{note_id}/comments  session or notes:read token required
-POST   /api/notes/{note_id}/comments  session or comments:write token required
-PUT    /api/notes/{note_id}/tags      session or tags:write token required
-POST   /api/notes/{note_id}/share     session or share:write token required
-GET    /api/notes/shared/{token}      guest read access
-
-GET    /api/tags                 session or tags:read token required
-GET    /api/search?q=term        session or notes:read token required
-```
-
-`PUT /api/notes/{note_id}/tags` replaces the note's full tag list. Notes can have up to 5 tags.
-`POST /api/notes/from-file` and `POST /api/notes/from-url` return a note plus a queued parse job.
-`POST /api/notes/{note_id}/summarise` creates a background OpenAI summarise job when an API key is configured.
-`GET /api/search` uses ripgrep to search saved Markdown files and returns note metadata with each match.
-
-FastAPI exposes interactive local API docs at:
-
-```text
-http://127.0.0.1:8200/docs
-```
-
-Mianotes services use the `8200` range by convention. The web service defaults to
-`8200`; use `8201`, `8202`, and so on for parallel local instances.
-
-Mianotes also ships a stdio MCP server for AI agents:
-
-```bash
-MIANOTES_API_URL=http://127.0.0.1:8200 \
-MIANOTES_API_TOKEN=mia_your_token \
-python -m mianotes_web_service.mcp_server
-```
-
-The MCP server calls the same REST API with the provided bearer token, so normal
-scope checks still apply. Fresh package installs also expose the `mianotes-mcp`
-console script.
-
-## Checks
-
-```bash
-python -m compileall src tests
-pytest
-ruff check .
-```
+- FastAPI
+- Pydantic
+- SQLAlchemy
+- Alembic
+- SQLite
+- MarkItDown
+- OpenAI
+- pytest
+- Ruff
 
 ## License
 
