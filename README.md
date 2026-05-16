@@ -26,7 +26,8 @@ technical source of truth is [SPEC.md](SPEC.md).
 - Exposes JSON REST APIs for the web app and external automation.
 - Provides a stdio MCP server so compatible AI agents can use Mianotes as a
   local knowledge tool.
-- Uses OpenAI for Mia-powered note operations when an API key is configured.
+- Supports OpenAI and local OpenAI-compatible LLMs for Mia-powered note
+  operations.
 
 ## Documentation
 
@@ -49,7 +50,7 @@ technical source of truth is [SPEC.md](SPEC.md).
 - Alembic
 - SQLite
 - MarkItDown
-- OpenAI
+- OpenAI or local OpenAI-compatible LLMs
 - pytest
 - Ruff
 

@@ -25,12 +25,20 @@ MIANOTES_HOST=0.0.0.0
 MIANOTES_PORT=8200
 MIANOTES_DATA_DIR=data
 MIANOTES_DATABASE_URL=sqlite:///mianotes.db
-MIANOTES_OPENAI_API_KEY=sk-...
-MIANOTES_OPENAI_MODEL=gpt-4o-mini
+MIANOTES_LLM_PROVIDER=openai
+MIANOTES_LLM_MODEL=gpt-4o-mini
+MIANOTES_LLM_BASE_URL=
+MIANOTES_LLM_API_KEY=
 ```
 
-Mia also accepts `OPENAI_API_KEY` and `OPENAI_MODEL` for compatibility with
-standard OpenAI tooling. The `MIANOTES_` variables take precedence.
+`MIANOTES_LLM_PROVIDER` supports `openai`, `local`, and `openai-compatible`.
+Use `local` for an Ollama-style OpenAI-compatible endpoint on your machine.
+
+Mia also accepts `OPENAI_API_KEY`, `OPENAI_MODEL`, `OLLAMA_BASE_URL`,
+`OLLAMA_MODEL`, and `OLLAMA_API_KEY` for compatibility with common tooling.
+Legacy `MIANOTES_OPENAI_API_KEY` and `MIANOTES_OPENAI_MODEL` values are still
+accepted for OpenAI installs. The provider-agnostic `MIANOTES_LLM_` variables
+take precedence.
 
 ## Manual run
 

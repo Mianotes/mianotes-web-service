@@ -37,9 +37,9 @@ ruff check .
 
 ## Notes
 
-Tests should not require real OpenAI credentials. Code that calls external
-services should be isolated behind service boundaries and tested with fakes or
-mocks.
+Tests should not require real OpenAI credentials or a local LLM server. Code
+that calls external model providers should be isolated behind service boundaries
+and tested with fakes or mocks.
 
 Parser tests should avoid requiring live network access. URL behavior should be
 tested by faking the HTTP fetch boundary and verifying that local files are

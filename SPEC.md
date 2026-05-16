@@ -23,7 +23,8 @@ automation scripts, AI agents, and future MCP integrations.
 - Provide Mia, a built-in AI agent that improves, structures, extracts, and
   summarises notes.
 - Start with SQLite while keeping the storage layer adaptable for PostgreSQL later.
-- Use OpenAI ChatGPT APIs for note generation in v1.
+- Support OpenAI and local OpenAI-compatible LLMs for Mia-powered note
+  generation and improvement.
 - Use Microsoft MarkItDown as the primary v1 parser for documents, images,
   audio, HTML, links, archives, and text formats.
 - Keep the system simple enough for local self-hosting, but structured enough to scale.
@@ -32,7 +33,6 @@ automation scripts, AI agents, and future MCP integrations.
 
 - Full multi-database support at runtime.
 - YouTube transcript extraction.
-- Local LLM note generation.
 - Full MCP server implementation.
 - Complex tagging or multi-topic notes.
 - Relocating saved notes after creation.
@@ -403,7 +403,7 @@ Every note creation flow follows this high-level pipeline:
 1. Accept source input: upload, link, or plain text.
 2. Store the source file or source representation on disk.
 3. Parse source content.
-4. Send parsed content to OpenAI ChatGPT API.
+4. Send parsed content to the configured LLM provider.
 5. Generate a Markdown note.
 6. Generate or infer a note title.
 7. Save the Markdown file under `/data/<username>/<topic>/<note_id>.md`.
@@ -412,8 +412,10 @@ Every note creation flow follows this high-level pipeline:
 
 ## AI requirements
 
-V1 uses OpenAI ChatGPT API for Mia-powered Markdown note generation and
-improvement.
+V1 supports OpenAI and local OpenAI-compatible LLMs for Mia-powered Markdown
+note generation and improvement. OpenAI is the default provider. Local mode is
+designed for tools such as Ollama that expose an OpenAI-compatible chat
+completion endpoint on the user's machine.
 
 The generated note should be:
 
@@ -449,8 +451,8 @@ Long-running Mia operations should use job/status records rather than blocking
 HTTP requests indefinitely.
 
 For the backend MVP, `summarise` is the first executable Mia operation. It
-creates a durable job, calls OpenAI when an API key is configured, writes the
-generated Markdown back to the note, and increments the note revision. Other Mia
+creates a durable job, calls the configured LLM provider, writes the generated
+Markdown back to the note, and increments the note revision. Other Mia
 operations can remain queued stubs until their prompt contracts are finalised.
 
 ## Title generation
@@ -460,11 +462,11 @@ Each note has a title.
 The API creates an initial title automatically using one of these strategies:
 
 - Use the first meaningful 200 characters of the generated note.
-- Ask a small title-generation model to propose a title based on the first 1000 characters.
+- Ask the configured LLM provider to propose a title based on the first 1000 characters.
 
-For v1, OpenAI can perform title generation to avoid introducing a second model runtime immediately.
-
-Local small-model support, such as Ollama, should be researched separately. The current hardware target may have only 4 GB RAM, so model choice must be conservative.
+For v1, title generation should use the same provider boundary as Mia
+operations. Local models should be supported through the OpenAI-compatible
+provider path, with conservative defaults for small machines.
 
 ## API requirements
 
@@ -615,7 +617,7 @@ V1 should:
 - Which OpenAI transcription API should be used for audio?
 - Should source files be served directly by the app, or through signed/authorized API routes?
 - What naming strategy should be used to prevent filename collisions?
-- What minimum hardware target should guide local model research?
+- Which local model should be recommended by default for 4 GB RAM devices?
 - What is the first scoped-token model for AI agents?
 - Which Mia operations should be synchronous and which should be jobs?
 
@@ -631,7 +633,7 @@ Recommended v1 architecture:
 - Ruff linting.
 - SQLite as the default database.
 - Filesystem storage service for notes and source files.
-- OpenAI integration service for Mia-powered note generation and improvement.
+- LLM provider service for OpenAI and local OpenAI-compatible Mia operations.
 - MarkItDown parser adapter layer with room for future specialist or hosted parsers.
 - Link ingestion service for URL fetching and text extraction.
 - Scoped token authentication for AI agents and automation scripts.

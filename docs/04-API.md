@@ -1454,9 +1454,9 @@ Admins can delete any note. Normal users can delete only notes they created.
 ## Create Mia note job
 
 Creates a Mia job for a note. `summarise` is executed by the background job
-runner and calls OpenAI when an API key is configured. `structure`, `extract`,
-and `rewrite` currently create durable queued jobs and will be wired to concrete
-Mia operations later.
+runner and calls the configured LLM provider. `structure`, `extract`, and
+`rewrite` currently create durable queued jobs and will be wired to concrete Mia
+operations later.
 
 ### Endpoints
 
@@ -1517,6 +1517,8 @@ Returns a `Job`.
 Poll `GET /api/jobs/{job_id}` to watch the job move through `queued`,
 `running`, `succeeded`, or `failed`. When `summarise` succeeds, the backend
 writes the generated Markdown back to the note and increments the note revision.
+
+Successful summarise job results include the provider and model used.
 
 ### Error responses
 

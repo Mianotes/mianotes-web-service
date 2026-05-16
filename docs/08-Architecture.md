@@ -69,6 +69,21 @@ queued -> cancelled
 This gives the web app and agent clients a stable polling model for parsing,
 summarising, extracting, structuring, and rewriting work.
 
+## LLM providers
+
+Mia calls language models through a provider boundary. The default provider is
+OpenAI. Local mode uses the same OpenAI client against an OpenAI-compatible
+endpoint, which makes local tools such as Ollama fit the same code path.
+
+The supported provider values are:
+
+- `openai`
+- `local`
+- `openai-compatible`
+
+Job results record the provider and model used, so clients can explain whether a
+note was improved by OpenAI or by a local model.
+
 ## Authentication
 
 The web app uses long-lived HTTP-only cookie sessions. Agents and automation

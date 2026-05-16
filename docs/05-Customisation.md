@@ -51,13 +51,34 @@ or hosted parsers can be added later behind the same parser adapter boundary.
 
 ## Mia provider
 
-Mia should start with OpenAI for v1. The agent layer should still be isolated
-behind a service boundary so a future install can choose different providers or
-local models for specific tasks.
+Mia uses an LLM provider boundary. OpenAI and local OpenAI-compatible servers
+are supported out of the box.
 
-Set `MIANOTES_OPENAI_API_KEY` or `OPENAI_API_KEY` to enable Mia jobs that call
-OpenAI. `MIANOTES_OPENAI_MODEL` defaults to `gpt-4o-mini`; `OPENAI_MODEL` is
-also supported for local developer convenience.
+```text
+MIANOTES_LLM_PROVIDER=openai
+MIANOTES_LLM_MODEL=gpt-4o-mini
+MIANOTES_LLM_API_KEY=sk-...
+```
+
+For local Ollama-style servers:
+
+```text
+MIANOTES_LLM_PROVIDER=local
+MIANOTES_LLM_MODEL=llama3.2
+MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
+```
+
+For other OpenAI-compatible servers:
+
+```text
+MIANOTES_LLM_PROVIDER=openai-compatible
+MIANOTES_LLM_MODEL=<model-name>
+MIANOTES_LLM_BASE_URL=<base-url>
+MIANOTES_LLM_API_KEY=<token-or-local-placeholder>
+```
+
+OpenAI compatibility variables are also supported: `OPENAI_API_KEY`,
+`OPENAI_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, and `OLLAMA_API_KEY`.
 
 ## Agent access
 

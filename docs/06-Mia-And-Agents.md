@@ -56,7 +56,11 @@ The backend is the brain. The web app explains context and collects input, but t
 The MCP server lets compatible agents use Mianotes as a toolset. See
 [MCP](07-MCP.md) for setup, authentication, and the current tool list.
 
+Mia supports OpenAI and local OpenAI-compatible LLMs through the same provider
+boundary. This lets a household run Mia against OpenAI, a local Ollama-style
+server, or another compatible endpoint without changing the REST or MCP API.
+
 The first executable Mia operation is `summarise`. It creates a durable job,
-runs through the backend job runner, calls OpenAI when an API key is configured,
-and writes the generated Markdown back to the note. The other Mia operations are
+runs through the backend job runner, calls the configured LLM provider, and
+writes the generated Markdown back to the note. The other Mia operations are
 queued as durable stubs until their prompts and edit semantics are finalised.

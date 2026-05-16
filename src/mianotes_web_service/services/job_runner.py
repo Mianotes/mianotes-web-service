@@ -133,15 +133,16 @@ def _run_summarise_job(session: Session, job: MiaJob) -> dict[str, object]:
     note_path = Path(note.note_path)
     summary = summarise_markdown(title=note.title, markdown=note_path.read_text(encoding="utf-8"))
     note_path.write_text(
-        render_markdown_note(title=note.title, text=summary),
+        render_markdown_note(title=note.title, text=summary.text),
         encoding="utf-8",
     )
     note.revision_number += 1
     note.status = "ready"
     return {
-        "provider": "openai",
+        "provider": summary.provider,
+        "model": summary.model,
         "operation": "summarise",
-        "characters": len(summary),
+        "characters": len(summary.text),
     }
 
 
