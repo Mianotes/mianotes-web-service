@@ -1,35 +1,21 @@
 # Mianotes web service
 
-Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge
-repository for humans and AI agents.
+Mianotes Web Service is the Python backend for Mianotes, a local-first knowledge repository for humans and AI agents.
 
-It turns documents, images, links, audio, and text into organised Markdown notes
-that can be searched, shared, improved by Mia, and managed programmatically by
-other agents.
-
-The service is designed for small groups of people: small teams, families,
-developers, researchers, and students who want durable knowledge stored in plain
-files that agents and tools can use directly. Because Mianotes uses the
-filesystem as its main storage layer, anyone can install as many instances as
-they want. It is local, private, and extremely portable.
+It turns documents, images, links, audio, and text into organised Markdown notes that can be searched, shared, improved by Mia, and managed programmatically by other agents.
 
 ![Mianotes overview](docs/assets/mianotes_intro.png)
 
-## Current status
-
-This repository is in early MVP implementation. The current product and
-technical source of truth is [SPEC.md](SPEC.md).
+The service is designed for small groups of people: small teams, families, developers, researchers, and students who want durable knowledge stored in plain files that agents and tools can use directly. Because Mianotes uses the filesystem as its main storage layer, anyone can install as many instances as they want. 
 
 ## What it does
 
 - Stores note text as Markdown on the filesystem.
-- Keeps users, topics, notes, tags, comments, source files, jobs, sessions, and
-  API tokens indexed in SQLite.
+- Keeps users, topics, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
 - Converts uploaded files and URLs through a MarkItDown-based parser layer.
-- Supports household browser sessions and scoped API tokens for agents.
+- Supports browser sessions and scoped API tokens for agents.
 - Exposes JSON REST APIs for the web app and external automation.
-- Provides a stdio MCP server so compatible AI agents can use Mianotes as a
-  local knowledge tool.
+- Provides a stdio MCP server so compatible AI agents can use Mianotes as a local knowledge tool.
 - Supports local LLMs, or OpenAI, for Mia-powered note operations.
 
 ## Documentation
