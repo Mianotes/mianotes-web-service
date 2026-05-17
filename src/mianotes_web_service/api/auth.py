@@ -48,8 +48,8 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     session.flush()
     text = (
         "Welcome to Mianotes. Add text, links, documents, images, and audio to turn "
-        "them into organised Markdown notes. Everyone in your household can browse "
-        "shared notes, while owners keep control of their own contributions."
+        "them into organised Markdown notes. Everyone with access to this instance "
+        "can browse shared notes, while owners keep control of their own contributions."
     )
     storage = FilesystemStorage(get_settings().data_dir)
     note_id = new_id()
