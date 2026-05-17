@@ -14,6 +14,7 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
+    Response,
     UploadFile,
     status,
 )
@@ -37,6 +38,7 @@ from mianotes_web_service.domain.schemas import (
     CommentRead,
     CommentUpdate,
     MiaJobRead,
+    MiaPromptRead,
     NoteCreateFromText,
     NoteCreateFromUrl,
     NoteIngestionRead,
@@ -46,6 +48,7 @@ from mianotes_web_service.domain.schemas import (
     TagsUpdate,
 )
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
+from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
 from mianotes_web_service.services.share import (
     generate_share_token,
     get_share_secret,
@@ -257,6 +260,19 @@ def _ensure_can_change_note(note: Note, user: User) -> None:
     )
 
 
+def _mia_prompt(body: str) -> str | None:
+    stripped = body.strip()
+    if not stripped.lower().startswith("@mia"):
+        return None
+    prompt = stripped[4:].strip()
+    if not prompt:
+        raise HTTPException(
+            status_code=422,
+            detail="Mia prompt cannot be empty",
+        )
+    return prompt
+
+
 def _mia_job_response(job) -> MiaJobRead:
     return MiaJobRead(
         id=job.id,
@@ -289,30 +305,6 @@ def _note_ingestion_response(note: Note, job, request: Request) -> NoteIngestion
 
 def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: str) -> None:
     request.app.state.job_runner.enqueue(background_tasks, job_id)
-
-
-def _create_mia_note_job(
-    note_id: str,
-    job_type: str,
-    session: SessionDep,
-    user: NotesWriteUser,
-    request: Request,
-    background_tasks: BackgroundTasks,
-) -> MiaJobRead:
-    note = _read_note_or_404(session, note_id)
-    _ensure_can_change_note(note, user)
-    job = create_job(
-        session,
-        user,
-        job_type=job_type,
-        note_id=note.id,
-        input_payload={"note_id": note.id, "operation": job_type},
-    )
-    session.commit()
-    session.refresh(job)
-    if job_type == "summarise":
-        _enqueue_job(request, background_tasks, job.id)
-    return _mia_job_response(job)
 
 
 @router.post("/from-text", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -642,58 +634,6 @@ def update_note(
     return _note_response(_read_note_or_404(session, note.id), request)
 
 
-@router.post(
-    "/{note_id}/summarise",
-    response_model=MiaJobRead,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-def summarise_note(
-    note_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    user: NotesWriteUser,
-) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "summarise", session, user, request, background_tasks)
-
-
-@router.post(
-    "/{note_id}/structure",
-    response_model=MiaJobRead,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-def structure_note(
-    note_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    user: NotesWriteUser,
-) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "structure", session, user, request, background_tasks)
-
-
-@router.post("/{note_id}/extract", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
-def extract_note(
-    note_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    user: NotesWriteUser,
-) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "extract", session, user, request, background_tasks)
-
-
-@router.post("/{note_id}/rewrite", response_model=MiaJobRead, status_code=status.HTTP_202_ACCEPTED)
-def rewrite_note(
-    note_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    session: SessionDep,
-    user: NotesWriteUser,
-) -> MiaJobRead:
-    return _create_mia_note_job(note_id, "rewrite", session, user, request, background_tasks)
-
-
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = _read_note_or_404(session, note_id)
@@ -721,14 +661,45 @@ def get_note_comments(
     ]
 
 
-@router.post("/{note_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{note_id}/comments",
+    response_model=CommentRead | MiaPromptRead,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_note_comment(
     note_id: str,
     payload: CommentCreate,
+    response: Response,
     session: SessionDep,
     user: CommentsWriteUser,
-) -> Comment:
+) -> Comment | MiaPromptRead:
     note = _read_note_or_404(session, note_id)
+    prompt = _mia_prompt(payload.body)
+    if prompt is not None:
+        try:
+            result = prompt_markdown(
+                title=note.title,
+                markdown=Path(note.note_path).read_text(encoding="utf-8"),
+                prompt=prompt,
+            )
+        except MiaUnavailable as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
+        except Exception as exc:  # pragma: no cover - provider/network boundary
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Mia prompt failed",
+            ) from exc
+        response.status_code = status.HTTP_200_OK
+        return MiaPromptRead(
+            prompt=prompt,
+            note_id=note.id,
+            text=result.text,
+        )
+
+    response.status_code = status.HTTP_201_CREATED
     comment = Comment(note_id=note.id, user_id=user.id, body=payload.body, comments_path="")
     session.add(comment)
     session.commit()

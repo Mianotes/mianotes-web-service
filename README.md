@@ -14,7 +14,7 @@ The service is designed for small groups of people: small teams, families, devel
 - Supports browser sessions and scoped API tokens for agents.
 - Exposes JSON REST APIs for the web app and external automation.
 - Provides a stdio MCP server so compatible AI agents can use Mianotes as a local knowledge tool.
-- Supports local LLMs, or OpenAI, for Mia-powered note operations.
+- Supports local LLMs, or OpenAI, for Mia prompts sent through comments.
 
 ## Documentation
 
@@ -28,6 +28,7 @@ The service is designed for small groups of people: small teams, families, devel
 - [Architecture](docs/08-Architecture.md)
 - [Development](docs/09-Development.md)
 - [Testing](docs/10-Testing.md)
+- [Comments](docs/11-Comments.md)
 
 ## Technology
 

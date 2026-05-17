@@ -363,6 +363,7 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     )
     assert comment.status_code == 201
     comment_body = comment.json()
+    assert comment_body["type"] == "comment"
     assert comment_body["body"] == "This is useful for the next call."
     assert comment_body["user"]["id"] == user["id"]
 
@@ -384,3 +385,94 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert disabled.status_code == 204
     guest_missing = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
     assert guest_missing.status_code == 404
+
+
+def test_mia_comment_prompt_returns_markdown_without_saving_comment(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from mianotes_web_service.api import notes
+    from mianotes_web_service.services.mia import MiaTextResult
+
+    captured: dict[str, str] = {}
+
+    def fake_prompt_markdown(*, title: str, markdown: str, prompt: str) -> MiaTextResult:
+        captured["title"] = title
+        captured["markdown"] = markdown
+        captured["prompt"] = prompt
+        return MiaTextResult(
+            text="## Summary\n\nThis is the short version.",
+            provider="test",
+            model="test-model",
+        )
+
+    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "mia-comment@example.com",
+            "name": "Mia Comment User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Prompts"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Planning trip to Mallorca",
+            "text": "Long text goes here.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/comments",
+        json={"body": "@mia summarise this text"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body == {
+        "type": "prompt",
+        "prompt": "summarise this text",
+        "note_id": note["id"],
+        "text": "## Summary\n\nThis is the short version.",
+        "format": "markdown",
+    }
+    assert captured["title"] == "Planning trip to Mallorca"
+    assert "# Planning trip to Mallorca" in captured["markdown"]
+    assert captured["prompt"] == "summarise this text"
+
+    comments = client.get(f"/api/notes/{note['id']}/comments")
+    assert comments.status_code == 200
+    assert comments.json() == []
+
+
+def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "empty-mia@example.com",
+            "name": "Empty Mia User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Prompts"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Empty prompt",
+            "text": "A note.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/comments",
+        json={"body": "@mia"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Mia prompt cannot be empty"

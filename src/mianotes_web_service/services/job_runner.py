@@ -12,7 +12,6 @@ from mianotes_web_service.services.jobs import (
     mark_job_running,
     mark_job_succeeded,
 )
-from mianotes_web_service.services.mia import summarise_markdown
 from mianotes_web_service.services.parsing import fetch_url_to_html, parse_document
 from mianotes_web_service.services.storage import render_markdown_note
 
@@ -58,8 +57,6 @@ def _run_job(session: Session, job: MiaJob) -> dict[str, object]:
         return _run_parse_file_job(session, job)
     if job.job_type == "parse_url":
         return _run_parse_url_job(session, job)
-    if job.job_type == "summarise":
-        return _run_summarise_job(session, job)
     raise RuntimeError(f"Unsupported job type: {job.job_type}")
 
 
@@ -125,24 +122,6 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
         "source_file_id": source_file.id,
         "url": url,
         "characters": len(parsed.text),
-    }
-
-
-def _run_summarise_job(session: Session, job: MiaJob) -> dict[str, object]:
-    note = _job_note(session, job)
-    note_path = Path(note.note_path)
-    summary = summarise_markdown(title=note.title, markdown=note_path.read_text(encoding="utf-8"))
-    note_path.write_text(
-        render_markdown_note(title=note.title, text=summary.text),
-        encoding="utf-8",
-    )
-    note.revision_number += 1
-    note.status = "ready"
-    return {
-        "provider": summary.provider,
-        "model": summary.model,
-        "operation": "summarise",
-        "characters": len(summary.text),
     }
 
 

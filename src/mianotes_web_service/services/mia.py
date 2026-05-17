@@ -104,6 +104,14 @@ def _client_for(config: LLMConfig) -> OpenAI:
 
 
 def summarise_markdown(*, title: str, markdown: str) -> MiaTextResult:
+    return prompt_markdown(
+        title=title,
+        markdown=markdown,
+        prompt="Summarise this note into clear, useful Markdown.",
+    )
+
+
+def prompt_markdown(*, title: str, markdown: str, prompt: str) -> MiaTextResult:
     config = _llm_config()
     client = _client_for(config)
     response = client.chat.completions.create(
@@ -112,19 +120,24 @@ def summarise_markdown(*, title: str, markdown: str) -> MiaTextResult:
             {
                 "role": "system",
                 "content": (
-                    "You are Mia, the Mianotes assistant. Summarise notes into clear, "
-                    "useful Markdown for humans and AI agents. Return Markdown body only."
+                    "You are Mia, the Mianotes assistant. Help humans and AI agents "
+                    "improve notes. Return Markdown body only. Do not wrap the response "
+                    "in code fences unless the user explicitly asks for code."
                 ),
             },
             {
                 "role": "user",
-                "content": f"Title: {title}\n\nMarkdown note:\n\n{markdown}",
+                "content": (
+                    f"User prompt:\n{prompt}\n\n"
+                    f"Note title:\n{title}\n\n"
+                    f"Markdown note:\n{markdown}"
+                ),
             },
         ],
     )
     content = response.choices[0].message.content
     if not content:
-        raise MiaUnavailable(f"{config.provider} returned an empty summary")
+        raise MiaUnavailable(f"{config.provider} returned an empty response")
     return MiaTextResult(
         text=content.strip(),
         provider=config.provider,

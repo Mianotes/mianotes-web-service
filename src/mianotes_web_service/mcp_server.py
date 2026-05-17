@@ -129,42 +129,6 @@ TOOL_DEFINITIONS: list[JsonObject] = [
             "properties": {"q": {"type": "string"}, "limit": {"type": "integer"}},
         },
     },
-    {
-        "name": "summarise_note",
-        "description": "Create a queued Mia summarise job for a note.",
-        "inputSchema": {
-            "type": "object",
-            "required": ["note_id"],
-            "properties": {"note_id": {"type": "string"}},
-        },
-    },
-    {
-        "name": "structure_note",
-        "description": "Create a queued Mia structure job for a note.",
-        "inputSchema": {
-            "type": "object",
-            "required": ["note_id"],
-            "properties": {"note_id": {"type": "string"}},
-        },
-    },
-    {
-        "name": "extract_note",
-        "description": "Create a queued Mia extract job for a note.",
-        "inputSchema": {
-            "type": "object",
-            "required": ["note_id"],
-            "properties": {"note_id": {"type": "string"}},
-        },
-    },
-    {
-        "name": "rewrite_note",
-        "description": "Create a queued Mia rewrite job for a note.",
-        "inputSchema": {
-            "type": "object",
-            "required": ["note_id"],
-            "properties": {"note_id": {"type": "string"}},
-        },
-    },
 ]
 
 
@@ -255,9 +219,6 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
         )
     if name == "search_notes":
         return _request("GET", "/api/search", query=arguments)
-    if name in {"summarise_note", "structure_note", "extract_note", "rewrite_note"}:
-        operation = name.removesuffix("_note")
-        return _request("POST", f"/api/notes/{arguments['note_id']}/{operation}")
     raise RuntimeError(f"Unknown tool: {name}")
 
 

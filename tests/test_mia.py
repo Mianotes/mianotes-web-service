@@ -59,3 +59,24 @@ def test_mia_uses_local_openai_compatible_provider(monkeypatch):
     }
     assert calls["completion"]["model"] == "llama3.2"
     get_settings.cache_clear()
+
+
+def test_mia_prompt_sends_user_prompt_and_note(monkeypatch):
+    calls: dict[str, object] = {}
+    monkeypatch.setenv("MIANOTES_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(mia, "OpenAI", _fake_openai(calls))
+    get_settings.cache_clear()
+
+    result = mia.prompt_markdown(
+        title="Planning trip to Mallorca",
+        markdown="# Planning trip to Mallorca\n\nLong text goes here.",
+        prompt="summarise this text",
+    )
+
+    user_message = calls["completion"]["messages"][1]["content"]
+    assert result.text == "## Summary\n\nUseful and tidy."
+    assert "User prompt:\nsummarise this text" in user_message
+    assert "Note title:\nPlanning trip to Mallorca" in user_message
+    assert "# Planning trip to Mallorca" in user_message
+    get_settings.cache_clear()

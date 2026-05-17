@@ -11,8 +11,7 @@ def test_mcp_initialize_and_tool_list():
     tool_names = {tool["name"] for tool in listed["result"]["tools"]}
     assert "search_notes" in tool_names
     assert "create_note_from_url" in tool_names
-    assert "summarise_note" in tool_names
-    assert "rewrite_note" in tool_names
+    assert "add_comment" in tool_names
 
 
 def test_mcp_initialized_notification_has_no_response():

@@ -66,8 +66,9 @@ queued -> running -> failed
 queued -> cancelled
 ```
 
-This gives the web app and agent clients a stable polling model for parsing,
-summarising, extracting, structuring, and rewriting work.
+This gives the web app and agent clients a stable polling model for file and
+URL ingestion. Mia prompts sent through comments are synchronous and do not use
+jobs.
 
 ## LLM providers
 

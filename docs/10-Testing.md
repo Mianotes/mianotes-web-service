@@ -9,7 +9,7 @@ pytest
 ```
 
 The test suite covers the current API behavior, auth flow, notes, projects, tags,
-search, MCP helpers, parser adapter behavior, and Mia job stubs.
+search, MCP helpers, parser adapter behavior, and synchronous Mia prompts.
 
 ## Linting
 

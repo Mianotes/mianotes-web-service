@@ -28,7 +28,7 @@ Humans use Mianotes through the web app. They can:
 - Browse the shared knowledge base.
 - Add projects and notes.
 - Upload files.
-- Ask Mia to improve notes.
+- Prompt Mia from comments.
 - Comment, tag, share, and export information.
 
 ## Agent users
@@ -41,7 +41,7 @@ AI agents use Mianotes programmatically. They can:
 - Update notes when new information appears.
 - Use tags to organise memory.
 - Query notes through search.
-- Ask Mia to improve or extract content.
+- Prompt Mia from comments.
 
 Agents should use scoped API tokens and MCP tools, not browser cookies. The
 stdio MCP server is started with `MIANOTES_API_URL` and `MIANOTES_API_TOKEN`,
@@ -60,7 +60,7 @@ Mia supports OpenAI and local OpenAI-compatible LLMs through the same provider
 boundary. This lets a household run Mia against OpenAI, a local Ollama-style
 server, or another compatible endpoint without changing the REST or MCP API.
 
-The first executable Mia operation is `summarise`. It creates a durable job,
-runs through the backend job runner, calls the configured LLM provider, and
-writes the generated Markdown back to the note. The other Mia operations are
-queued as durable stubs until their prompts and edit semantics are finalised.
+In v1, Mia is prompted through comments. When a comment starts with `@mia`, the
+backend sends the prompt and note Markdown to the configured LLM provider and
+returns Markdown directly. This does not create a job and does not update the
+note. See [Comments](11-Comments.md) for the exact request and response shape.

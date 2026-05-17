@@ -16,7 +16,7 @@ automation scripts, AI agents, and future MCP integrations.
 - Convert human- or agent-provided content into clean Markdown notes.
 - Store notes and source files in a transparent filesystem layout.
 - Keep an indexed record of users, projects, notes, source files, and comments.
-- Keep durable Mia job records for asynchronous parsing and note improvement operations.
+- Keep durable Mia job records for asynchronous note creation and parsing.
 - Support a shared local household auth flow for the React app.
 - Support scoped API tokens for AI agents and automation scripts.
 - Provide a stdio MCP surface so AI agents can manage their own docs through tools.
@@ -142,8 +142,10 @@ Mia is the built-in Mianotes AI agent. Mia helps humans and other agents:
 - Maintain metadata such as tags and source summaries.
 
 Mia must be implemented as backend capability. The web app can provide prompts
-and controls, but the web service owns permissions, state transitions, note
-updates, and persistence.
+and controls, but the web service owns permissions, state transitions, and
+provider calls. In v1, users and agents prompt Mia by posting comments that
+start with `@mia`; the response is returned synchronously as Markdown and does
+not update the note unless the client later patches the note.
 
 ## Storage model
 
@@ -437,23 +439,14 @@ The exact prompt contract should be defined during implementation.
 
 ### Mia operations
 
-Mia should expose backend operations that can be called by the web app, REST API
-clients, and future MCP tools:
+Mia is called through comments. When a comment body starts with `@mia`, the
+backend strips the prefix, sends the prompt and current note Markdown to the
+configured LLM provider, and returns Markdown directly. Mia prompt comments do
+not create jobs, do not save the prompt as a normal comment, and do not mutate
+the note.
 
-- Summarise a note.
-- Structure a note.
-- Extract key information from a note or source file.
-- Rewrite a note for clarity.
-- Suggest tags.
-- Convert parsed source text into durable Markdown.
-
-Long-running Mia operations should use job/status records rather than blocking
-HTTP requests indefinitely.
-
-For the backend MVP, `summarise` is the first executable Mia operation. It
-creates a durable job, calls the configured LLM provider, writes the generated
-Markdown back to the note, and increments the note revision. Other Mia
-operations can remain queued stubs until their prompt contracts are finalised.
+Long-running jobs are reserved for note creation and parsing work, such as file
+and URL ingestion.
 
 ## Title generation
 
@@ -548,10 +541,7 @@ Example shape:
 - `GET /api/notes/{note_id}`
 - `PATCH /api/notes/{note_id}`
 - `DELETE /api/notes/{note_id}`
-- `POST /api/notes/{note_id}/summarise`
-- `POST /api/notes/{note_id}/structure`
-- `POST /api/notes/{note_id}/extract`
-- `POST /api/notes/{note_id}/rewrite`
+- `POST /api/notes/{note_id}/comments` supports normal comments and synchronous `@mia` prompts
 - `PUT /api/notes/{note_id}/tags`
 - `POST /api/notes/{note_id}/share`
 - `DELETE /api/notes/{note_id}/share`

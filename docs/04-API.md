@@ -266,6 +266,7 @@ comments metadata, sharing metadata, and API action hints.
 
 ```json
 {
+  "type": "comment",
   "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "user": {
@@ -285,6 +286,7 @@ comments metadata, sharing metadata, and API action hints.
 
 | Field | Type | Description |
 |---|---|---|
+| `type` | string | Always `comment`. |
 | `id` | string | Unique comment ID. |
 | `note_id` | string | ID of the note the comment belongs to. |
 | `user` | object \| null | User who created the comment. |
@@ -307,11 +309,12 @@ comments metadata, sharing metadata, and API action hints.
     "updated_at": "2026-05-15T10:30:00Z"
   },
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-  "job_type": "summarise",
+  "job_type": "parse_file",
   "status": "queued",
   "input": {
     "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-    "operation": "summarise"
+    "source_file_id": "6aa09fd4-ef76-4cb4-88df-7136d2d85738",
+    "operation": "parse_file"
   },
   "result": {},
   "error": null,
@@ -327,7 +330,7 @@ comments metadata, sharing metadata, and API action hints.
 | `id` | string | Unique job ID. |
 | `user` | object | User who created the job. |
 | `note_id` | string \| null | Related note ID, when the job is note-specific. |
-| `job_type` | string | Job type, for example `summarise`, `structure`, `extract`, or `rewrite`. |
+| `job_type` | string | Job type, for example `parse_file` or `parse_url`. |
 | `status` | string | Job status: `queued`, `running`, `succeeded`, `failed`, or `cancelled`. |
 | `input` | object | Job input payload. |
 | `result` | object | Job result payload. Empty until the job succeeds. |
@@ -1469,83 +1472,6 @@ Admins can delete any note. Normal users can delete only notes they created.
 | `403` | Token lacks `notes:write`, or user cannot delete the note. |
 | `404` | Note does not exist. |
 
-## Create Mia note job
-
-Creates a Mia job for a note. `summarise` is executed by the background job
-runner and calls the configured LLM provider. `structure`, `extract`, and
-`rewrite` currently create durable queued jobs and will be wired to concrete Mia
-operations later.
-
-### Endpoints
-
-```text
-POST /api/notes/{note_id}/summarise
-POST /api/notes/{note_id}/structure
-POST /api/notes/{note_id}/extract
-POST /api/notes/{note_id}/rewrite
-```
-
-### Authentication
-
-Session cookie or bearer token with `notes:write` or `admin`.
-
-### Authorization
-
-Admins can create jobs for any note. Normal users can create jobs only for notes
-they created.
-
-### Request
-
-No request body.
-
-### Response
-
-`202 Accepted`
-
-Returns a `Job`.
-
-```json
-{
-  "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
-  "user": {
-    "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "email": "matt@example.com",
-    "name": "Matt",
-    "username": "u_2d9f6b1a",
-    "is_admin": true,
-    "created_at": "2026-05-15T10:30:00Z",
-    "updated_at": "2026-05-15T10:30:00Z"
-  },
-  "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-  "job_type": "summarise",
-  "status": "queued",
-  "input": {
-    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-    "operation": "summarise"
-  },
-  "result": {},
-  "error": null,
-  "created_at": "2026-05-15T10:45:00Z",
-  "updated_at": "2026-05-15T10:45:00Z",
-  "started_at": null,
-  "finished_at": null
-}
-```
-
-Poll `GET /api/jobs/{job_id}` to watch the job move through `queued`,
-`running`, `succeeded`, or `failed`. When `summarise` succeeds, the backend
-writes the generated Markdown back to the note and increments the note revision.
-
-Successful summarise job results include the provider and model used.
-
-### Error responses
-
-| Status | Reason |
-|---:|---|
-| `401` | Not authenticated. |
-| `403` | Token lacks `notes:write`, or user cannot change the note. |
-| `404` | Note does not exist. |
-
 ## Share note
 
 Creates or replaces a read-only share URL for a note.
@@ -1728,6 +1654,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 ```json
 [
   {
+    "type": "comment",
     "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
     "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
     "user": {
@@ -1748,7 +1675,10 @@ Session cookie or bearer token with `notes:read` or `admin`.
 
 ## Create comment
 
-Creates a comment for a note.
+Creates a comment for a note. If the body starts with `@mia`, the request is
+treated as a synchronous Mia prompt instead of a saved comment. Mia receives the
+prompt and the current note Markdown, then returns Markdown directly in the API
+response. Mia prompt responses do not create jobs and do not update the note.
 
 ### Endpoint
 
@@ -1766,15 +1696,77 @@ Session cookie or bearer token with `comments:write` or `admin`.
 }
 ```
 
+Mia prompt request:
+
+```json
+{
+  "body": "@mia summarise this text"
+}
+```
+
 ### Request fields
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `body` | string | Yes | Comment text. |
+| `body` | string | Yes | Comment text. Prefix with `@mia` to send a synchronous prompt to Mia. |
 
 ### Response
 
-Returns a `Comment`.
+Returns either a saved `Comment` with `201 Created` or a Mia prompt response
+with `200 OK`.
+
+Normal comment response:
+
+```json
+{
+  "type": "comment",
+  "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
+  "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "user": {
+    "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "u_2d9f6b1a",
+    "is_admin": true,
+    "created_at": "2026-05-15T10:30:00Z",
+    "updated_at": "2026-05-15T10:30:00Z"
+  },
+  "body": "This is useful for the next call.",
+  "created_at": "2026-05-15T10:40:00Z",
+  "updated_at": "2026-05-15T10:40:00Z"
+}
+```
+
+Mia prompt response:
+
+```json
+{
+  "type": "prompt",
+  "prompt": "summarise this text",
+  "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+  "text": "## Summary\n\nThe note explains the Mallorca trip plan...",
+  "format": "markdown"
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | string | `comment` for saved comments, or `prompt` for Mia responses. |
+| `prompt` | string | Mia prompt without the `@mia` prefix. Present only when `type` is `prompt`. |
+| `text` | string | Markdown returned by Mia. Present only when `type` is `prompt`. |
+| `format` | string | Response format for Mia prompt output. Current value is `markdown`. |
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Token lacks `comments:write`. |
+| `404` | Note does not exist. |
+| `422` | Request validation failed, or `@mia` was sent without a prompt. |
+| `503` | Mia is not configured or the configured LLM provider is unavailable. |
 
 ## Update comment
 
@@ -1940,11 +1932,12 @@ Session cookie or bearer token with `notes:read` or `admin`.
       "updated_at": "2026-05-15T10:30:00Z"
     },
     "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-    "job_type": "summarise",
+    "job_type": "parse_file",
     "status": "queued",
     "input": {
       "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-      "operation": "summarise"
+      "source_file_id": "6aa09fd4-ef76-4cb4-88df-7136d2d85738",
+      "operation": "parse_file"
     },
     "result": {},
     "error": null,

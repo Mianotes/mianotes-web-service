@@ -41,13 +41,9 @@ The current MCP surface includes tools for:
 - Creating notes from text
 - Creating notes from URLs
 - Updating notes
-- Adding comments
+- Adding comments, including synchronous `@mia` prompts
 - Setting tags
 - Searching Markdown notes
-- Creating Mia summarise jobs
-- Creating Mia structure jobs
-- Creating Mia extract jobs
-- Creating Mia rewrite jobs
 
 ## Ingestion results
 

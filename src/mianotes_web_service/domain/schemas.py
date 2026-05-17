@@ -97,6 +97,7 @@ class CommentUpdate(BaseModel):
 
 
 class CommentRead(BaseModel):
+    type: Literal["comment"] = "comment"
     id: str
     note_id: str
     user: UserRead | None = None
@@ -105,6 +106,14 @@ class CommentRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MiaPromptRead(BaseModel):
+    type: Literal["prompt"] = "prompt"
+    prompt: str
+    note_id: str
+    text: str
+    format: Literal["markdown"] = "markdown"
 
 
 class ApiAction(BaseModel):
