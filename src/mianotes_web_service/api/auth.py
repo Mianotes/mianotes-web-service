@@ -120,7 +120,7 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
             user = User(
                 email=email,
                 name=payload.name,
-                username=make_username(email),
+                username=make_username(email, payload.name),
                 is_admin=True,
             )
             session.add(user)
@@ -136,7 +136,12 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
         if session.scalars(select(User).where(User.email == email)).one_or_none() is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
 
-        user = User(email=email, name=payload.name, username=make_username(email), is_admin=False)
+        user = User(
+            email=email,
+            name=payload.name,
+            username=make_username(email, payload.name),
+            is_admin=False,
+        )
         session.add(user)
         try:
             session.flush()

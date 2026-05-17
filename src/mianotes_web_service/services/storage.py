@@ -11,14 +11,26 @@ from typing import BinaryIO
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 
 
-def make_username(email: str) -> str:
+def make_username(email: str, name: str | None = None) -> str:
     normalized = email.strip().lower().encode("utf-8")
-    return hashlib.sha256(normalized).hexdigest()[:16]
+    suffix = hashlib.sha256(normalized).hexdigest()[:8]
+    if name is None:
+        return hashlib.sha256(normalized).hexdigest()[:16]
+    return f"{slugify(name, 'user')}-{suffix}"
 
 
 def slugify(value: str, fallback: str = "untitled") -> str:
     slug = SLUG_PATTERN.sub("-", value.strip().lower()).strip("-")
     return slug or fallback
+
+
+def short_id(value: str, length: int = 8) -> str:
+    compact = re.sub(r"[^a-zA-Z0-9]", "", value).lower()
+    return compact[:length] or "00000000"
+
+
+def note_stem(title: str, note_id: str) -> str:
+    return f"{slugify(title)}-{short_id(note_id)}"
 
 
 @dataclass(frozen=True)
@@ -42,11 +54,12 @@ class FilesystemStorage:
         username: str,
         project: str,
         filename: str,
+        title: str | None = None,
         source_extension: str | None = None,
         source_suffix: str = "",
     ) -> NotePaths:
         base_dir = self.project_dir(username, project)
-        stem = slugify(Path(filename).stem)
+        stem = note_stem(title, filename) if title is not None else slugify(Path(filename).stem)
         note_path = base_dir / f"{stem}.md"
         comments_path = base_dir / f"{stem}.comments.json"
         source_path = None
@@ -75,6 +88,7 @@ class FilesystemStorage:
             username=username,
             project=project,
             filename=filename or title,
+            title=title if filename is not None else None,
             source_extension=".source.txt",
         )
         paths.directory.mkdir(parents=True, exist_ok=True)
@@ -98,6 +112,7 @@ class FilesystemStorage:
             username=username,
             project=project,
             filename=filename,
+            title=title,
             source_extension=extension,
             source_suffix=".source",
         )
@@ -124,6 +139,7 @@ class FilesystemStorage:
             username=username,
             project=project,
             filename=filename,
+            title=title,
             source_extension=".source.html",
         )
         paths.directory.mkdir(parents=True, exist_ok=True)

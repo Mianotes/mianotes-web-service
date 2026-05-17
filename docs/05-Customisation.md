@@ -17,9 +17,11 @@ Mianotes services use the `8200` range:
 By default, generated notes and source files live under `data/`.
 
 ```text
-data/<username>/<project>/<note_id>.md
-data/<username>/<project>/<note_id>.source.<ext>
+data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md
+data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.<ext>
 ```
+
+User and project directories are filesystem-safe slugs. Note filenames are readable enough for GitHub while still carrying a stable note ID prefix.
 
 Set `MIANOTES_DATA_DIR` to change the storage location.
 

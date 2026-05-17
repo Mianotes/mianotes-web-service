@@ -77,20 +77,23 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["is_published"] is False
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
-    assert note["note_url"].endswith(f"/data/926c16eeec762774/meeting-notes/{note['id']}.md")
+    note_filename = f"kickoff-notes-{note['id'][:8]}"
+    assert note["note_url"].endswith(
+        f"/data/note-user-926c16ee/meeting-notes/{note_filename}.md"
+    )
     assert note["source_files"][0]["url"].endswith(
-        f"/data/926c16eeec762774/meeting-notes/{note['id']}.source.txt"
+        f"/data/note-user-926c16ee/meeting-notes/{note_filename}.source.txt"
     )
     assert note["comments_count"] == 0
     assert note["comments_url"].endswith(f"/api/notes/{note['id']}/comments")
 
-    note_path = tmp_path / "data" / "926c16eeec762774" / "meeting-notes" / f"{note['id']}.md"
+    note_path = tmp_path / "data" / "note-user-926c16ee" / "meeting-notes" / f"{note_filename}.md"
     source_path = (
         tmp_path
         / "data"
-        / "926c16eeec762774"
+        / "note-user-926c16ee"
         / "meeting-notes"
-        / f"{note['id']}.source.txt"
+        / f"{note_filename}.source.txt"
     )
     assert note_path.read_text(encoding="utf-8").startswith("# Kickoff Notes")
     assert (
@@ -100,9 +103,9 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert not (
         tmp_path
         / "data"
-        / "926c16eeec762774"
+        / "note-user-926c16ee"
         / "meeting-notes"
-        / f"{note['id']}.comments.json"
+        / f"{note_filename}.comments.json"
     ).exists()
 
     listed = client.get("/api/notes", params={"project_id": project["id"]})
@@ -177,15 +180,20 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["note_api_url"].endswith(f"/api/notes/{note['id']}")
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert "waiting for the parsing pipeline" in note["text"]
-    assert note["note_url"].endswith(f"/data/43916aabf99c29b8/uploads/{note['id']}.md")
+    note_filename = f"receipt-{note['id'][:8]}"
+    assert note["note_url"].endswith(f"/data/upload-user-43916aab/uploads/{note_filename}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/43916aabf99c29b8/uploads/{note['id']}.source.pdf"
+        f"/data/upload-user-43916aab/uploads/{note_filename}.source.pdf"
     )
 
-    note_path = tmp_path / "data" / "43916aabf99c29b8" / "uploads" / f"{note['id']}.md"
+    note_path = tmp_path / "data" / "upload-user-43916aab" / "uploads" / f"{note_filename}.md"
     source_path = (
-        tmp_path / "data" / "43916aabf99c29b8" / "uploads" / f"{note['id']}.source.pdf"
+        tmp_path
+        / "data"
+        / "upload-user-43916aab"
+        / "uploads"
+        / f"{note_filename}.source.pdf"
     )
     assert note_path.read_text(encoding="utf-8").startswith("# Receipt")
     assert source_path.read_bytes() == b"%PDF-1.4 test content"
@@ -230,14 +238,15 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert [tag["slug"] for tag in note["tags"]] == ["research"]
     assert "waiting for the parsing pipeline" in note["text"]
 
-    note_path = tmp_path / "data" / "09592df946423e42" / "links" / f"{note['id']}.md"
+    note_filename = f"mianotes-{note['id'][:8]}"
+    note_path = tmp_path / "data" / "url-user-09592df9" / "links" / f"{note_filename}.md"
     source_path = (
-        tmp_path / "data" / "09592df946423e42" / "links" / f"{note['id']}.source.html"
+        tmp_path / "data" / "url-user-09592df9" / "links" / f"{note_filename}.source.html"
     )
     assert note_path.read_text(encoding="utf-8").startswith("# mianotes")
     assert note["source_files"][0]["original_filename"] == "https://example.com/articles/mianotes"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/09592df946423e42/links/{note['id']}.source.html"
+        f"/data/url-user-09592df9/links/{note_filename}.source.html"
     )
     assert not source_path.exists()
 

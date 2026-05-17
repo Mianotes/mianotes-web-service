@@ -27,7 +27,7 @@ def _read_user_or_404(session: Session, user_id: str) -> User:
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, session: SessionDep, user: AdminUser) -> User:
     email = str(payload.email).lower()
-    created_user = User(email=email, name=payload.name, username=make_username(email))
+    created_user = User(email=email, name=payload.name, username=make_username(email, payload.name))
     session.add(created_user)
     try:
         session.commit()
@@ -59,7 +59,7 @@ def update_user(user_id: str, payload: UserUpdate, session: SessionDep, user: Ad
     if payload.email is not None:
         email = str(payload.email).lower()
         user.email = email
-        user.username = make_username(email)
+        user.username = make_username(email, payload.name or user.name)
     try:
         session.commit()
     except IntegrityError as exc:

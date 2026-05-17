@@ -65,7 +65,7 @@ The API currently uses FastAPI error responses.
   "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
   "email": "matt@example.com",
   "name": "Matt",
-  "username": "u_2d9f6b1a",
+  "username": "matt-2d9f6b1a",
   "is_admin": true,
   "created_at": "2026-05-15T10:30:00Z",
   "updated_at": "2026-05-15T10:30:00Z"
@@ -77,7 +77,7 @@ The API currently uses FastAPI error responses.
 | `id` | string | Unique user ID. |
 | `email` | string | User email address. Email is unique. |
 | `name` | string | User display name. |
-| `username` | string | App-generated filesystem-safe username. |
+| `username` | string | App-generated filesystem-safe username, derived from the display name plus a short email hash. |
 | `is_admin` | boolean | Whether the user is an admin. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
@@ -120,7 +120,7 @@ The API currently uses FastAPI error responses.
   "source_type": "text",
   "revision_number": 1,
   "is_published": false,
-  "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+  "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/holidays-mallorca/kickoff-notes-4a95f146.md",
   "created_at": "2026-05-15T10:35:00Z",
   "updated_at": "2026-05-15T10:35:00Z"
 }
@@ -136,7 +136,7 @@ The API currently uses FastAPI error responses.
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
-| `note_path` | string | Absolute filesystem path to the Markdown note. |
+| `note_path` | string | Absolute filesystem path to the Markdown note. New notes use `<title_slug>-<note_id[:8]>.md`. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
@@ -152,7 +152,7 @@ comments metadata, sharing metadata, and API action hints.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -177,13 +177,13 @@ comments metadata, sharing metadata, and API action hints.
   "published_at": null,
   "shared_at": null,
   "text": "# Kickoff notes\n\nWe agreed to build Mianotes...",
-  "note_url": "http://127.0.0.1:8200/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+  "note_url": "http://127.0.0.1:8200/data/matt-2d9f6b1a/holidays-mallorca/kickoff-notes-4a95f146.md",
   "source_files": [
     {
       "id": "b5e20df8-bd95-45f0-a4f6-a2ee2db3f7b6",
       "original_filename": "kickoff.source.txt",
       "content_type": "text/plain",
-      "url": "http://127.0.0.1:8200/data/u_2d9f6b1a/holidays-mallorca/4a95f146-9d27-4c79-b7d8-34739aef8998.source.txt"
+      "url": "http://127.0.0.1:8200/data/matt-2d9f6b1a/holidays-mallorca/kickoff-notes-4a95f146.source.txt"
     }
   ],
   "comments_count": 0,
@@ -273,7 +273,7 @@ comments metadata, sharing metadata, and API action hints.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -303,7 +303,7 @@ comments metadata, sharing metadata, and API action hints.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -482,7 +482,7 @@ None.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -543,7 +543,7 @@ None.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -580,7 +580,7 @@ Session cookie or bearer token.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -668,7 +668,7 @@ tokens:write
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -740,7 +740,7 @@ Session cookie or bearer token with `tokens:read` or `admin`.
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
       "email": "matt@example.com",
       "name": "Matt",
-      "username": "u_2d9f6b1a",
+      "username": "matt-2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"
@@ -858,7 +858,7 @@ Session cookie or bearer token with `users:read` or `admin`.
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -1205,10 +1205,10 @@ parse `Job`.
   "source_files": [
     {
       "id": "83c3b0d9-49a4-49cb-99b0-b20a553ef4bb",
-      "file_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/uploads/4a95f146-9d27-4c79-b7d8-34739aef8998.source.pdf",
+      "file_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/uploads/receipt-4a95f146.source.pdf",
       "original_filename": "receipt.pdf",
       "content_type": "application/pdf",
-      "url": "http://127.0.0.1:8200/data/u_2d9f6b1a/uploads/4a95f146-9d27-4c79-b7d8-34739aef8998.source.pdf"
+      "url": "http://127.0.0.1:8200/data/matt-2d9f6b1a/uploads/receipt-4a95f146.source.pdf"
     }
   ],
   "job": {
@@ -1364,7 +1364,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "source_type": "text",
     "revision_number": 1,
     "is_published": false,
-    "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/school/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+    "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/school/homework-14-may-4a95f146.md",
     "created_at": "2026-05-15T10:35:00Z",
     "updated_at": "2026-05-15T10:35:00Z"
   }
@@ -1661,7 +1661,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
       "email": "matt@example.com",
       "name": "Matt",
-      "username": "u_2d9f6b1a",
+      "username": "matt-2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"
@@ -1726,7 +1726,7 @@ Normal comment response:
     "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "email": "matt@example.com",
     "name": "Matt",
-    "username": "u_2d9f6b1a",
+    "username": "matt-2d9f6b1a",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -1867,7 +1867,7 @@ GET /api/search?q=product%20launch&limit=10
       "source_type": "text",
       "revision_number": 1,
       "is_published": false,
-      "note_path": "/home/arduino/mianotes-web-service/data/u_2d9f6b1a/work/4a95f146-9d27-4c79-b7d8-34739aef8998.md",
+      "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/work/research-summary-4a95f146.md",
       "created_at": "2026-05-15T10:35:00Z",
       "updated_at": "2026-05-15T10:35:00Z"
     },
@@ -1926,7 +1926,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
       "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
       "email": "matt@example.com",
       "name": "Matt",
-      "username": "u_2d9f6b1a",
+      "username": "matt-2d9f6b1a",
       "is_admin": true,
       "created_at": "2026-05-15T10:30:00Z",
       "updated_at": "2026-05-15T10:30:00Z"

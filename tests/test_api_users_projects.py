@@ -59,7 +59,7 @@ def test_user_crud(client: TestClient):
     user = response.json()
     assert user["email"] == "alice@example.com"
     assert user["name"] == "Alice"
-    assert len(user["username"]) == 16
+    assert user["username"].startswith("alice-")
 
     duplicate = client.post("/api/users", json={"email": "alice@example.com", "name": "Alice Two"})
     assert duplicate.status_code == 409

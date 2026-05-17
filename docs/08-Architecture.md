@@ -17,13 +17,13 @@ storage and a small relational index.
 Generated notes and source files live under the configured data directory:
 
 ```text
-data/<username>/<project>/<note_id>.md
-data/<username>/<project>/<note_id>.source.<ext>
+data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md
+data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.<ext>
 ```
 
-The filename is the note ID, not the note title. This keeps paths stable when a
-title changes and makes filesystem search results easy to join back to database
-metadata.
+The filename combines a human-readable title slug with the first eight
+characters of the note ID. Paths are written once and stored in SQLite, so later
+title edits do not rename files.
 
 ## Database responsibilities
 
