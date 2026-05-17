@@ -25,16 +25,7 @@ User and project directories are filesystem-safe slugs. Note filenames are reada
 
 Set `MIANOTES_DATA_DIR` to change the storage location.
 
-Existing installs that still have old hash-only user directories can migrate the
-stored paths after pulling the latest code:
-
-```bash
-mianotes-web-service migrate-storage-paths
-```
-
-The command updates existing usernames in SQLite, moves note/source files to the
-readable layout, and refuses to overwrite files that already exist. Comments are
-stored in SQLite and do not use `.comments.json` sidecars.
+Comments are stored in SQLite and do not use `.comments.json` sidecars.
 
 ## Database
 
