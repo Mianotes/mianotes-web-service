@@ -4,8 +4,38 @@ This page is for people working on the Python web service locally.
 
 ## Setup
 
-Create a virtual environment, then run the installer with development
-dependencies:
+Install system dependencies first.
+
+macOS:
+
+```bash
+brew install python ripgrep ffmpeg
+```
+
+Linux:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip ripgrep ffmpeg
+```
+
+Then start the development server:
+
+```bash
+./start-dev.sh
+```
+
+The script creates `.venv` if needed, installs Mianotes with development
+dependencies, installs the Codex and Claude skills, initializes the database,
+and starts the API on port `8200` with reload enabled.
+
+To use a different host or port:
+
+```bash
+MIANOTES_HOST=127.0.0.1 MIANOTES_PORT=8201 ./start-dev.sh
+```
+
+To run the setup manually instead:
 
 ```bash
 python -m venv .venv

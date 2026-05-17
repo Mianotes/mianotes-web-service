@@ -2,9 +2,26 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN="${PYTHON:-python3}"
 INSTALL_DEV=0
 MODE="default"
+
+find_python() {
+  if [[ -n "${PYTHON:-}" ]]; then
+    echo "$PYTHON"
+    return
+  fi
+
+  for candidate in python3 /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+    if command -v "$candidate" >/dev/null 2>&1 \
+      && "$candidate" -c 'import sys; raise SystemExit(sys.version_info < (3, 11))' >/dev/null 2>&1; then
+      command -v "$candidate"
+      return
+    fi
+  done
+
+  echo "Python 3.11 or newer is required. Install it with Homebrew or your package manager." >&2
+  exit 1
+}
 
 usage() {
   cat <<'USAGE'
@@ -39,6 +56,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$MODE" != "skills-only" ]]; then
+  PYTHON_BIN="$(find_python)"
   if [[ "$INSTALL_DEV" -eq 1 ]]; then
     "$PYTHON_BIN" -m pip install -e "${ROOT_DIR}[dev]"
   else
@@ -61,7 +79,13 @@ fi
 install_skill "${CODEX_HOME:-$HOME/.codex}/skills/mianotes"
 install_skill "${CLAUDE_HOME:-$HOME/.claude}/skills/mianotes"
 
-cat <<'NEXT'
+if [[ "$MODE" == "skills-only" ]]; then
+  cat <<'NEXT'
+
+Mianotes agent skills installed.
+NEXT
+else
+  cat <<'NEXT'
 
 Mianotes web service installed.
 
@@ -69,3 +93,4 @@ Next:
   mianotes-web-service init-db
   mianotes-web-service --host 0.0.0.0 --port 8200
 NEXT
+fi

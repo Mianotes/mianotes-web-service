@@ -8,6 +8,43 @@ see [Testing](10-Testing.md).
 
 ## Install
 
+Install the system dependencies first.
+
+macOS:
+
+```bash
+brew install python ripgrep ffmpeg
+```
+
+Linux:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip ripgrep ffmpeg
+```
+
+`ripgrep` is required for search. `ffmpeg` is optional unless you want to parse
+audio or video files.
+
+## Start
+
+For the simplest local run:
+
+```bash
+./start.sh
+```
+
+The script creates `.venv` if needed, installs Mianotes, installs the Codex and
+Claude skills, initializes the database, and starts the API on port `8200`.
+
+To use a different host or port:
+
+```bash
+MIANOTES_HOST=127.0.0.1 MIANOTES_PORT=8201 ./start.sh
+```
+
+## Manual install
+
 Install from the repository with the installer:
 
 ```bash
@@ -65,7 +102,7 @@ Legacy `MIANOTES_OPENAI_API_KEY` and `MIANOTES_OPENAI_MODEL` values are still
 accepted for OpenAI installs. The provider-agnostic `MIANOTES_LLM_` variables
 take precedence.
 
-## Manual run
+## Manual run commands
 
 Manual run is the default path for local installs, quick testing, and people who
 want to try Mianotes without installing a service.
