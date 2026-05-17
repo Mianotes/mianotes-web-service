@@ -8,7 +8,26 @@ see [Testing](10-Testing.md).
 
 ## Install
 
-Install from the repository:
+Install from the repository with the installer:
+
+```bash
+./install.sh
+```
+
+The installer installs the Python package and copies the Mianotes skill to:
+
+```text
+~/.codex/skills/mianotes/SKILL.md
+~/.claude/skills/mianotes/SKILL.md
+```
+
+For development dependencies:
+
+```bash
+./install.sh --dev
+```
+
+To install manually instead:
 
 ```bash
 python -m venv .venv

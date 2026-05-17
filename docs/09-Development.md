@@ -4,14 +4,18 @@ This page is for people working on the Python web service locally.
 
 ## Setup
 
-Create a virtual environment and install the project with development
+Create a virtual environment, then run the installer with development
 dependencies:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate
-pip install -e ".[dev]"
+./install.sh --dev
 ```
+
+The installer also copies the repo's Mianotes skill to
+`~/.codex/skills/mianotes/SKILL.md` and
+`~/.claude/skills/mianotes/SKILL.md`.
 
 ## Configuration
 
