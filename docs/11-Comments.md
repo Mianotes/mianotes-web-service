@@ -26,8 +26,9 @@ The API saves the comment and returns:
 
 ## Prompting Mia
 
-If a comment starts with `@mia`, the backend treats it as a prompt instead of a
-normal comment:
+If a comment starts with `@mia`, the backend treats it as a Mia prompt. The
+prompt is still saved as a comment so other users and agents can see what was
+asked and reuse the prompt later:
 
 ```json
 {
@@ -47,6 +48,14 @@ The response is returned directly:
   "prompt": "summarise this text",
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "text": "## Summary\n\nThe note explains the Mallorca trip plan...",
+  "comment": {
+    "type": "comment",
+    "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
+    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+    "body": "@mia summarise this text",
+    "created_at": "2026-05-15T10:40:00Z",
+    "updated_at": "2026-05-15T10:40:00Z"
+  },
   "format": "markdown"
 }
 ```
@@ -55,7 +64,7 @@ Prompt comments:
 
 - are synchronous
 - do not create jobs
-- are not saved as comments
+- are saved as comments with the original `@mia` body
 - do not update the note
 - return Markdown only
 

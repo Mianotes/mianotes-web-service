@@ -675,6 +675,10 @@ def create_note_comment(
     note = _read_note_or_404(session, note_id)
     prompt = _mia_prompt(payload.body)
     if prompt is not None:
+        comment = Comment(note_id=note.id, user_id=user.id, body=payload.body)
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
         try:
             result = prompt_markdown(
                 title=note.title,
@@ -696,6 +700,7 @@ def create_note_comment(
             prompt=prompt,
             note_id=note.id,
             text=result.text,
+            comment=CommentRead.model_validate(comment),
         )
 
     response.status_code = status.HTTP_201_CREATED

@@ -388,7 +388,7 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert guest_missing.status_code == 404
 
 
-def test_mia_comment_prompt_returns_markdown_without_saving_comment(
+def test_mia_comment_prompt_returns_markdown_and_saves_prompt_comment(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -434,20 +434,21 @@ def test_mia_comment_prompt_returns_markdown_without_saving_comment(
 
     assert response.status_code == 200
     body = response.json()
-    assert body == {
-        "type": "prompt",
-        "prompt": "summarise this text",
-        "note_id": note["id"],
-        "text": "## Summary\n\nThis is the short version.",
-        "format": "markdown",
-    }
+    assert body["type"] == "prompt"
+    assert body["prompt"] == "summarise this text"
+    assert body["note_id"] == note["id"]
+    assert body["text"] == "## Summary\n\nThis is the short version."
+    assert body["format"] == "markdown"
+    assert body["comment"]["type"] == "comment"
+    assert body["comment"]["note_id"] == note["id"]
+    assert body["comment"]["body"] == "@mia summarise this text"
     assert captured["title"] == "Planning trip to Mallorca"
     assert "# Planning trip to Mallorca" in captured["markdown"]
     assert captured["prompt"] == "summarise this text"
 
     comments = client.get(f"/api/notes/{note['id']}/comments")
     assert comments.status_code == 200
-    assert comments.json() == []
+    assert [comment["body"] for comment in comments.json()] == ["@mia summarise this text"]
 
 
 def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
