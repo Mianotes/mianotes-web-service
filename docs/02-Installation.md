@@ -112,6 +112,13 @@ mianotes-web-service init-db
 mianotes-web-service --host 0.0.0.0 --port 8200
 ```
 
+When upgrading an existing local instance from the old hash-only storage layout,
+run this once after `init-db`:
+
+```bash
+mianotes-web-service migrate-storage-paths
+```
+
 The default API URL is:
 
 ```text

@@ -100,14 +100,6 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
         source_path.read_text(encoding="utf-8")
         == "We agreed to build Mianotes with Markdown notes."
     )
-    assert not (
-        tmp_path
-        / "data"
-        / "note-user-926c16ee"
-        / "meeting-notes"
-        / f"{note_filename}.comments.json"
-    ).exists()
-
     listed = client.get("/api/notes", params={"project_id": project["id"]})
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == note["id"]

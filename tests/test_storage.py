@@ -44,9 +44,6 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
     assert paths.note_path == (
         tmp_path / "abc123" / "meeting-notes" / "kickoff-plan-4a95f146.md"
     )
-    assert paths.comments_path == (
-        tmp_path / "abc123" / "meeting-notes" / "kickoff-plan-4a95f146.comments.json"
-    )
     assert paths.source_path == (
         tmp_path / "abc123" / "meeting-notes" / "kickoff-plan-4a95f146.pdf"
     )

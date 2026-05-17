@@ -118,7 +118,6 @@ class Comment(Base, TimestampMixin):
     note_id: Mapped[str] = mapped_column(ForeignKey("notes.id"), index=True, nullable=False)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
     body: Mapped[str | None] = mapped_column(Text)
-    comments_path: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
     note: Mapped[Note] = relationship(back_populates="comments")
     user: Mapped[User | None] = relationship()

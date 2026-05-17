@@ -1,0 +1,2 @@
+Kickoff meeting notes: build a FastAPI service, use filesystem storage, index metadata in SQLite, and start with text note creation before document parsing.
+

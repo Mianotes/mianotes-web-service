@@ -37,7 +37,6 @@ def note_stem(title: str, note_id: str) -> str:
 class NotePaths:
     directory: Path
     note_path: Path
-    comments_path: Path
     source_path: Path | None = None
 
 
@@ -61,7 +60,6 @@ class FilesystemStorage:
         base_dir = self.project_dir(username, project)
         stem = note_stem(title, filename) if title is not None else slugify(Path(filename).stem)
         note_path = base_dir / f"{stem}.md"
-        comments_path = base_dir / f"{stem}.comments.json"
         source_path = None
         if source_extension:
             extension = (
@@ -71,7 +69,6 @@ class FilesystemStorage:
         return NotePaths(
             directory=base_dir,
             note_path=note_path,
-            comments_path=comments_path,
             source_path=source_path,
         )
 

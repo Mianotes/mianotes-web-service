@@ -640,7 +640,6 @@ def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None
     _ensure_can_change_note(note, user)
     paths = [Path(note.note_path)]
     paths.extend(Path(source.file_path) for source in note.source_files)
-    paths.extend(Path(comment.comments_path) for comment in note.comments if comment.comments_path)
     session.delete(note)
     session.commit()
     for path in paths:
@@ -700,7 +699,7 @@ def create_note_comment(
         )
 
     response.status_code = status.HTTP_201_CREATED
-    comment = Comment(note_id=note.id, user_id=user.id, body=payload.body, comments_path="")
+    comment = Comment(note_id=note.id, user_id=user.id, body=payload.body)
     session.add(comment)
     session.commit()
     session.refresh(comment)
