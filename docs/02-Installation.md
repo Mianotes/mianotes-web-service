@@ -27,6 +27,12 @@ For development dependencies:
 ./install.sh --dev
 ```
 
+To refresh only the Codex and Claude skills:
+
+```bash
+./install.sh --skills-only
+```
+
 To install manually instead:
 
 ```bash
