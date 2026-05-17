@@ -1,10 +1,10 @@
-# Mianotes web service
+# Mianotes Web Service
 
 The Python backend for Mianotes, providing the local REST API, filesystem-backed Markdown storage, SQLite indexing, file/link parsing, agent tokens, MCP tools, and Mia prompt integration.
 
-![Mianotes overview](docs/assets/mianotes_intro.png)
+The service is designed for small groups: teams, developers, researchers, students, and families who want durable knowledge stored as plain files that people, agents, and tools like Claude, Codex and Slack can use directly. It uses the filesystem as its main storage layer, which makes it extremely portable and easy to run locally on your computer or on a hosted server without relying on an external database server.
 
-The service is designed for small groups of people: small teams, families, developers, researchers, and students who want durable knowledge stored in plain files that agents and tools can use directly. Because Mianotes uses the filesystem as its main storage layer, anyone can install as many instances as they want. 
+![Mianotes overview](docs/assets/mianotes_intro.png)
 
 ## What it does
 
