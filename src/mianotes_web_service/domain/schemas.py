@@ -197,6 +197,17 @@ class SessionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StorageCapacityRead(BaseModel):
+    data_dir: str
+    total_bytes: int
+    used_bytes: int
+    free_bytes: int
+    used_percent: float
+    cache_seconds: int
+    refreshed_at: datetime
+    cache_expires_at: datetime
+
+
 class ApiTokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     user_id: str | None = None

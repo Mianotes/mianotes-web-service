@@ -380,6 +380,52 @@ No request body.
 | `storage.data_dir` | string | Configured note data directory. |
 | `storage.database_url` | string | Redacted database URL. |
 
+## Storage capacity
+
+Returns cached capacity information for the drive that stores Mianotes data.
+The service refreshes this snapshot at most once per hour and stores the cached
+value in SQLite.
+
+### Endpoint
+
+`GET /api/storage`
+
+### Authentication
+
+Browser session or API token with `notes:read`.
+
+### Request
+
+No request body.
+
+### Response
+
+```json
+{
+  "data_dir": "data",
+  "total_bytes": 494384795648,
+  "used_bytes": 227633410048,
+  "free_bytes": 266751385600,
+  "used_percent": 46.04,
+  "cache_seconds": 3600,
+  "refreshed_at": "2026-05-18T00:55:00Z",
+  "cache_expires_at": "2026-05-18T01:55:00Z"
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|---|---|---|
+| `data_dir` | string | Configured data directory measured by the service. |
+| `total_bytes` | number | Total capacity of the filesystem containing `data_dir`. |
+| `used_bytes` | number | Used capacity on that filesystem. |
+| `free_bytes` | number | Available capacity on that filesystem. |
+| `used_percent` | number | Percentage of the filesystem currently used. |
+| `cache_seconds` | number | Cache TTL used by the service. Defaults to one hour. |
+| `refreshed_at` | string | ISO 8601 timestamp when the cached snapshot was refreshed. |
+| `cache_expires_at` | string | ISO 8601 timestamp when the cached snapshot expires. |
+
 ## Check email
 
 Checks whether an email address belongs to an existing user and whether this is
