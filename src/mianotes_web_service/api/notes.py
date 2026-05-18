@@ -60,6 +60,7 @@ from mianotes_web_service.services.storage import (
     render_markdown_note,
     replace_markdown_title,
     slugify,
+    summarize_markdown_note,
     summarize_text,
 )
 
@@ -197,10 +198,18 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
     )
 
 
+def _normalized_summary(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def _note_summary_needs_refresh(note: Note) -> bool:
+    return not note.summary or _normalized_summary(note.summary) == _normalized_summary(note.title)
+
+
 def _note_list_response(note: Note) -> NoteListItem:
-    if not note.summary:
+    if _note_summary_needs_refresh(note):
         try:
-            note.summary = summarize_text(Path(note.note_path).read_text(encoding="utf-8"))
+            note.summary = summarize_markdown_note(Path(note.note_path).read_text(encoding="utf-8"))
         except OSError:
             note.summary = ""
     return NoteListItem(
@@ -552,7 +561,7 @@ def list_notes(
     if project_id is not None:
         statement = statement.where(Note.project_id == project_id)
     notes = list(session.scalars(statement).unique())
-    needs_summary_backfill = any(not note.summary for note in notes)
+    needs_summary_backfill = any(_note_summary_needs_refresh(note) for note in notes)
     items = [_note_list_response(note) for note in notes]
     if needs_summary_backfill:
         session.commit()

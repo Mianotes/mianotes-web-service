@@ -166,6 +166,40 @@ def test_note_summary_is_limited_to_55_words(client: TestClient):
     assert summary.endswith("...")
 
 
+def test_list_notes_backfills_summary_from_note_body(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "backfill@example.com",
+            "name": "Backfill User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Backfill"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Backfill title",
+            "text": "The useful description should come from the note body.",
+        },
+    ).json()
+
+    from mianotes_web_service.db.models import Note
+    from mianotes_web_service.db.session import get_session
+
+    with next(client.app.dependency_overrides[get_session]()) as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        db_note.summary = "Backfill title"
+        session.commit()
+
+    listed = client.get("/api/notes")
+    assert listed.status_code == 200
+    assert listed.json()[0]["summary"] == "The useful description should come from the note body."
+
+
 def test_create_note_from_file_stores_source_and_pending_note(
     client: TestClient,
     tmp_path: Path,

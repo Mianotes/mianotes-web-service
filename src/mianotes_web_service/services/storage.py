@@ -163,6 +163,27 @@ def summarize_text(text: str, max_words: int = 55) -> str:
     return f"{' '.join(words[:max_words]).rstrip(' .,;:-')}..."
 
 
+def markdown_note_body(markdown: str) -> str:
+    lines = markdown.splitlines()
+    note_heading_index = next(
+        (index for index, line in enumerate(lines) if line.strip().lower() == "## note"),
+        None,
+    )
+    if note_heading_index is not None:
+        return "\n".join(lines[note_heading_index + 1 :]).strip()
+
+    body_lines = lines[1:] if lines and lines[0].startswith("# ") else lines
+    return "\n".join(
+        line
+        for line in body_lines
+        if not line.strip().startswith(("Created:", "Status:"))
+    ).strip()
+
+
+def summarize_markdown_note(markdown: str, max_words: int = 55) -> str:
+    return summarize_text(markdown_note_body(markdown), max_words=max_words)
+
+
 def render_markdown_note(title: str, text: str) -> str:
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f"# {title}\n\nCreated: {created_at}\n\n## Note\n\n{text.strip()}\n"
