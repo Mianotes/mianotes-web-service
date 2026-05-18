@@ -203,7 +203,11 @@ def _normalized_summary(value: str) -> str:
 
 
 def _note_summary_needs_refresh(note: Note) -> bool:
-    return not note.summary or _normalized_summary(note.summary) == _normalized_summary(note.title)
+    summary = _normalized_summary(note.summary)
+    title = _normalized_summary(note.title)
+    if not summary or summary == title:
+        return True
+    return bool(title and summary.startswith(f"{title} created:"))
 
 
 def _note_list_response(note: Note) -> NoteListItem:

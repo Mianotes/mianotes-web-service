@@ -200,6 +200,43 @@ def test_list_notes_backfills_summary_from_note_body(client: TestClient):
     assert listed.json()[0]["summary"] == "The useful description should come from the note body."
 
 
+def test_list_notes_backfills_stale_wrapped_summary(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "wrapped-summary@example.com",
+            "name": "Wrapped Summary User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Wrapped Summary"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Wrapped title",
+            "text": "Only this sentence should appear in the note list.",
+        },
+    ).json()
+
+    from mianotes_web_service.db.models import Note
+    from mianotes_web_service.db.session import get_session
+
+    with next(client.app.dependency_overrides[get_session]()) as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        db_note.summary = (
+            "Wrapped title Created: 2026 05 18T00:00:00Z Note "
+            "Only this sentence should appear in the note list."
+        )
+        session.commit()
+
+    listed = client.get("/api/notes")
+    assert listed.status_code == 200
+    assert listed.json()[0]["summary"] == "Only this sentence should appear in the note list."
+
+
 def test_create_note_from_file_stores_source_and_pending_note(
     client: TestClient,
     tmp_path: Path,
