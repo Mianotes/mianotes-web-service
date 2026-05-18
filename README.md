@@ -1,5 +1,6 @@
 # Mianotes Web Service
 
+[![CI](https://github.com/Mianotes/mianotes-web-service/actions/workflows/ci.yml/badge.svg)](https://github.com/Mianotes/mianotes-web-service/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/framework-FastAPI-009688?logo=fastapi&logoColor=white)
 ![Storage](https://img.shields.io/badge/storage-filesystem%20%2B%20SQLite-4B5563)
