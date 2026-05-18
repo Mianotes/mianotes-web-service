@@ -10,6 +10,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, Project, SourceFile, User, new_id
 from mianotes_web_service.domain.schemas import (
     EmailCheck,
+    EmailCheckResult,
     JoinRequest,
     LoginRequest,
     SessionRead,
@@ -87,17 +88,28 @@ def _household_initialized(session: Session) -> bool:
     return bool(admin_count) or get_master_password_hash(session) is not None
 
 
-@router.post("/check-email")
-def check_email(payload: EmailCheck, session: SessionDep) -> dict[str, bool | str | None]:
+def _master_password_owner_name(session: Session) -> str | None:
+    admin = session.scalars(
+        select(User).where(User.is_admin.is_(True)).order_by(User.created_at.asc())
+    ).first()
+    return admin.name if admin is not None else None
+
+
+@router.post("/check-email", response_model=EmailCheckResult)
+def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
     if not _household_initialized(session):
-        return {"user_id": None, "is_first_user": True}
+        return EmailCheckResult(user_id=None, is_first_user=True)
 
     user = session.scalars(
         select(User).where(User.email == str(payload.email).lower())
     ).one_or_none()
+    master_password_owner_name = _master_password_owner_name(session)
     if user is not None:
-        return {"user_id": user.id}
-    return {"user_id": None}
+        return EmailCheckResult(
+            user_id=user.id,
+            master_password_owner_name=master_password_owner_name,
+        )
+    return EmailCheckResult(user_id=None, master_password_owner_name=master_password_owner_name)
 
 
 @router.post("/join", response_model=SessionRead, status_code=status.HTTP_201_CREATED)

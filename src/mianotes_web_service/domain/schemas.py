@@ -181,6 +181,7 @@ class EmailCheck(BaseModel):
 class EmailCheckResult(BaseModel):
     user_id: str | None
     is_first_user: bool | None = None
+    master_password_owner_name: str | None = None
 
 
 class JoinRequest(BaseModel):

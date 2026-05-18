@@ -46,7 +46,11 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         json={"email": "admin@example.com"},
     )
     assert first_check.status_code == 200
-    assert first_check.json() == {"user_id": None, "is_first_user": True}
+    assert first_check.json() == {
+        "user_id": None,
+        "is_first_user": True,
+        "master_password_owner_name": None,
+    }
 
     setup = client.post(
         "/api/auth/join",
@@ -70,14 +74,22 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         json={"email": "admin@example.com"},
     )
     assert known_check.status_code == 200
-    assert known_check.json() == {"user_id": admin["id"]}
+    assert known_check.json() == {
+        "user_id": admin["id"],
+        "is_first_user": None,
+        "master_password_owner_name": "Admin",
+    }
 
     unknown_check = client.post(
         "/api/auth/check-email",
         json={"email": "maria@example.com"},
     )
     assert unknown_check.status_code == 200
-    assert unknown_check.json() == {"user_id": None}
+    assert unknown_check.json() == {
+        "user_id": None,
+        "is_first_user": None,
+        "master_password_owner_name": "Admin",
+    }
 
     joined = client.post(
         "/api/auth/join",
