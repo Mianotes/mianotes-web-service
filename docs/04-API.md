@@ -137,7 +137,7 @@ The API currently uses FastAPI error responses.
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
-| `is_starred` | boolean | Whether the note is marked as starred. |
+| `is_starred` | boolean | Whether the note is starred by the authenticated user. |
 | `note_path` | string | Absolute filesystem path to the Markdown note. New notes use `<title_slug>-<note_id[:8]>.md`. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
@@ -238,7 +238,7 @@ comments metadata, sharing metadata, and API action hints.
 | `source_type` | string | Source type. |
 | `revision_number` | number | Revision counter. |
 | `is_published` | boolean | Whether the note is marked as published. |
-| `is_starred` | boolean | Whether the note is marked as starred. |
+| `is_starred` | boolean | Whether the note is starred by the authenticated user. |
 | `published_at` | string \| null | ISO 8601 publish timestamp. |
 | `shared_at` | string \| null | ISO 8601 share timestamp. |
 | `text` | string | Markdown note text. |
@@ -1405,7 +1405,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 |---|---|---:|---|
 | `user_id` | string | No | Return notes created by a specific user. |
 | `project_id` | string | No | Return notes in a specific project. |
-| `starred` | boolean | No | Return only starred notes when `true`, or only unstarred notes when `false`. |
+| `starred` | boolean | No | Return only notes starred by the authenticated user when `true`, or notes not starred by that user when `false`. |
 
 ### Response
 
@@ -1520,7 +1520,9 @@ Returns the updated full `Note`.
 
 ## Star note
 
-Marks a note as starred or removes it from starred notes.
+Marks a note as starred for the authenticated user, or removes it from that
+user's starred notes. Stars are private per user; starring a note does not make
+it starred for other users.
 
 ### Endpoint
 
@@ -1542,11 +1544,12 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `is_starred` | boolean | Yes | Whether the note should appear in starred views. |
+| `is_starred` | boolean | Yes | Whether the note should appear in the authenticated user's starred views. |
 
 ### Response
 
-Returns the updated full `Note`.
+Returns the updated full `Note`. The note `updated_at` timestamp is not changed
+when a user stars or unstars it.
 
 ### Error responses
 

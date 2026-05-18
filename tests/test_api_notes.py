@@ -113,7 +113,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
 
 
 def test_note_star_can_be_toggled_and_filtered(client: TestClient):
-    client.post(
+    admin = client.post(
         "/api/auth/join",
         json={
             "email": "star@example.com",
@@ -121,7 +121,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
             "password": "house-password",
             "password_confirmation": "house-password",
         },
-    )
+    ).json()["user"]
     project = client.post("/api/projects", json={"name": "Stars"}).json()
     note = client.post(
         "/api/notes/from-text",
@@ -143,6 +143,29 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     assert listed.json()[0]["is_starred"] is True
     assert listed.json()[0]["updated_at"] == note["updated_at"]
 
+    second_user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "other-star@example.com",
+            "name": "Other Star User",
+            "password": "house-password",
+        },
+    ).json()["user"]
+    listed = client.get("/api/notes", params={"starred": True})
+    assert listed.status_code == 200
+    assert listed.json() == []
+    visible_note = client.get(f"/api/notes/{note['id']}")
+    assert visible_note.status_code == 200
+    assert visible_note.json()["is_starred"] is False
+
+    second_starred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": True})
+    assert second_starred.status_code == 200
+    assert second_starred.json()["is_starred"] is True
+    listed = client.get("/api/notes", params={"starred": True})
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [note["id"]]
+
+    client.post("/api/auth/login", json={"user_id": admin["id"], "password": "house-password"})
     unstarred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": False})
 
     assert unstarred.status_code == 200
@@ -151,6 +174,14 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
     assert listed.json() == []
+
+    client.post(
+        "/api/auth/login",
+        json={"user_id": second_user["id"], "password": "house-password"},
+    )
+    listed = client.get("/api/notes", params={"starred": True})
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [note["id"]]
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):

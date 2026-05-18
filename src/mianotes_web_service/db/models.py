@@ -43,6 +43,10 @@ class User(Base, TimestampMixin):
         foreign_keys="Project.user_id",
     )
     notes: Mapped[list[Note]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    note_stars: Mapped[list[NoteStar]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     api_tokens: Mapped[list[ApiToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -97,6 +101,10 @@ class Note(Base, TimestampMixin):
         secondary="note_tags",
         back_populates="notes",
     )
+    stars: Mapped[list[NoteStar]] = relationship(
+        back_populates="note",
+        cascade="all, delete-orphan",
+    )
     jobs: Mapped[list[MiaJob]] = relationship(back_populates="note", cascade="all, delete-orphan")
 
 
@@ -150,6 +158,23 @@ class NoteTag(Base):
         primary_key=True,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class NoteStar(Base):
+    __tablename__ = "note_stars"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id"),
+        primary_key=True,
+    )
+    note_id: Mapped[str] = mapped_column(
+        ForeignKey("notes.id"),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    user: Mapped[User] = relationship(back_populates="note_stars")
+    note: Mapped[Note] = relationship(back_populates="stars")
 
 
 class AppSetting(Base, TimestampMixin):

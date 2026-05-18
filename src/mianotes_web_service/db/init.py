@@ -101,3 +101,12 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(text("ALTER TABLE comments ADD COLUMN user_id VARCHAR(36)"))
             if "body" not in columns:
                 connection.execute(text("ALTER TABLE comments ADD COLUMN body TEXT"))
+        table_names = _sqlite_table_names(connection)
+        if "note_stars" in table_names and "notes" in table_names:
+            connection.execute(
+                text(
+                    "INSERT OR IGNORE INTO note_stars (user_id, note_id, created_at) "
+                    "SELECT user_id, id, COALESCE(updated_at, created_at) "
+                    "FROM notes WHERE is_starred = 1"
+                )
+            )

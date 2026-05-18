@@ -19,7 +19,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy import select, update
+from sqlalchemy import delete, exists, select
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import (
@@ -30,7 +30,16 @@ from mianotes_web_service.api.dependencies import (
     TagsWriteUser,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Comment, Note, Project, SourceFile, Tag, User, new_id
+from mianotes_web_service.db.models import (
+    Comment,
+    Note,
+    NoteStar,
+    Project,
+    SourceFile,
+    Tag,
+    User,
+    new_id,
+)
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     MAX_TAGS_PER_NOTE,
@@ -142,7 +151,35 @@ def _share_url(request: Request, note: Note, token: str | None = None) -> str | 
     return None
 
 
-def _note_response(note: Note, request: Request, share_token: str | None = None) -> NoteRead:
+def _note_is_starred(session: Session, note_id: str, user_id: str) -> bool:
+    return session.scalars(
+        select(NoteStar.note_id).where(
+            NoteStar.note_id == note_id,
+            NoteStar.user_id == user_id,
+        )
+    ).first() is not None
+
+
+def _starred_note_ids(session: Session, note_ids: list[str], user_id: str) -> set[str]:
+    if not note_ids:
+        return set()
+    return set(
+        session.scalars(
+            select(NoteStar.note_id).where(
+                NoteStar.user_id == user_id,
+                NoteStar.note_id.in_(note_ids),
+            )
+        )
+    )
+
+
+def _note_response(
+    note: Note,
+    request: Request,
+    *,
+    is_starred: bool = False,
+    share_token: str | None = None,
+) -> NoteRead:
     text = Path(note.note_path).read_text(encoding="utf-8")
     source_files = [
         {
@@ -175,7 +212,7 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
         source_type=note.source_type,
         revision_number=note.revision_number,
         is_published=note.is_published,
-        is_starred=note.is_starred,
+        is_starred=is_starred,
         published_at=note.published_at,
         summary=note.summary,
         shared_at=note.shared_at,
@@ -217,7 +254,7 @@ def _note_summary_needs_refresh(note: Note) -> bool:
     return bool(title and summary.startswith(f"{title} created:"))
 
 
-def _note_list_response(note: Note) -> NoteListItem:
+def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem:
     if _note_summary_needs_refresh(note):
         try:
             note.summary = summarize_markdown_note(Path(note.note_path).read_text(encoding="utf-8"))
@@ -232,7 +269,7 @@ def _note_list_response(note: Note) -> NoteListItem:
         source_type=note.source_type,
         revision_number=note.revision_number,
         is_published=note.is_published,
-        is_starred=note.is_starred,
+        is_starred=is_starred,
         summary=note.summary,
         note_path=note.note_path,
         created_at=note.created_at,
@@ -337,8 +374,18 @@ def _mia_job_response(job) -> MiaJobRead:
     )
 
 
-def _note_ingestion_response(note: Note, job, request: Request) -> NoteIngestionRead:
-    note_read = _note_response(note, request)
+def _note_ingestion_response(
+    note: Note,
+    job,
+    request: Request,
+    user: User,
+    session: Session,
+) -> NoteIngestionRead:
+    note_read = _note_response(
+        note,
+        request,
+        is_starred=_note_is_starred(session, note.id, user.id),
+    )
     return NoteIngestionRead(
         **note_read.model_dump(),
         note_id=note.id,
@@ -398,7 +445,11 @@ def create_note_from_text(
         )
     _sync_note_tags(session, note, payload.tags)
     session.commit()
-    return _note_response(_read_note_or_404(session, note.id), request)
+    return _note_response(
+        _read_note_or_404(session, note.id),
+        request,
+        is_starred=_note_is_starred(session, note.id, user.id),
+    )
 
 
 @router.post("/from-file", response_model=NoteIngestionRead, status_code=status.HTTP_201_CREATED)
@@ -477,7 +528,13 @@ def create_note_from_file(
     session.commit()
     session.refresh(job)
     _enqueue_job(request, background_tasks, job.id)
-    return _note_ingestion_response(_read_note_or_404(session, note.id), job, request)
+    return _note_ingestion_response(
+        _read_note_or_404(session, note.id),
+        job,
+        request,
+        user,
+        session,
+    )
 
 
 @router.post("/from-url", response_model=NoteIngestionRead, status_code=status.HTTP_201_CREATED)
@@ -543,7 +600,13 @@ def create_note_from_url(
     session.commit()
     session.refresh(job)
     _enqueue_job(request, background_tasks, job.id)
-    return _note_ingestion_response(_read_note_or_404(session, note.id), job, request)
+    return _note_ingestion_response(
+        _read_note_or_404(session, note.id),
+        job,
+        request,
+        user,
+        session,
+    )
 
 
 @router.post("", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -573,11 +636,15 @@ def list_notes(
         statement = statement.where(Note.user_id == user_id)
     if project_id is not None:
         statement = statement.where(Note.project_id == project_id)
-    if starred is not None:
-        statement = statement.where(Note.is_starred.is_(starred))
+    star_exists = exists().where(NoteStar.note_id == Note.id, NoteStar.user_id == user.id)
+    if starred is True:
+        statement = statement.where(star_exists)
+    elif starred is False:
+        statement = statement.where(~star_exists)
     notes = list(session.scalars(statement).unique())
     needs_summary_backfill = any(_note_summary_needs_refresh(note) for note in notes)
-    items = [_note_list_response(note) for note in notes]
+    starred_ids = _starred_note_ids(session, [note.id for note in notes], user.id)
+    items = [_note_list_response(note, is_starred=note.id in starred_ids) for note in notes]
     if needs_summary_backfill:
         session.commit()
     return items
@@ -615,7 +682,11 @@ def get_note(
     request: Request,
     user: NotesReadUser,
 ) -> NoteRead:
-    return _note_response(_read_note_or_404(session, note_id), request)
+    return _note_response(
+        _read_note_or_404(session, note_id),
+        request,
+        is_starred=_note_is_starred(session, note_id, user.id),
+    )
 
 
 @router.post("/{note_id}/share")
@@ -658,7 +729,11 @@ def update_note_tags(
     _ensure_can_change_note(note, user)
     _sync_note_tags(session, note, payload.tags)
     session.commit()
-    return _note_response(_read_note_or_404(session, note.id), request)
+    return _note_response(
+        _read_note_or_404(session, note.id),
+        request,
+        is_starred=_note_is_starred(session, note.id, user.id),
+    )
 
 
 @router.patch("/{note_id}/star", response_model=NoteRead, name="update_note_star")
@@ -667,16 +742,24 @@ def update_note_star(
     payload: NoteStarUpdate,
     session: SessionDep,
     request: Request,
-    _user: NotesWriteUser,
+    user: NotesWriteUser,
 ) -> NoteRead:
     note = _read_note_or_404(session, note_id)
-    session.execute(
-        update(Note)
-        .where(Note.id == note.id)
-        .values(is_starred=payload.is_starred, updated_at=note.updated_at)
-    )
+    existing_star = session.scalars(
+        select(NoteStar).where(NoteStar.note_id == note.id, NoteStar.user_id == user.id)
+    ).one_or_none()
+    if payload.is_starred and existing_star is None:
+        session.add(NoteStar(note_id=note.id, user_id=user.id))
+    elif not payload.is_starred and existing_star is not None:
+        session.execute(
+            delete(NoteStar).where(NoteStar.note_id == note.id, NoteStar.user_id == user.id)
+        )
     session.commit()
-    return _note_response(_read_note_or_404(session, note.id), request)
+    return _note_response(
+        _read_note_or_404(session, note.id),
+        request,
+        is_starred=payload.is_starred,
+    )
 
 
 @router.patch("/{note_id}", response_model=NoteRead)
@@ -712,7 +795,11 @@ def update_note(
     if payload.tags is not None:
         _sync_note_tags(session, note, payload.tags)
     session.commit()
-    return _note_response(_read_note_or_404(session, note.id), request)
+    return _note_response(
+        _read_note_or_404(session, note.id),
+        request,
+        is_starred=_note_is_starred(session, note.id, user.id),
+    )
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
