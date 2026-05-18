@@ -1,5 +1,13 @@
 # Mianotes Web Service
 
+![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/framework-FastAPI-009688?logo=fastapi&logoColor=white)
+![Storage](https://img.shields.io/badge/storage-filesystem%20%2B%20SQLite-4B5563)
+![Parser](https://img.shields.io/badge/parser-MarkItDown-2563EB)
+![MCP](https://img.shields.io/badge/MCP-enabled-7C3AED)
+![Code style](https://img.shields.io/badge/code%20style-Ruff-D7FF64?logo=ruff&logoColor=111111)
+![License](https://img.shields.io/badge/license-GPL--3.0-8B0000)
+
 The Python backend for Mianotes, providing the local REST API, filesystem-backed Markdown storage, SQLite indexing, file/link parsing, agent tokens, MCP tools, and Mia prompt integration.
 
 The service is designed for small groups: developers, researchers, students, and families who want durable knowledge stored as plain files that people, agents, and tools like OpenClaw, Claude, Codex, Copilot, Gemini, and Slack can use directly. It uses the filesystem as its main storage layer, which makes it extremely portable and easy to run locally on your computer or on a hosted server without relying on an external database server.
