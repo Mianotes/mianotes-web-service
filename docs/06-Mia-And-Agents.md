@@ -57,11 +57,13 @@ The MCP server lets compatible agents use Mianotes as a toolset. See
 [MCP](07-MCP.md) for setup, authentication, and the current tool list.
 
 Mia supports OpenAI and local OpenAI-compatible LLMs through the same provider
-boundary. This lets a household run Mia against OpenAI, a local Ollama-style
-server, or another compatible endpoint without changing the REST or MCP API.
+boundary. This lets a Mianotes instance run Mia against OpenAI, a local
+Ollama-style server, or another compatible endpoint without changing the REST
+or MCP API.
 
-In v1, Mia is prompted through comments. When a comment starts with `@mia`, the
-backend saves the prompt as a comment, sends the prompt and note Markdown to the
-configured LLM provider, and returns Markdown directly. This does not create a
-job and does not update the note. See [Comments](11-Comments.md) for the exact
-request and response shape.
+In v1, Mia is prompted through the comments endpoint. When the request body
+starts with `@mia`, the backend treats it as a private prompt, sends the prompt
+and note Markdown to the configured LLM provider, and returns Markdown directly.
+This does not create a job, does not save a shared comment, and does not update
+the note. See [Comments](11-Comments.md) for the exact request and response
+shape.

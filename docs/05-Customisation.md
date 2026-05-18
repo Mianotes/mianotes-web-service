@@ -81,13 +81,10 @@ MIANOTES_LLM_BASE_URL=<base-url>
 MIANOTES_LLM_API_KEY=<token-or-local-placeholder>
 ```
 
-OpenAI compatibility variables are also supported: `OPENAI_API_KEY`,
-`OPENAI_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, and `OLLAMA_API_KEY`.
-
 ## Agent access
 
 Agent credentials should be scoped and revocable. They should not use the
-browser household password or cookie session. Use `POST /api/tokens` from a
+browser master password or cookie session. Use `POST /api/tokens` from a
 browser session to create a token, then send it as `Authorization: Bearer
 mia_<token>` from agent clients.
 

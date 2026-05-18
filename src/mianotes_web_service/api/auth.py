@@ -81,7 +81,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
         )
 
 
-def _household_initialized(session: Session) -> bool:
+def _instance_initialized(session: Session) -> bool:
     admin_count = session.scalar(
         select(func.count()).select_from(User).where(User.is_admin.is_(True))
     )
@@ -97,7 +97,7 @@ def _master_password_owner_name(session: Session) -> str | None:
 
 @router.post("/check-email", response_model=EmailCheckResult)
 def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
-    if not _household_initialized(session):
+    if not _instance_initialized(session):
         return EmailCheckResult(user_id=None, is_first_user=True)
 
     user = session.scalars(
@@ -116,7 +116,7 @@ def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
 def join(payload: JoinRequest, response: Response, session: SessionDep) -> SessionRead:
     email = str(payload.email).lower()
 
-    if not _household_initialized(session):
+    if not _instance_initialized(session):
         if payload.password_confirmation is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -69,12 +69,6 @@ MIANOTES_LLM_API_KEY=
   `http://127.0.0.1:11434/v1`.
 - `openai-compatible` for any custom OpenAI-compatible chat completion endpoint.
 
-Mia also accepts `OPENAI_API_KEY`, `OPENAI_MODEL`, `OLLAMA_BASE_URL`,
-`OLLAMA_MODEL`, and `OLLAMA_API_KEY` for compatibility with common tooling.
-Legacy `MIANOTES_OPENAI_API_KEY` and `MIANOTES_OPENAI_MODEL` values are still
-accepted for OpenAI installs. The provider-agnostic `MIANOTES_LLM_` variables
-take precedence.
-
 For local Ollama-style development:
 
 ```text
@@ -142,9 +136,9 @@ Mianotes services use the `8200` range:
 ## First run
 
 The first user joins through `POST /api/auth/join`. The service detects that no
-household exists, creates the first admin, stores the master password hash, and
+Mianotes instance has been configured, creates the first admin, stores the master password hash, and
 seeds the default `Mianotes` project.
 
 The frontend can call `POST /api/auth/check-email` first. If the response
 contains `is_first_user: true`, it should explain that the first password
-becomes the shared household password.
+becomes the master password for this instance.

@@ -41,7 +41,7 @@ The current MCP surface includes tools for:
 - Creating notes from text
 - Creating notes from URLs
 - Updating notes
-- Adding comments, including synchronous `@mia` prompts
+- Sending private synchronous `@mia` prompts through the comments endpoint
 - Setting tags
 - Searching Markdown notes
 

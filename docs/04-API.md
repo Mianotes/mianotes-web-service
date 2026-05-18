@@ -10,7 +10,7 @@ flow or an agent API token sent as a bearer token.
 Authorization: Bearer mia_<token>
 ```
 
-Browser sessions represent an interactive household user and bypass token scope
+Browser sessions represent an interactive user and bypass token scope
 checks. Bearer tokens must include the required scope, or the `admin` scope.
 
 ## Base URL
@@ -472,7 +472,7 @@ First user setup:
 }
 ```
 
-Unknown user after household setup:
+Unknown user after instance setup:
 
 ```json
 {
@@ -493,12 +493,13 @@ Existing user:
 | Field | Type | Description |
 |---|---|---|
 | `user_id` | string \| null | Existing user ID, or `null` if the email is not registered. |
-| `is_first_user` | boolean | Present only when no household has been initialized. |
+| `is_first_user` | boolean | Present only when no Mianotes instance has been initialized. |
 
 ## Join
 
-Creates a user and starts a browser session. If no household exists yet, this
-endpoint creates the first admin user and stores the household password.
+Creates a user and starts a browser session. If no Mianotes instance has been
+initialized yet, this endpoint creates the first admin user and stores the
+master password.
 
 ### Endpoint
 
@@ -525,8 +526,8 @@ None.
 |---|---|---:|---|
 | `email` | string | Yes | New user's email address. |
 | `name` | string | Yes | New user's display name. |
-| `password` | string | Yes | Household password. |
-| `password_confirmation` | string | First user only | Confirmation for the first household password. |
+| `password` | string | Yes | Master password for this instance. |
+| `password_confirmation` | string | First user only | Confirmation for the first instance master password. |
 
 ### Response
 
@@ -1018,7 +1019,7 @@ Admin session or bearer token with `admin`.
 
 ## Create project
 
-Creates a household-visible project owned by the current user.
+Creates a shared project owned by the current user.
 
 ### Endpoint
 
@@ -1788,10 +1789,10 @@ Session cookie or bearer token with `notes:read` or `admin`.
 ## Create comment
 
 Creates a comment for a note. If the body starts with `@mia`, the request is
-treated as a synchronous Mia prompt and the original prompt is saved as a
-comment. Mia receives the prompt and the current note Markdown, then returns
-Markdown directly in the API response. Mia prompt responses do not create jobs
-and do not update the note.
+treated as a private synchronous Mia prompt instead of a shared comment. Mia
+receives the prompt and the current note Markdown, then returns Markdown
+directly in the API response. Mia prompt responses do not create jobs, do not
+update the note, and are not returned by the comments list.
 
 ### Endpoint
 
@@ -1858,14 +1859,6 @@ Mia prompt response:
   "prompt": "summarise this text",
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "text": "## Summary\n\nThe note explains the Mallorca trip plan...",
-  "comment": {
-    "type": "comment",
-    "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
-    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-    "body": "@mia summarise this text",
-    "created_at": "2026-05-15T10:40:00Z",
-    "updated_at": "2026-05-15T10:40:00Z"
-  },
   "format": "markdown"
 }
 ```
@@ -1877,7 +1870,6 @@ Mia prompt response:
 | `type` | string | `comment` for saved comments, or `prompt` for Mia responses. |
 | `prompt` | string | Mia prompt without the `@mia` prefix. Present only when `type` is `prompt`. |
 | `text` | string | Markdown returned by Mia. Present only when `type` is `prompt`. |
-| `comment` | object | Saved comment containing the original `@mia` prompt. Present only when `type` is `prompt`. |
 | `format` | string | Response format for Mia prompt output. Current value is `markdown`. |
 
 ### Error responses

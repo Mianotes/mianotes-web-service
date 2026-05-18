@@ -13,7 +13,7 @@ Mia is the built-in AI agent for Mianotes. Mia helps convert messy inputs into d
 - Upload files and keep their original source next to the generated Markdown note.
 - Ask Mia to improve, summarise, extract, or restructure notes.
 - Browse notes by person, project, tag, or recency.
-- Share a read-only note link with someone outside the household or team.
+- Share a read-only note link with someone outside the Mianotes instance.
 - Keep content transparent on disk instead of hiding it in a database blob.
 
 ## Storage model

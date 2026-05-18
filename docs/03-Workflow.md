@@ -2,9 +2,11 @@
 
 Mianotes is built around shared knowledge with light ownership. Humans and AI agents can both create projects, add notes, improve existing notes, and leave comments.
 
-## Families
+## Shared instances
 
-Family members use the same household password to join. Everyone can read the shared notes, browse by user, browse by project, and add notes to active projects.
+Teams, families, developers, researchers, and other small groups use the same
+master password to join a Mianotes instance. Everyone can read the shared notes,
+browse by user, browse by project, and add notes to active projects.
 
 Ownership still matters:
 
@@ -45,4 +47,4 @@ Projects are group-visible. Any signed-in user can create a project and add note
 
 ## Sharing
 
-Share links are note-level and read-only. They are revocable. A share link does not grant full household access.
+Share links are note-level and read-only. They are revocable. A share link does not grant full instance access.

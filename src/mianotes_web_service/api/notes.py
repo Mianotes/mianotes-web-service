@@ -767,16 +767,11 @@ def create_note_comment(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Mia prompt failed",
             ) from exc
-        comment = Comment(note_id=note.id, user_id=user.id, body=payload.body)
-        session.add(comment)
-        session.commit()
-        session.refresh(comment)
         response.status_code = status.HTTP_200_OK
         return MiaPromptRead(
             prompt=prompt,
             note_id=note.id,
             text=result.text,
-            comment=CommentRead.model_validate(comment),
         )
 
     response.status_code = status.HTTP_201_CREATED

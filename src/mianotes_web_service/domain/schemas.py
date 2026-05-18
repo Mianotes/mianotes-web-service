@@ -117,7 +117,6 @@ class MiaPromptRead(BaseModel):
     prompt: str
     note_id: str
     text: str
-    comment: CommentRead
     format: Literal["markdown"] = "markdown"
 
 

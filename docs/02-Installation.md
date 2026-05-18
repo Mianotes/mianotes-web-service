@@ -96,12 +96,6 @@ MIANOTES_LLM_API_KEY=
 `MIANOTES_LLM_PROVIDER` supports `openai`, `local`, and `openai-compatible`.
 Use `local` for an Ollama-style OpenAI-compatible endpoint on your machine.
 
-Mia also accepts `OPENAI_API_KEY`, `OPENAI_MODEL`, `OLLAMA_BASE_URL`,
-`OLLAMA_MODEL`, and `OLLAMA_API_KEY` for compatibility with common tooling.
-Legacy `MIANOTES_OPENAI_API_KEY` and `MIANOTES_OPENAI_MODEL` values are still
-accepted for OpenAI installs. The provider-agnostic `MIANOTES_LLM_` variables
-take precedence.
-
 ## Manual run commands
 
 Manual run is the default path for local installs, quick testing, and people who
@@ -137,6 +131,6 @@ mianotes-web-service --host 0.0.0.0 --port 8200
 
 ## First run
 
-The first user joins through `POST /api/auth/join`. The service detects that no household exists, creates the first admin, stores the master password hash, and seeds the default `Mianotes` project.
+The first user joins through `POST /api/auth/join`. The service detects that no Mianotes instance has been configured, creates the first admin, stores the master password hash, and seeds the default `Mianotes` project.
 
-The frontend can call `POST /api/auth/check-email` first. If the response contains `is_first_user: true`, it should explain that the first password becomes the shared household password.
+The frontend can call `POST /api/auth/check-email` first. If the response contains `is_first_user: true`, it should explain that the first password becomes the master password for this instance.

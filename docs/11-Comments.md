@@ -26,9 +26,8 @@ The API saves the comment and returns:
 
 ## Prompting Mia
 
-If a comment starts with `@mia`, the backend treats it as a Mia prompt. The
-prompt is still saved as a comment so other users and agents can see what was
-asked and reuse the prompt later:
+If a request body starts with `@mia`, the backend treats it as a private Mia
+prompt instead of a shared comment:
 
 ```json
 {
@@ -38,7 +37,8 @@ asked and reuse the prompt later:
 
 Mianotes strips the `@mia` prefix, reads the current note Markdown, sends the
 prompt and note content to the configured LLM provider, and waits for the
-response.
+response. The prompt is not saved as a comment and is not returned by
+`GET /api/notes/{note_id}/comments`.
 
 The response is returned directly:
 
@@ -48,23 +48,15 @@ The response is returned directly:
   "prompt": "summarise this text",
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "text": "## Summary\n\nThe note explains the Mallorca trip plan...",
-  "comment": {
-    "type": "comment",
-    "id": "0ebd5d0d-b40c-4084-aeb4-cf687ab81922",
-    "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
-    "body": "@mia summarise this text",
-    "created_at": "2026-05-15T10:40:00Z",
-    "updated_at": "2026-05-15T10:40:00Z"
-  },
   "format": "markdown"
 }
 ```
 
-Prompt comments:
+Mia prompts:
 
 - are synchronous
 - do not create jobs
-- are saved as comments with the original `@mia` body
+- are private and not saved as comments
 - do not update the note
 - return Markdown only
 
@@ -73,7 +65,7 @@ The frontend can show a loader while the request is running, then display
 note with `PATCH /api/notes/{note_id}`. If the user closes the modal, nothing
 changes.
 
-Agents use the same flow. An agent can send an `@mia` comment, read the returned
+Agents use the same flow. An agent can send an `@mia` prompt, read the returned
 Markdown, then decide whether to update the note.
 
 ## Error handling
