@@ -558,7 +558,7 @@ The response sets an HTTP-only `mianotes_session` cookie.
 | Status | Reason |
 |---:|---|
 | `400` | Password confirmation is missing or does not match during first setup. |
-| `401` | Household password is invalid. |
+| `401` | Instance password is invalid. |
 | `409` | Email already exists. |
 | `422` | Request validation failed. |
 
@@ -588,7 +588,7 @@ None.
 | Field | Type | Required | Description |
 |---|---|---:|---|
 | `user_id` | string | Yes | Existing user ID. |
-| `password` | string | Yes | Household password. |
+| `password` | string | Yes | Instance password. |
 
 ### Response
 
