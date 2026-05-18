@@ -620,3 +620,45 @@ def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
 
     assert response.status_code == 422
     assert response.json()["detail"] == "Mia prompt cannot be empty"
+
+
+def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from mianotes_web_service.api import notes
+    from mianotes_web_service.services.mia import MiaUnavailable
+
+    def fake_prompt_markdown(**_kwargs):
+        raise MiaUnavailable("OpenAI API key is not configured")
+
+    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "failed-mia-comment@example.com",
+            "name": "Failed Mia Comment User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Failed prompts"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Failed prompt",
+            "text": "A note.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/comments",
+        json={"body": "@mia summarise text"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "OpenAI API key is not configured"
+    comments = client.get(f"/api/notes/{note['id']}/comments")
+    assert comments.status_code == 200
+    assert comments.json() == []

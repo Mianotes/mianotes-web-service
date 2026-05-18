@@ -751,10 +751,6 @@ def create_note_comment(
     note = _read_note_or_404(session, note_id)
     prompt = _mia_prompt(payload.body)
     if prompt is not None:
-        comment = Comment(note_id=note.id, user_id=user.id, body=payload.body)
-        session.add(comment)
-        session.commit()
-        session.refresh(comment)
         try:
             result = prompt_markdown(
                 title=note.title,
@@ -771,6 +767,10 @@ def create_note_comment(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Mia prompt failed",
             ) from exc
+        comment = Comment(note_id=note.id, user_id=user.id, body=payload.body)
+        session.add(comment)
+        session.commit()
+        session.refresh(comment)
         response.status_code = status.HTTP_200_OK
         return MiaPromptRead(
             prompt=prompt,
