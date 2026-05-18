@@ -58,6 +58,7 @@ from mianotes_web_service.services.share import (
 from mianotes_web_service.services.storage import (
     FilesystemStorage,
     infer_title,
+    markdown_note_body,
     render_markdown_note,
     replace_markdown_title,
     slugify,
@@ -752,9 +753,10 @@ def create_note_comment(
     prompt = _mia_prompt(payload.body)
     if prompt is not None:
         try:
+            raw_markdown = Path(note.note_path).read_text(encoding="utf-8")
             result = prompt_markdown(
                 title=note.title,
-                markdown=Path(note.note_path).read_text(encoding="utf-8"),
+                markdown=markdown_note_body(raw_markdown) or raw_markdown,
                 prompt=prompt,
             )
         except MiaUnavailable as exc:

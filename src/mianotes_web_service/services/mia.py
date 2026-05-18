@@ -122,7 +122,9 @@ def prompt_markdown(*, title: str, markdown: str, prompt: str) -> MiaTextResult:
                 "content": (
                     "You are Mia, the Mianotes assistant. Help humans and AI agents "
                     "improve notes. Return Markdown body only. Do not wrap the response "
-                    "in code fences unless the user explicitly asks for code."
+                    "in code fences unless the user explicitly asks for code. Do not "
+                    "include the original note title, creation date, or generated "
+                    "'## Note' wrapper unless the user explicitly asks for them."
                 ),
             },
             {

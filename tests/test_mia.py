@@ -24,11 +24,12 @@ def _fake_openai(calls: dict[str, object]):
     return FakeOpenAI
 
 
-def test_mia_uses_openai_provider(monkeypatch):
+def test_mia_uses_openai_provider(monkeypatch, tmp_path):
     calls: dict[str, object] = {}
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MIANOTES_LLM_PROVIDER", "openai")
     monkeypatch.setenv("MIANOTES_LLM_MODEL", "gpt-4o-mini")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("MIANOTES_LLM_API_KEY", "sk-test")
     monkeypatch.setattr(mia, "OpenAI", _fake_openai(calls))
     get_settings.cache_clear()
 
@@ -42,8 +43,9 @@ def test_mia_uses_openai_provider(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_mia_uses_local_openai_compatible_provider(monkeypatch):
+def test_mia_uses_local_openai_compatible_provider(monkeypatch, tmp_path):
     calls: dict[str, object] = {}
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MIANOTES_LLM_PROVIDER", "local")
     monkeypatch.setenv("MIANOTES_LLM_MODEL", "llama3.2")
     monkeypatch.setattr(mia, "OpenAI", _fake_openai(calls))
@@ -61,10 +63,11 @@ def test_mia_uses_local_openai_compatible_provider(monkeypatch):
     get_settings.cache_clear()
 
 
-def test_mia_prompt_sends_user_prompt_and_note(monkeypatch):
+def test_mia_prompt_sends_user_prompt_and_note(monkeypatch, tmp_path):
     calls: dict[str, object] = {}
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("MIANOTES_LLM_PROVIDER", "openai")
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("MIANOTES_LLM_API_KEY", "sk-test")
     monkeypatch.setattr(mia, "OpenAI", _fake_openai(calls))
     get_settings.cache_clear()
 

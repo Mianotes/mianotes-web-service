@@ -583,7 +583,10 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     assert body["format"] == "markdown"
     assert "comment" not in body
     assert captured["title"] == "Planning trip to Mallorca"
-    assert "# Planning trip to Mallorca" in captured["markdown"]
+    assert captured["markdown"] == "Long text goes here."
+    assert "# Planning trip to Mallorca" not in captured["markdown"]
+    assert "Created:" not in captured["markdown"]
+    assert "## Note" not in captured["markdown"]
     assert captured["prompt"] == "summarise this text"
 
     comments = client.get(f"/api/notes/{note['id']}/comments")
