@@ -19,7 +19,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import (
@@ -670,7 +670,11 @@ def update_note_star(
     _user: NotesWriteUser,
 ) -> NoteRead:
     note = _read_note_or_404(session, note_id)
-    note.is_starred = payload.is_starred
+    session.execute(
+        update(Note)
+        .where(Note.id == note.id)
+        .values(is_starred=payload.is_starred, updated_at=note.updated_at)
+    )
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
 

@@ -136,15 +136,18 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
 
     assert starred.status_code == 200
     assert starred.json()["is_starred"] is True
+    assert starred.json()["updated_at"] == note["updated_at"]
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
     assert [item["id"] for item in listed.json()] == [note["id"]]
     assert listed.json()[0]["is_starred"] is True
+    assert listed.json()[0]["updated_at"] == note["updated_at"]
 
     unstarred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": False})
 
     assert unstarred.status_code == 200
     assert unstarred.json()["is_starred"] is False
+    assert unstarred.json()["updated_at"] == note["updated_at"]
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
     assert listed.json() == []
