@@ -1410,12 +1410,29 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "source_type": "text",
     "revision_number": 1,
     "is_published": false,
+    "summary": "We agreed to build Mianotes with Markdown notes.",
     "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/school/homework-14-may-4a95f146.md",
     "created_at": "2026-05-15T10:35:00Z",
-    "updated_at": "2026-05-15T10:35:00Z"
+    "updated_at": "2026-05-15T10:35:00Z",
+    "comments_count": 0,
+    "tags": [
+      {
+        "id": "2525a586-dbb2-42b8-a521-6c6a96718cc1",
+        "name": "planning",
+        "slug": "planning",
+        "created_at": "2026-05-15T10:35:00Z",
+        "updated_at": "2026-05-15T10:35:00Z"
+      }
+    ]
   }
 ]
 ```
+
+### Response notes
+
+`summary` is stored in SQLite and is capped at 55 words. List responses do not
+include the full Markdown `text`; call `GET /api/notes/{note_id}` when a client
+opens a note.
 
 ## Get note
 

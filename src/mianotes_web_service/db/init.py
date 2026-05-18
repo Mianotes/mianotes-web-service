@@ -78,6 +78,10 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 )
             if "published_at" not in columns:
                 connection.execute(text("ALTER TABLE notes ADD COLUMN published_at DATETIME"))
+            if "summary" not in columns:
+                connection.execute(
+                    text("ALTER TABLE notes ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+                )
             if "share_token_hash" not in columns:
                 connection.execute(
                     text("ALTER TABLE notes ADD COLUMN share_token_hash VARCHAR(128)")

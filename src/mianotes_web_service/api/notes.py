@@ -60,6 +60,7 @@ from mianotes_web_service.services.storage import (
     render_markdown_note,
     replace_markdown_title,
     slugify,
+    summarize_text,
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])
@@ -172,6 +173,7 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
         revision_number=note.revision_number,
         is_published=note.is_published,
         published_at=note.published_at,
+        summary=note.summary,
         shared_at=note.shared_at,
         text=text,
         note_url=_file_url(request, note.note_path),
@@ -192,6 +194,30 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
                 "url": str(request.url_for("get_note_comments", note_id=note.id)),
             },
         },
+    )
+
+
+def _note_list_response(note: Note) -> NoteListItem:
+    if not note.summary:
+        try:
+            note.summary = summarize_text(Path(note.note_path).read_text(encoding="utf-8"))
+        except OSError:
+            note.summary = ""
+    return NoteListItem(
+        id=note.id,
+        user_id=note.user_id,
+        project_id=note.project_id,
+        title=note.title,
+        status=note.status,
+        source_type=note.source_type,
+        revision_number=note.revision_number,
+        is_published=note.is_published,
+        summary=note.summary,
+        note_path=note.note_path,
+        created_at=note.created_at,
+        updated_at=note.updated_at,
+        comments_count=len([comment for comment in note.comments if comment.body]),
+        tags=note.tags,
     )
 
 
@@ -335,6 +361,7 @@ def create_note_from_text(
         project_id=project.id,
         title=title,
         source_type="text",
+        summary=summarize_text(payload.text),
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -398,6 +425,7 @@ def create_note_from_file(
         title=note_title,
         status="pending_parse",
         source_type=_source_type_from_filename(file.filename),
+        summary="This uploaded file is waiting for the parsing pipeline.",
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -465,6 +493,7 @@ def create_note_from_url(
         title=title,
         status="pending_parse",
         source_type="link",
+        summary="This link is waiting for the parsing pipeline.",
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -512,13 +541,22 @@ def list_notes(
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
     project_id: Annotated[str | None, Query()] = None,
-) -> list[Note]:
-    statement = select(Note).order_by(Note.created_at.desc())
+) -> list[NoteListItem]:
+    statement = (
+        select(Note)
+        .options(joinedload(Note.comments), joinedload(Note.tags))
+        .order_by(Note.created_at.desc())
+    )
     if user_id is not None:
         statement = statement.where(Note.user_id == user_id)
     if project_id is not None:
         statement = statement.where(Note.project_id == project_id)
-    return list(session.scalars(statement))
+    notes = list(session.scalars(statement).unique())
+    needs_summary_backfill = any(not note.summary for note in notes)
+    items = [_note_list_response(note) for note in notes]
+    if needs_summary_backfill:
+        session.commit()
+    return items
 
 
 @router.get("/shared/{token}", response_model=NoteRead, name="get_shared_note")
@@ -617,6 +655,7 @@ def update_note(
             render_markdown_note(title=next_title, text=payload.text),
             encoding="utf-8",
         )
+        note.summary = summarize_text(payload.text)
         note.revision_number += 1
     elif payload.title is not None:
         note_path.write_text(

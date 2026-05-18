@@ -75,6 +75,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["source_type"] == "text"
     assert note["revision_number"] == 1
     assert note["is_published"] is False
+    assert note["summary"] == "We agreed to build Mianotes with Markdown notes."
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
     note_filename = f"kickoff-notes-{note['id'][:8]}"
@@ -105,6 +106,8 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert listed.json()[0]["id"] == note["id"]
     assert listed.json()[0]["status"] == "ready"
     assert listed.json()[0]["source_type"] == "text"
+    assert listed.json()[0]["summary"] == "We agreed to build Mianotes with Markdown notes."
+    assert "text" not in listed.json()[0]
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
@@ -133,6 +136,34 @@ def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
 
     assert response.status_code == 201
     assert response.json()["title"] == "This note has no provided title, so the API infers one"
+
+
+def test_note_summary_is_limited_to_55_words(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "summary@example.com",
+            "name": "Summary User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Summaries"}).json()
+    text = " ".join(f"word{i}" for i in range(70))
+
+    response = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Long Summary",
+            "text": text,
+        },
+    )
+
+    assert response.status_code == 201
+    summary = response.json()["summary"]
+    assert len(summary.removesuffix("...").split()) == 55
+    assert summary.endswith("...")
 
 
 def test_create_note_from_file_stores_source_and_pending_note(

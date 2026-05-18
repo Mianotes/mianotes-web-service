@@ -154,6 +154,15 @@ def infer_title(text: str, fallback: str = "Untitled Note") -> str:
     return compact[:80].rstrip(" .,;:-") or fallback
 
 
+def summarize_text(text: str, max_words: int = 55) -> str:
+    compact = " ".join(text.strip().split())
+    compact = re.sub(r"[#>*_`~\[\]()-]+", " ", compact)
+    words = compact.split()
+    if len(words) <= max_words:
+        return " ".join(words)
+    return f"{' '.join(words[:max_words]).rstrip(' .,;:-')}..."
+
+
 def render_markdown_note(title: str, text: str) -> str:
     created_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return f"# {title}\n\nCreated: {created_at}\n\n## Note\n\n{text.strip()}\n"

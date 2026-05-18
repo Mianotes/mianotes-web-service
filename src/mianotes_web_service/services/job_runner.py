@@ -13,7 +13,7 @@ from mianotes_web_service.services.jobs import (
     mark_job_succeeded,
 )
 from mianotes_web_service.services.parsing import fetch_url_to_html, parse_document
-from mianotes_web_service.services.storage import render_markdown_note
+from mianotes_web_service.services.storage import render_markdown_note, summarize_text
 
 
 class InProcessJobRunner:
@@ -92,6 +92,7 @@ def _run_parse_file_job(session: Session, job: MiaJob) -> dict[str, object]:
         encoding="utf-8",
     )
     note.status = "ready"
+    note.summary = summarize_text(parsed.text)
     return {
         "parser": parsed.parser,
         "source_file_id": source_file.id,
@@ -117,6 +118,7 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
         encoding="utf-8",
     )
     note.status = "ready"
+    note.summary = summarize_text(parsed.text)
     return {
         "parser": parsed.parser,
         "source_file_id": source_file.id,

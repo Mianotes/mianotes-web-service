@@ -134,6 +134,7 @@ class NoteRead(BaseModel):
     revision_number: int
     is_published: bool
     published_at: datetime | None = None
+    summary: str
     shared_at: datetime | None = None
     text: str
     note_url: str
@@ -156,9 +157,12 @@ class NoteListItem(BaseModel):
     source_type: str
     revision_number: int
     is_published: bool
+    summary: str = ""
     note_path: str
     created_at: datetime
     updated_at: datetime
+    comments_count: int = 0
+    tags: list[TagRead] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
