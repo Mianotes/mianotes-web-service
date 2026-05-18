@@ -338,9 +338,10 @@ def _read_note_by_share_token(session: Session, token: str) -> Note:
 def _ensure_can_change_note(note: Note, user: User) -> None:
     if user.is_admin or note.user_id == user.id:
         return
+    owner_name = note.user.name if note.user is not None else "the note owner"
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="Cannot change this note",
+        detail=f"Only {owner_name} or an admin can change this note.",
     )
 
 

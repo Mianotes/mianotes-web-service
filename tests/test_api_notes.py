@@ -452,6 +452,7 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
         json={"title": "Maria Edit"},
     )
     assert forbidden_update.status_code == 403
+    assert forbidden_update.json()["detail"] == "Only Admin or an admin can change this note."
 
     maria_note = client.post(
         "/api/notes/from-text",
