@@ -76,6 +76,13 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                         "BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
+            if "is_starred" not in columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE notes ADD COLUMN is_starred "
+                        "BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
             if "published_at" not in columns:
                 connection.execute(text("ALTER TABLE notes ADD COLUMN published_at DATETIME"))
             if "summary" not in columns:

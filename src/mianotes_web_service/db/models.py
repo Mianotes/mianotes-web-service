@@ -76,6 +76,7 @@ class Note(Base, TimestampMixin):
     source_type: Mapped[str] = mapped_column(String(50), default="text", nullable=False)
     revision_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_starred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
     share_token_hash: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)

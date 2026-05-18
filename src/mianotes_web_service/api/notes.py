@@ -44,6 +44,7 @@ from mianotes_web_service.domain.schemas import (
     NoteIngestionRead,
     NoteListItem,
     NoteRead,
+    NoteStarUpdate,
     NoteUpdate,
     TagsUpdate,
 )
@@ -173,6 +174,7 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
         source_type=note.source_type,
         revision_number=note.revision_number,
         is_published=note.is_published,
+        is_starred=note.is_starred,
         published_at=note.published_at,
         summary=note.summary,
         shared_at=note.shared_at,
@@ -193,6 +195,10 @@ def _note_response(note: Note, request: Request, share_token: str | None = None)
             "comments": {
                 "method": "GET",
                 "url": str(request.url_for("get_note_comments", note_id=note.id)),
+            },
+            "star": {
+                "method": "PATCH",
+                "url": str(request.url_for("update_note_star", note_id=note.id)),
             },
         },
     )
@@ -225,6 +231,7 @@ def _note_list_response(note: Note) -> NoteListItem:
         source_type=note.source_type,
         revision_number=note.revision_number,
         is_published=note.is_published,
+        is_starred=note.is_starred,
         summary=note.summary,
         note_path=note.note_path,
         created_at=note.created_at,
@@ -554,6 +561,7 @@ def list_notes(
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
     project_id: Annotated[str | None, Query()] = None,
+    starred: Annotated[bool | None, Query()] = None,
 ) -> list[NoteListItem]:
     statement = (
         select(Note)
@@ -564,6 +572,8 @@ def list_notes(
         statement = statement.where(Note.user_id == user_id)
     if project_id is not None:
         statement = statement.where(Note.project_id == project_id)
+    if starred is not None:
+        statement = statement.where(Note.is_starred.is_(starred))
     notes = list(session.scalars(statement).unique())
     needs_summary_backfill = any(_note_summary_needs_refresh(note) for note in notes)
     items = [_note_list_response(note) for note in notes]
@@ -646,6 +656,20 @@ def update_note_tags(
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
     _sync_note_tags(session, note, payload.tags)
+    session.commit()
+    return _note_response(_read_note_or_404(session, note.id), request)
+
+
+@router.patch("/{note_id}/star", response_model=NoteRead, name="update_note_star")
+def update_note_star(
+    note_id: str,
+    payload: NoteStarUpdate,
+    session: SessionDep,
+    request: Request,
+    _user: NotesWriteUser,
+) -> NoteRead:
+    note = _read_note_or_404(session, note_id)
+    note.is_starred = payload.is_starred
     session.commit()
     return _note_response(_read_note_or_404(session, note.id), request)
 

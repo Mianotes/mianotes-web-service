@@ -120,6 +120,7 @@ The API currently uses FastAPI error responses.
   "source_type": "text",
   "revision_number": 1,
   "is_published": false,
+  "is_starred": false,
   "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/holidays-mallorca/kickoff-notes-4a95f146.md",
   "created_at": "2026-05-15T10:35:00Z",
   "updated_at": "2026-05-15T10:35:00Z"
@@ -136,6 +137,7 @@ The API currently uses FastAPI error responses.
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
+| `is_starred` | boolean | Whether the note is marked as starred. |
 | `note_path` | string | Absolute filesystem path to the Markdown note. New notes use `<title_slug>-<note_id[:8]>.md`. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
@@ -174,6 +176,7 @@ comments metadata, sharing metadata, and API action hints.
   "source_type": "text",
   "revision_number": 1,
   "is_published": false,
+  "is_starred": false,
   "published_at": null,
   "shared_at": null,
   "text": "# Kickoff notes\n\nWe agreed to build Mianotes...",
@@ -214,6 +217,10 @@ comments metadata, sharing metadata, and API action hints.
     "comments": {
       "method": "GET",
       "url": "http://127.0.0.1:8200/api/notes/4a95f146-9d27-4c79-b7d8-34739aef8998/comments"
+    },
+    "star": {
+      "method": "PATCH",
+      "url": "http://127.0.0.1:8200/api/notes/4a95f146-9d27-4c79-b7d8-34739aef8998/star"
     }
   }
 }
@@ -231,6 +238,7 @@ comments metadata, sharing metadata, and API action hints.
 | `source_type` | string | Source type. |
 | `revision_number` | number | Revision counter. |
 | `is_published` | boolean | Whether the note is marked as published. |
+| `is_starred` | boolean | Whether the note is marked as starred. |
 | `published_at` | string \| null | ISO 8601 publish timestamp. |
 | `shared_at` | string \| null | ISO 8601 share timestamp. |
 | `text` | string | Markdown note text. |
@@ -1396,6 +1404,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 |---|---|---:|---|
 | `user_id` | string | No | Return notes created by a specific user. |
 | `project_id` | string | No | Return notes in a specific project. |
+| `starred` | boolean | No | Return only starred notes when `true`, or only unstarred notes when `false`. |
 
 ### Response
 
@@ -1410,6 +1419,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
     "source_type": "text",
     "revision_number": 1,
     "is_published": false,
+    "is_starred": false,
     "summary": "We agreed to build Mianotes with Markdown notes.",
     "note_path": "/home/arduino/mianotes-web-service/data/matt-2d9f6b1a/school/homework-14-may-4a95f146.md",
     "created_at": "2026-05-15T10:35:00Z",
@@ -1504,6 +1514,45 @@ Returns the updated full `Note`.
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`, or user cannot change the note. |
+| `404` | Note does not exist. |
+| `422` | Request validation failed. |
+
+## Star note
+
+Marks a note as starred or removes it from starred notes.
+
+### Endpoint
+
+`PATCH /api/notes/{note_id}/star`
+
+### Authentication
+
+Session cookie or bearer token with `notes:write` or `admin`.
+
+### Request
+
+```json
+{
+  "is_starred": true
+}
+```
+
+### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `is_starred` | boolean | Yes | Whether the note should appear in starred views. |
+
+### Response
+
+Returns the updated full `Note`.
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Token lacks `notes:write`. |
 | `404` | Note does not exist. |
 | `422` | Request validation failed. |
 

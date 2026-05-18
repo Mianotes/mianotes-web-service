@@ -74,6 +74,10 @@ class NoteUpdate(BaseModel):
     tags: list[str] | None = Field(default=None, max_length=MAX_TAGS_PER_NOTE)
 
 
+class NoteStarUpdate(BaseModel):
+    is_starred: bool
+
+
 class TagRead(BaseModel):
     id: str
     name: str
@@ -133,6 +137,7 @@ class NoteRead(BaseModel):
     source_type: str
     revision_number: int
     is_published: bool
+    is_starred: bool
     published_at: datetime | None = None
     summary: str
     shared_at: datetime | None = None
@@ -157,6 +162,7 @@ class NoteListItem(BaseModel):
     source_type: str
     revision_number: int
     is_published: bool
+    is_starred: bool
     summary: str = ""
     note_path: str
     created_at: datetime

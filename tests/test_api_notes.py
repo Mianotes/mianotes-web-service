@@ -75,6 +75,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["source_type"] == "text"
     assert note["revision_number"] == 1
     assert note["is_published"] is False
+    assert note["is_starred"] is False
     assert note["summary"] == "We agreed to build Mianotes with Markdown notes."
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
@@ -106,8 +107,47 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert listed.json()[0]["id"] == note["id"]
     assert listed.json()[0]["status"] == "ready"
     assert listed.json()[0]["source_type"] == "text"
+    assert listed.json()[0]["is_starred"] is False
     assert listed.json()[0]["summary"] == "We agreed to build Mianotes with Markdown notes."
     assert "text" not in listed.json()[0]
+
+
+def test_note_star_can_be_toggled_and_filtered(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "star@example.com",
+            "name": "Star User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Stars"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Important Note",
+            "text": "This note should be easy to find later.",
+        },
+    ).json()
+
+    starred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": True})
+
+    assert starred.status_code == 200
+    assert starred.json()["is_starred"] is True
+    listed = client.get("/api/notes", params={"starred": True})
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == [note["id"]]
+    assert listed.json()[0]["is_starred"] is True
+
+    unstarred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": False})
+
+    assert unstarred.status_code == 200
+    assert unstarred.json()["is_starred"] is False
+    listed = client.get("/api/notes", params={"starred": True})
+    assert listed.status_code == 200
+    assert listed.json() == []
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
