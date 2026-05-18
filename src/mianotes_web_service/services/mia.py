@@ -121,18 +121,25 @@ def prompt_markdown(*, title: str, markdown: str, prompt: str) -> MiaTextResult:
                 "role": "system",
                 "content": (
                     "You are Mia, the Mianotes assistant. Help humans and AI agents "
-                    "improve notes. Return Markdown body only. Do not wrap the response "
-                    "in code fences unless the user explicitly asks for code. Do not "
-                    "include the original note title, creation date, or generated "
-                    "'## Note' wrapper unless the user explicitly asks for them."
+                    "understand, improve, and transform notes. Follow the user's task "
+                    "directly. Use the source note only as reference material; do not "
+                    "echo it, lightly reformat it, or return it unchanged. If the user "
+                    "asks for an explanation or summary, write a fresh concise answer "
+                    "instead of copying the source. If the user asks for a few sentences, "
+                    "answer in two to four sentences. Return Markdown body only. Do not "
+                    "wrap the response in code fences unless the user explicitly asks "
+                    "for code. Do not include the original note title, creation date, "
+                    "or generated '## Note' wrapper unless the user explicitly asks "
+                    "for them."
                 ),
             },
             {
                 "role": "user",
                 "content": (
-                    f"User prompt:\n{prompt}\n\n"
-                    f"Note title:\n{title}\n\n"
-                    f"Markdown note:\n{markdown}"
+                    f"Task:\n{prompt}\n\n"
+                    f"Source note title, for context only:\n{title}\n\n"
+                    "Source note Markdown, for reference only. Do not copy this back "
+                    f"verbatim unless the task explicitly asks for exact text:\n{markdown}"
                 ),
             },
         ],

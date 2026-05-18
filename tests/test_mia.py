@@ -79,7 +79,11 @@ def test_mia_prompt_sends_user_prompt_and_note(monkeypatch, tmp_path):
 
     user_message = calls["completion"]["messages"][1]["content"]
     assert result.text == "## Summary\n\nUseful and tidy."
-    assert "User prompt:\nsummarise this text" in user_message
-    assert "Note title:\nPlanning trip to Mallorca" in user_message
+    system_message = calls["completion"]["messages"][0]["content"]
+    assert "do not echo it" in system_message
+    assert "answer in two to four sentences" in system_message
+    assert "Task:\nsummarise this text" in user_message
+    assert "Source note title, for context only:\nPlanning trip to Mallorca" in user_message
+    assert "Do not copy this back" in user_message
     assert "# Planning trip to Mallorca" in user_message
     get_settings.cache_clear()
