@@ -400,7 +400,7 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert note["note_api_url"].endswith(f"/api/notes/{note['id']}")
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert [tag["slug"] for tag in note["tags"]] == ["research"]
-    assert "waiting for the parsing pipeline" in note["text"]
+    assert "Mia is indexing your link" in note["text"]
 
     note_filename = f"mianotes-{note['id'][:8]}"
     note_path = tmp_path / "data" / "links" / f"{note_filename}.md"

@@ -572,7 +572,7 @@ def create_note_from_url(
         title=title,
         status="pending_parse",
         source_type="link",
-        summary="This link is waiting for the parsing pipeline.",
+        summary="Mia is indexing this link.",
         note_path=str(paths.note_path),
     )
     session.add(note)
