@@ -17,13 +17,18 @@ storage and a small relational index.
 Generated notes and source files live under the configured data directory:
 
 ```text
-data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md
-data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.<ext>
+data/<project_slug>/<title_slug>-<note_id[:8]>.md
+data/<project_slug>/sources/<note_id[:8]>/original.<ext>
 ```
 
 The filename combines a human-readable title slug with the first eight
 characters of the note ID. Paths are written once and stored in SQLite, so later
-title edits do not rename files.
+title edits do not rename files. Source files are grouped by note ID under the
+project's `sources/` directory, which is ignored by the project-level
+`.gitignore`.
+
+Project slugs are unique across the instance because each project owns one
+top-level storage directory.
 
 ## Database responsibilities
 

@@ -7,7 +7,7 @@
       "username": "matt-b1edd8d4",
       "token_hint": "test token not generated yet",
       "notes": [
-        "tests/fixtures/data/matt-b1edd8d4/product-research/ai-note-taking-landscape-4a95f146.md"
+        "tests/fixtures/data/product-research/ai-note-taking-landscape-4a95f146.md"
       ]
     },
     {
@@ -17,7 +17,7 @@
       "username": "ben-carter-f871a76f",
       "token_hint": "test token not generated yet",
       "notes": [
-        "tests/fixtures/data/ben-carter-f871a76f/meeting-notes/kickoff-action-items-dc6d54d2.md"
+        "tests/fixtures/data/meeting-notes/kickoff-action-items-dc6d54d2.md"
       ]
     },
     {
@@ -27,7 +27,7 @@
       "username": "emily-davis-6599ce4d",
       "token_hint": "test token not generated yet",
       "notes": [
-        "tests/fixtures/data/emily-davis-6599ce4d/reading-list/local-first-architecture-8b6c2a10.md"
+        "tests/fixtures/data/reading-list/local-first-architecture-8b6c2a10.md"
       ]
     }
   ]

@@ -440,7 +440,7 @@ def create_note_from_text(
             SourceFile(
                 note_id=note.id,
                 file_path=str(paths.source_path),
-                original_filename=f"{slugify(title)}.source.txt",
+                original_filename="original.txt",
                 content_type="text/plain",
             )
         )

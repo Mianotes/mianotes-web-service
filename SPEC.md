@@ -163,14 +163,16 @@ Index storage:
 Generated notes are stored under:
 
 ```text
-/data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md
+/data/<project_slug>/<title_slug>-<note_id[:8]>.md
 ```
 
-Source files are stored in the same folder using the same readable stem and their original extension:
+Source files are stored under a note-specific source folder:
 
 ```text
-/data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.<original-extension>
+/data/<project_slug>/sources/<note_id[:8]>/original.<original-extension>
 ```
+
+Project folders include a `.gitignore` file that ignores `/sources/`, so a project folder can be turned into a Git repository without committing original source files by default.
 
 Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames. The title slug is only used at creation time; later title edits do not rename the file.
 
@@ -179,7 +181,7 @@ Once a Markdown note path is created, it must not change. The database stores th
 For plain text note creation, v1 should save a source text file alongside the generated note when it is useful for auditability and reprocessing:
 
 ```text
-/data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.txt
+/data/<project_slug>/sources/<note_id[:8]>/original.txt
 ```
 
 This keeps all note types consistent: every generated note can have a traceable source file when practical.
@@ -403,7 +405,7 @@ Every note creation flow follows this high-level pipeline:
 4. Send parsed content to the configured LLM provider.
 5. Generate a Markdown note.
 6. Generate or infer a note title.
-7. Save the Markdown file under `/data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md`.
+7. Save the Markdown file under `/data/<project_slug>/<title_slug>-<note_id[:8]>.md`.
 8. Insert database records for the note, tags, comments, and source file.
 9. Return a JSON representation of the note.
 

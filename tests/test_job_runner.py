@@ -71,7 +71,7 @@ def test_job_runner_parses_file_and_updates_note(
     monkeypatch,
 ):
     testing_session = _session_factory()
-    source_path = tmp_path / "data" / "user" / "project" / "note.source.txt"
+    source_path = tmp_path / "data" / "project" / "sources" / "note1234" / "original.txt"
     note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
 
     def fake_parse_document(path: Path) -> ParsedDocument:

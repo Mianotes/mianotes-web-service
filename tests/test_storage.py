@@ -40,10 +40,29 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
         source_extension=".pdf",
     )
 
-    assert paths.directory == tmp_path / "abc123" / "meeting-notes"
-    assert paths.note_path == (
-        tmp_path / "abc123" / "meeting-notes" / "kickoff-plan-4a95f146.md"
-    )
+    assert paths.directory == tmp_path / "meeting-notes"
+    assert paths.note_path == tmp_path / "meeting-notes" / "kickoff-plan-4a95f146.md"
     assert paths.source_path == (
-        tmp_path / "abc123" / "meeting-notes" / "kickoff-plan-4a95f146.pdf"
+        tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.pdf"
     )
+
+
+def test_write_text_note_creates_project_gitignore_and_source_folder(tmp_path: Path):
+    storage = FilesystemStorage(tmp_path)
+
+    paths = storage.write_text_note(
+        username="abc123",
+        project="Meeting Notes",
+        title="Kickoff Plan",
+        text="Shared project note.",
+        filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
+    )
+
+    assert (tmp_path / "meeting-notes" / ".gitignore").read_text(encoding="utf-8") == (
+        "/sources/\n"
+    )
+    assert paths.note_path == tmp_path / "meeting-notes" / "kickoff-plan-4a95f146.md"
+    assert paths.source_path == (
+        tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.txt"
+    )
+    assert paths.source_path.read_text(encoding="utf-8") == "Shared project note."

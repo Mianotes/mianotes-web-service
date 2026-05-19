@@ -45,7 +45,15 @@ class FilesystemStorage:
         self.data_dir = data_dir
 
     def project_dir(self, username: str, project: str) -> Path:
-        return self.data_dir / slugify(username, "user") / slugify(project, "project")
+        # Keep username in the signature while storage paths move to project-first.
+        _ = username
+        return self.data_dir / slugify(project, "project")
+
+    def prepare_project_directory(self, directory: Path) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        gitignore_path = directory / ".gitignore"
+        if not gitignore_path.exists():
+            gitignore_path.write_text("/sources/\n", encoding="utf-8")
 
     def note_paths(
         self,
@@ -55,7 +63,6 @@ class FilesystemStorage:
         filename: str,
         title: str | None = None,
         source_extension: str | None = None,
-        source_suffix: str = "",
     ) -> NotePaths:
         base_dir = self.project_dir(username, project)
         stem = note_stem(title, filename) if title is not None else slugify(Path(filename).stem)
@@ -65,7 +72,7 @@ class FilesystemStorage:
             extension = (
                 source_extension if source_extension.startswith(".") else f".{source_extension}"
             )
-            source_path = base_dir / f"{stem}{source_suffix}{extension.lower()}"
+            source_path = base_dir / "sources" / short_id(filename) / f"original{extension.lower()}"
         return NotePaths(
             directory=base_dir,
             note_path=note_path,
@@ -86,11 +93,12 @@ class FilesystemStorage:
             project=project,
             filename=filename or title,
             title=title if filename is not None else None,
-            source_extension=".source.txt",
+            source_extension=".txt",
         )
-        paths.directory.mkdir(parents=True, exist_ok=True)
+        self.prepare_project_directory(paths.directory)
         paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")
         if paths.source_path is not None:
+            paths.source_path.parent.mkdir(parents=True, exist_ok=True)
             paths.source_path.write_text(text, encoding="utf-8")
         return paths
 
@@ -111,14 +119,14 @@ class FilesystemStorage:
             filename=filename,
             title=title,
             source_extension=extension,
-            source_suffix=".source",
         )
-        paths.directory.mkdir(parents=True, exist_ok=True)
+        self.prepare_project_directory(paths.directory)
         paths.note_path.write_text(
             render_pending_upload_note(title=title, original_filename=original_filename),
             encoding="utf-8",
         )
         if paths.source_path is not None:
+            paths.source_path.parent.mkdir(parents=True, exist_ok=True)
             with paths.source_path.open("wb") as destination:
                 shutil.copyfileobj(source_stream, destination)
         return paths
@@ -137,9 +145,11 @@ class FilesystemStorage:
             project=project,
             filename=filename,
             title=title,
-            source_extension=".source.html",
+            source_extension=".html",
         )
-        paths.directory.mkdir(parents=True, exist_ok=True)
+        self.prepare_project_directory(paths.directory)
+        if paths.source_path is not None:
+            paths.source_path.parent.mkdir(parents=True, exist_ok=True)
         paths.note_path.write_text(
             render_pending_url_note(title=title, url=url),
             encoding="utf-8",

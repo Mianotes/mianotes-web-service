@@ -39,7 +39,7 @@ def _set_session_cookie(response: Response, token: str) -> None:
 
 def _create_onboarding_note(session: Session, user: User) -> None:
     existing_project = session.scalars(
-        select(Project).where(Project.user_id == user.id, Project.slug == "mianotes")
+        select(Project).where(Project.slug == "mianotes")
     ).one_or_none()
     if existing_project is not None:
         return
@@ -75,7 +75,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
             SourceFile(
                 note_id=note.id,
                 file_path=str(paths.source_path),
-                original_filename="how-to-use-mianotes.source.txt",
+                original_filename="original.txt",
                 content_type="text/plain",
             )
         )

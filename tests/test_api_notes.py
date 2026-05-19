@@ -80,23 +80,25 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
     note_filename = f"kickoff-notes-{note['id'][:8]}"
-    assert note["note_url"].endswith(
-        f"/data/note-user-926c16ee/meeting-notes/{note_filename}.md"
-    )
+    assert note["note_url"].endswith(f"/data/meeting-notes/{note_filename}.md")
     assert note["source_files"][0]["url"].endswith(
-        f"/data/note-user-926c16ee/meeting-notes/{note_filename}.source.txt"
+        f"/data/meeting-notes/sources/{note['id'][:8]}/original.txt"
     )
     assert note["comments_count"] == 0
     assert note["comments_url"].endswith(f"/api/notes/{note['id']}/comments")
 
-    note_path = tmp_path / "data" / "note-user-926c16ee" / "meeting-notes" / f"{note_filename}.md"
+    note_path = tmp_path / "data" / "meeting-notes" / f"{note_filename}.md"
     source_path = (
         tmp_path
         / "data"
-        / "note-user-926c16ee"
         / "meeting-notes"
-        / f"{note_filename}.source.txt"
+        / "sources"
+        / note["id"][:8]
+        / "original.txt"
     )
+    assert (tmp_path / "data" / "meeting-notes" / ".gitignore").read_text(
+        encoding="utf-8"
+    ) == "/sources/\n"
     assert note_path.read_text(encoding="utf-8").startswith("# Kickoff Notes")
     assert (
         source_path.read_text(encoding="utf-8")
@@ -349,20 +351,14 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert "waiting for the parsing pipeline" in note["text"]
     note_filename = f"receipt-{note['id'][:8]}"
-    assert note["note_url"].endswith(f"/data/upload-user-43916aab/uploads/{note_filename}.md")
+    assert note["note_url"].endswith(f"/data/uploads/{note_filename}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/upload-user-43916aab/uploads/{note_filename}.source.pdf"
+        f"/data/uploads/sources/{note['id'][:8]}/original.pdf"
     )
 
-    note_path = tmp_path / "data" / "upload-user-43916aab" / "uploads" / f"{note_filename}.md"
-    source_path = (
-        tmp_path
-        / "data"
-        / "upload-user-43916aab"
-        / "uploads"
-        / f"{note_filename}.source.pdf"
-    )
+    note_path = tmp_path / "data" / "uploads" / f"{note_filename}.md"
+    source_path = tmp_path / "data" / "uploads" / "sources" / note["id"][:8] / "original.pdf"
     assert note_path.read_text(encoding="utf-8").startswith("# Receipt")
     assert source_path.read_bytes() == b"%PDF-1.4 test content"
 
@@ -407,14 +403,12 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert "waiting for the parsing pipeline" in note["text"]
 
     note_filename = f"mianotes-{note['id'][:8]}"
-    note_path = tmp_path / "data" / "url-user-09592df9" / "links" / f"{note_filename}.md"
-    source_path = (
-        tmp_path / "data" / "url-user-09592df9" / "links" / f"{note_filename}.source.html"
-    )
+    note_path = tmp_path / "data" / "links" / f"{note_filename}.md"
+    source_path = tmp_path / "data" / "links" / "sources" / note["id"][:8] / "original.html"
     assert note_path.read_text(encoding="utf-8").startswith("# mianotes")
     assert note["source_files"][0]["original_filename"] == "https://example.com/articles/mianotes"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/url-user-09592df9/links/{note_filename}.source.html"
+        f"/data/links/sources/{note['id'][:8]}/original.html"
     )
     assert not source_path.exists()
 

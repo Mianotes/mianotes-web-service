@@ -40,7 +40,7 @@ def create_project(payload: ProjectCreate, session: SessionDep, user: ProjectsWr
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A project with this name already exists for this user",
+            detail="A project with this name already exists",
         ) from exc
     session.refresh(project)
     return project
@@ -94,7 +94,7 @@ def update_project(
         session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A project with this name already exists for this user",
+            detail="A project with this name already exists",
         ) from exc
     session.refresh(project)
     return project

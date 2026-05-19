@@ -17,11 +17,11 @@ Mianotes services use the `8200` range:
 By default, generated notes and source files live under `data/`.
 
 ```text
-data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.md
-data/<user_slug>/<project_slug>/<title_slug>-<note_id[:8]>.source.<ext>
+data/<project_slug>/<title_slug>-<note_id[:8]>.md
+data/<project_slug>/sources/<note_id[:8]>/original.<ext>
 ```
 
-User and project directories are filesystem-safe slugs. Note filenames are readable enough for GitHub while still carrying a stable note ID prefix.
+Project directories are filesystem-safe slugs and are unique across the instance. Note filenames are readable enough for GitHub while still carrying a stable note ID prefix. Source files live under each project's `sources/` directory, and Mianotes writes a project-level `.gitignore` that ignores `/sources/` so generated Git backups can keep Markdown notes without committing original uploads.
 
 Set `MIANOTES_DATA_DIR` to change the storage location.
 

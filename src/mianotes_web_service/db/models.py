@@ -56,7 +56,7 @@ class User(Base, TimestampMixin):
 
 class Project(Base, TimestampMixin):
     __tablename__ = "projects"
-    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_projects_user_slug"),)
+    __table_args__ = (UniqueConstraint("slug", name="uq_projects_slug"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
