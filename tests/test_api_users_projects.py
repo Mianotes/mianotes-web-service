@@ -79,7 +79,7 @@ def test_user_crud(client: TestClient):
     assert missing.status_code == 404
 
 
-def test_project_crud_and_user_filter(client: TestClient):
+def test_project_crud_and_user_filter(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
         json={
@@ -105,6 +105,9 @@ def test_project_crud_and_user_filter(client: TestClient):
     assert project["slug"] == "product-research"
     assert project["path"] == "product-research"
     assert project["is_pinned"] is True
+    project_dir = tmp_path / "data" / "product-research"
+    project_dir.mkdir(parents=True)
+    (project_dir / "note.md").write_text("note", encoding="utf-8")
 
     duplicate = client.post(
         "/api/projects",
@@ -130,6 +133,10 @@ def test_project_crud_and_user_filter(client: TestClient):
     assert updated.json()["slug"] == "research-notes"
     assert updated.json()["path"] == "research-notes"
     assert updated.json()["is_pinned"] is False
+    assert not project_dir.exists()
+    assert (tmp_path / "data" / "research-notes" / "note.md").read_text(
+        encoding="utf-8"
+    ) == "note"
 
     deleted = client.delete(f"/api/projects/{project['id']}")
     assert deleted.status_code == 204
