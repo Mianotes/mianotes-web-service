@@ -28,7 +28,16 @@ audio or video files.
 
 ## Start
 
-For the simplest local run:
+Choose the run command based on what you are trying to do:
+
+| Goal | Command | Use this when |
+|---|---|---|
+| Run Mianotes locally | `./start.sh` | You want to use Mianotes on your computer or local network. |
+| Develop the backend | `./start-dev.sh` | You are changing Python code and want auto-reload. |
+| Run manually | `mianotes-web-service init-db` then `mianotes-web-service --host 0.0.0.0 --port 8200` | You want full control over each step. |
+| Run always-on | `systemctl start mianotes-web-service` | You installed Mianotes as a service on a local box or server. |
+
+For the simplest local run, use `./start.sh`:
 
 ```bash
 ./start.sh
@@ -42,6 +51,15 @@ To use a different host or port:
 ```bash
 MIANOTES_HOST=127.0.0.1 MIANOTES_PORT=8201 ./start.sh
 ```
+
+During backend development, use `./start-dev.sh` instead:
+
+```bash
+./start-dev.sh
+```
+
+That script installs development dependencies and starts the API with reload
+enabled.
 
 ## Manual install
 

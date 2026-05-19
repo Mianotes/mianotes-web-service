@@ -29,6 +29,9 @@ The script creates `.venv` if needed, installs Mianotes with development
 dependencies, installs the Codex and Claude skills, initializes the database,
 and starts the API on port `8200` with reload enabled.
 
+Use `./start-dev.sh` only when you are developing the backend. For normal local
+use, follow [Installation](02-Installation.md) and run `./start.sh`.
+
 To use a different host or port:
 
 ```bash
