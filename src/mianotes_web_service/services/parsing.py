@@ -10,6 +10,8 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from mianotes_web_service.services.mia import MiaUnavailable, markitdown_llm_options
+
 
 class ParserError(RuntimeError):
     pass
@@ -36,6 +38,8 @@ class DocumentParser(Protocol):
 DEFAULT_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 )
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+IMAGE_DESCRIPTION_HEADING = "# Description:"
 
 
 def _markitdown_class():
@@ -51,6 +55,32 @@ def _trafilatura_module():
         return importlib.import_module("trafilatura")
     except ModuleNotFoundError:
         return None
+
+
+def _is_image(path: Path) -> bool:
+    return path.suffix.lower() in IMAGE_EXTENSIONS
+
+
+def _markitdown_options(path: Path) -> dict[str, object]:
+    if not _is_image(path):
+        return {}
+    try:
+        return markitdown_llm_options()
+    except MiaUnavailable as exc:
+        raise ParserUnavailable(
+            "Image parsing needs a configured vision-capable LLM. Set "
+            "MIANOTES_LLM_PROVIDER, MIANOTES_LLM_MODEL, and MIANOTES_LLM_API_KEY, "
+            "or set MIANOTES_LLM_IMAGE_MODEL to a model that can read images."
+        ) from exc
+
+
+def _normalise_image_markdown(text: str) -> str:
+    if IMAGE_DESCRIPTION_HEADING not in text:
+        raise ParserError(
+            "Image parsing returned metadata only. Configure a vision-capable model "
+            "for image uploads, for example by setting MIANOTES_LLM_IMAGE_MODEL."
+        )
+    return text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -104,12 +134,15 @@ class MarkItDownParser:
     def parse(self, path: Path) -> ParsedDocument:
         if not path.is_file():
             raise ParserError("Source file not found")
-        converter = _markitdown_class()()
+        converter = _markitdown_class()(**_markitdown_options(path))
         try:
             result = converter.convert(str(path))
         except Exception as exc:
             raise ParserError(str(exc)) from exc
-        return ParsedDocument(text=result.text_content, parser=self.name, source_path=path)
+        text = result.text_content
+        if _is_image(path):
+            text = _normalise_image_markdown(text)
+        return ParsedDocument(text=text, parser=self.name, source_path=path)
 
 
 class ParserRegistry:

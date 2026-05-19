@@ -34,6 +34,13 @@ MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
 MIANOTES_LLM_API_KEY=ollama
 ```
 
+`llama3.2:3b` is a text model. If you want image uploads to produce useful
+Markdown instead of image metadata, also configure a vision-capable model:
+
+```env
+MIANOTES_LLM_IMAGE_MODEL=<vision-model-name>
+```
+
 For OpenAI:
 
 ```env
@@ -111,6 +118,11 @@ To check it worked:
 ```bash
 ollama list
 ```
+
+Image uploads need a vision-capable model. If you use Ollama for image uploads,
+pull a model that supports images, then set `MIANOTES_LLM_IMAGE_MODEL` to that
+model name. Keep `MIANOTES_LLM_MODEL=llama3.2:3b` for normal text prompts if
+you want the smaller model for day-to-day Mia responses.
 
 `127.0.0.1` means the machine running the Python web service. If Mianotes and Ollama are both running on your Mac, this is the correct value.
 

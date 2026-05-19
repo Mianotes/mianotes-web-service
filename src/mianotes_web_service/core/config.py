@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     llm_provider: str = "openai"
     llm_model: str | None = None
+    llm_image_model: str | None = None
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     openai_api_key: str | None = None

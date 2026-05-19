@@ -3,10 +3,12 @@ from types import SimpleNamespace
 
 import pytest
 
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services import parsing
 from mianotes_web_service.services.parsing import (
     DEFAULT_BROWSER_USER_AGENT,
     MarkItDownParser,
+    ParserError,
     ParserUnavailable,
     fetch_url_to_html,
     parse_document,
@@ -15,8 +17,18 @@ from mianotes_web_service.services.parsing import (
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_settings_cache():
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
 def _fake_markitdown_module(text: str = "# Converted\n\nHello from MarkItDown."):
     class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
         def convert(self, path: str):
             return SimpleNamespace(text_content=f"{text}\n\nsource={Path(path).name}")
 
@@ -38,6 +50,76 @@ def test_markitdown_parser_converts_file(tmp_path: Path, monkeypatch: pytest.Mon
     assert parsed.source_path == source
     assert "Hello from MarkItDown" in parsed.text
     assert "source=note.md" in parsed.text
+
+
+def test_image_parser_uses_configured_llm_options(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "photo.jpeg"
+    source.write_bytes(b"fake image")
+    created_with = {}
+
+    class FakeMarkItDown:
+        def __init__(self, **kwargs):
+            created_with.update(kwargs)
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "ImageSize: 1179x1967\n\n"
+                    "# Description:\n"
+                    "A screenshot showing a Mianotes upload result."
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "llama3.2-vision",
+            "llm_prompt": "Convert this image into useful Markdown.",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "A screenshot showing a Mianotes upload result."
+    assert created_with["llm_model"] == "llama3.2-vision"
+    assert "llm_client" in created_with
+    assert "Convert this image into useful Markdown" in created_with["llm_prompt"]
+
+
+def test_image_parser_rejects_metadata_only_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "photo.png"
+    source.write_bytes(b"fake image")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "llama3.2-vision",
+            "llm_prompt": "Convert this image into useful Markdown.",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
+    )
+
+    with pytest.raises(ParserError, match="metadata only"):
+        parse_document(source)
 
 
 def test_missing_markitdown_reports_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

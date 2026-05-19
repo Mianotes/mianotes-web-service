@@ -103,6 +103,22 @@ def _client_for(config: LLMConfig) -> OpenAI:
     return OpenAI(**kwargs)
 
 
+def markitdown_llm_options() -> dict[str, object]:
+    settings = get_settings()
+    config = _llm_config()
+    return {
+        "llm_client": _client_for(config),
+        "llm_model": settings.llm_image_model or config.model,
+        "llm_prompt": (
+            "Convert this image into useful Markdown for a local knowledge base. "
+            "If the image contains text, transcribe the text accurately. If it is "
+            "a screenshot, document, diagram, receipt, photo, or UI, describe the "
+            "important content, structure, labels, values, and visible actions. "
+            "Return Markdown only."
+        ),
+    }
+
+
 def summarise_markdown(*, title: str, markdown: str) -> MiaTextResult:
     return prompt_markdown(
         title=title,
