@@ -1033,7 +1033,8 @@ Session cookie or bearer token with `projects:write` or `admin`.
 
 ```json
 {
-  "name": "School"
+  "name": "School",
+  "is_pinned": false
 }
 ```
 
@@ -1042,6 +1043,7 @@ Session cookie or bearer token with `projects:write` or `admin`.
 | Field | Type | Required | Description |
 |---|---|---:|---|
 | `name` | string | Yes | Project name. |
+| `is_pinned` | boolean | No | Whether the project should stay above unpinned projects in project lists. Defaults to `false`. |
 | `user_id` | string \| null | No | Accepted by schema but currently ignored; the project owner is always the current user. |
 
 ### Response
@@ -1116,6 +1118,52 @@ Returns a `Project`.
 | `401` | Not authenticated. |
 | `403` | Token lacks `projects:read`. |
 | `404` | Project does not exist. |
+
+## Update project
+
+Updates a project name or pinned state.
+
+### Endpoint
+
+`PATCH /api/projects/{project_id}`
+
+### Authentication
+
+Session cookie or bearer token with `projects:write` or `admin`.
+
+### Authorization
+
+Admins can update any project. Normal users can update only projects they created.
+
+### Request
+
+```json
+{
+  "name": "Research",
+  "is_pinned": true
+}
+```
+
+### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `name` | string | No | New project name. |
+| `is_pinned` | boolean | No | Whether the project should stay above unpinned projects in project lists. |
+
+### Response
+
+Returns the updated `Project`.
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Token lacks `projects:write`, or user does not own the project. |
+| `404` | Project does not exist or has been archived. |
+| `409` | Current user already has a project with this name. |
+| `422` | Request validation failed. |
 
 ## Archive project
 

@@ -37,7 +37,8 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    is_pinned: bool | None = None
 
 
 class ProjectRead(BaseModel):

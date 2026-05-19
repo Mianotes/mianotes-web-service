@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.api.dependencies import ProjectsReadUser, ProjectsWriteUser
 from mianotes_web_service.db.models import Project
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import ProjectCreate, ProjectRead
+from mianotes_web_service.domain.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 from mianotes_web_service.services.storage import slugify
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -64,6 +64,40 @@ def list_projects(
 @router.get("/{project_id}", response_model=ProjectRead)
 def get_project(project_id: str, session: SessionDep, user: ProjectsReadUser) -> Project:
     return _read_project_or_404(session, project_id)
+
+
+@router.patch("/{project_id}", response_model=ProjectRead)
+def update_project(
+    project_id: str,
+    payload: ProjectUpdate,
+    session: SessionDep,
+    user: ProjectsWriteUser,
+) -> Project:
+    project = _read_project_or_404(session, project_id)
+    if not user.is_admin and project.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot change this project",
+        )
+    if project.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    if payload.name is not None:
+        project.name = payload.name
+        project.slug = slugify(payload.name)
+    if payload.is_pinned is not None:
+        project.is_pinned = payload.is_pinned
+
+    try:
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A project with this name already exists for this user",
+        ) from exc
+    session.refresh(project)
+    return project
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

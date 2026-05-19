@@ -120,6 +120,15 @@ def test_project_crud_and_user_filter(client: TestClient):
     assert ordered[0]["id"] == project["id"]
     assert ordered[1]["id"] == unpinned["id"]
 
+    updated = client.patch(
+        f"/api/projects/{project['id']}",
+        json={"name": "Research Notes", "is_pinned": False},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Research Notes"
+    assert updated.json()["slug"] == "research-notes"
+    assert updated.json()["is_pinned"] is False
+
     deleted = client.delete(f"/api/projects/{project['id']}")
     assert deleted.status_code == 204
 
