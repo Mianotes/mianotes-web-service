@@ -845,7 +845,7 @@ def create_note_comment(
     prompt = _mia_prompt(payload.body)
     if prompt is not None:
         try:
-            raw_markdown = Path(note.note_path).read_text(encoding="utf-8")
+            raw_markdown = payload.markdown or Path(note.note_path).read_text(encoding="utf-8")
             result = prompt_markdown(
                 title=note.title,
                 markdown=markdown_note_body(raw_markdown) or raw_markdown,

@@ -97,6 +97,7 @@ class TagsUpdate(BaseModel):
 
 class CommentCreate(BaseModel):
     body: str = Field(min_length=1)
+    markdown: str | None = None
 
 
 class CommentUpdate(BaseModel):

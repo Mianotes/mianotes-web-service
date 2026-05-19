@@ -623,6 +623,55 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     assert comments.json() == []
 
 
+def test_mia_comment_prompt_can_use_unsaved_markdown(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    from mianotes_web_service.api import notes
+    from mianotes_web_service.services.mia import MiaTextResult
+
+    captured: dict[str, str] = {}
+
+    def fake_prompt_markdown(*, title: str, markdown: str, prompt: str) -> MiaTextResult:
+        captured["markdown"] = markdown
+        captured["prompt"] = prompt
+        return MiaTextResult(
+            text="## Improved\n\nUse the draft text.",
+            provider="test",
+            model="test-model",
+        )
+
+    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "mia-draft@example.com",
+            "name": "Mia Draft User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Draft prompts"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "project_id": project["id"],
+            "title": "Draft note",
+            "text": "Saved text.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/comments",
+        json={
+            "body": "@mia improve this",
+            "markdown": "Unsaved draft text.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["text"] == "## Improved\n\nUse the draft text."
+    assert captured["markdown"] == "Unsaved draft text."
+    assert captured["prompt"] == "improve this"
+
+
 def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
     client.post(
         "/api/auth/join",
