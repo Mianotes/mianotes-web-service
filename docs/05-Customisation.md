@@ -72,8 +72,9 @@ For local Ollama-style servers:
 
 ```text
 MIANOTES_LLM_PROVIDER=local
-MIANOTES_LLM_MODEL=llama3.2
+MIANOTES_LLM_MODEL=llama3.2:3b
 MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
+MIANOTES_LLM_API_KEY=ollama
 ```
 
 For other OpenAI-compatible servers:

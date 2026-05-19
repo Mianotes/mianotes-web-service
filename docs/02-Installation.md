@@ -98,6 +98,82 @@ When `MIANOTES_DATABASE_URL` is empty, Mianotes stores SQLite at `data/mia.db`.
 `MIANOTES_LLM_PROVIDER` supports `openai`, `local`, and `openai-compatible`.
 Use `local` for an Ollama-style OpenAI-compatible endpoint on your machine.
 
+## Local LLM with Ollama
+
+Mianotes can use Ollama through its OpenAI-compatible API. For an 8GB M1
+MacBook Air, `llama3.2:3b` is a good model to use.
+
+On your Mac, install Ollama first, then run the model.
+
+Option 1, easiest, using Homebrew:
+
+```bash
+brew install ollama
+```
+
+Start Ollama:
+
+```bash
+ollama serve
+```
+
+Open a second Terminal window and run:
+
+```bash
+ollama run llama3.2:3b
+```
+
+Option 2, download the Mac app:
+
+```text
+https://ollama.com/download/mac
+```
+
+Install it, open Ollama once, then run this in Terminal:
+
+```bash
+ollama run llama3.2:3b
+```
+
+To check it worked:
+
+```bash
+ollama list
+```
+
+Then add this to `.env`:
+
+```env
+MIANOTES_LLM_PROVIDER=local
+MIANOTES_LLM_MODEL=llama3.2:3b
+MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
+MIANOTES_LLM_API_KEY=ollama
+```
+
+Restart the backend after changing `.env`:
+
+```bash
+mianotes-web-service --host 0.0.0.0 --port 8200
+```
+
+Or, if you use the script:
+
+```bash
+./start.sh
+```
+
+`127.0.0.1` means the machine running the Python web service. If Mianotes and
+Ollama are both running on your Mac, this is the correct value.
+
+If the backend runs on another box, such as Senseibox, then `127.0.0.1` points
+to that box instead of your Mac. In that case, use your Mac's LAN IP address:
+
+```env
+MIANOTES_LLM_BASE_URL=http://192.168.1.238:11434/v1
+```
+
+Ollama also needs to listen on the network for another machine to reach it.
+
 ## Manual run commands
 
 Manual run is the default path for local installs, quick testing, and people who
