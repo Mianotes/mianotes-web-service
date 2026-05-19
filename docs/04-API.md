@@ -1265,7 +1265,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 |---|---|---:|---|
 | `project_id` | string | Yes | Project ID for the note. |
 | `file` | file | Yes | Source file to upload. |
-| `title` | string | No | Optional note title. If omitted, the API infers one from the filename. |
+| `title` | string | Yes | Note title to use for the Markdown note and stored note metadata. |
 
 ### Supported file extensions
 

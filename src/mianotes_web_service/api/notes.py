@@ -461,7 +461,7 @@ def create_note_from_file(
     user: NotesWriteUser,
     project_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
-    title: Annotated[str | None, Form()] = None,
+    title: Annotated[str, Form()],
 ) -> NoteRead:
     project = session.get(Project, project_id)
     if project is None or project.archived_at is not None:
@@ -480,7 +480,12 @@ def create_note_from_file(
         )
 
     note_id = new_id()
-    note_title = title or infer_title(Path(file.filename).stem.replace("-", " ").replace("_", " "))
+    note_title = title.strip()
+    if not note_title:
+        raise HTTPException(
+            status_code=422,
+            detail="Title required",
+        )
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_uploaded_file_note(
         username=user.username,

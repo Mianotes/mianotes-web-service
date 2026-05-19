@@ -363,6 +363,49 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert source_path.read_bytes() == b"%PDF-1.4 test content"
 
 
+def test_create_note_from_file_requires_title(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "upload-title@example.com",
+            "name": "Upload Title User",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Uploads"}).json()
+
+    response = client.post(
+        "/api/notes/from-file",
+        data={"project_id": project["id"]},
+        files={"file": ("receipt.pdf", b"%PDF-1.4 test content", "application/pdf")},
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_note_from_file_rejects_blank_title(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "upload-blank-title@example.com",
+            "name": "Upload Blank Title User",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    project = client.post("/api/projects", json={"name": "Uploads"}).json()
+
+    response = client.post(
+        "/api/notes/from-file",
+        data={"project_id": project["id"], "title": "   "},
+        files={"file": ("receipt.pdf", b"%PDF-1.4 test content", "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Title required"
+
+
 def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
