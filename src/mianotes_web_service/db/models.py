@@ -62,6 +62,7 @@ class Project(Base, TimestampMixin):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(220), nullable=False)
+    path: Mapped[str] = mapped_column(Text, nullable=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
@@ -86,6 +87,7 @@ class Note(Base, TimestampMixin):
     summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
     share_token_hash: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
     shared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    filename: Mapped[str | None] = mapped_column(String(500))
     note_path: Mapped[str] = mapped_column(Text, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="notes")
@@ -114,6 +116,7 @@ class SourceFile(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     note_id: Mapped[str] = mapped_column(ForeignKey("notes.id"), index=True, nullable=False)
+    filename: Mapped[str | None] = mapped_column(String(700))
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     original_filename: Mapped[str] = mapped_column(String(500), nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(200))

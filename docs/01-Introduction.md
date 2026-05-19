@@ -18,15 +18,15 @@ Mia is the built-in AI agent for Mianotes. Mia helps convert messy inputs into d
 
 ## Storage model
 
-Mianotes stores note content as Markdown files:
+Mianotes stores note content as Markdown files under each project directory:
 
 ```text
 data/<project_slug>/<title_slug>-<note_id[:8]>.md
 ```
 
-SQLite stores the index and metadata: users, projects, tags, notes, comments, source files, sessions, and share tokens.
+The default SQLite database lives at `data/mia.db`. It stores the index and metadata: users, projects, tags, notes, comments, source files, sessions, and share tokens.
 
-Filenames use the title slug plus the first eight characters of the note ID, for example `planning-trip-to-mallorca-4a95f146.md`. Source files live under `data/<project_slug>/sources/<note_id[:8]>/original.<ext>`. The path is created once and stored in SQLite; changing the note title later does not rename the file.
+Project rows store their filesystem path, and note rows store their Markdown filename. Mianotes derives the full path from those two values. Filenames use the title slug plus the first eight characters of the note ID, for example `planning-trip-to-mallorca-4a95f146.md`. Source files live under `data/<project_slug>/sources/<note_id[:8]>/original.<ext>` and are ignored by the project-level `.gitignore`.
 
 ## Humans and agents
 

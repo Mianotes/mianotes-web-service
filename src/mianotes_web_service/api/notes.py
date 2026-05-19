@@ -59,6 +59,7 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
+from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.share import (
     generate_share_token,
     get_share_secret,
@@ -140,7 +141,7 @@ def _file_url(request: Request, path: str | Path) -> str:
         public_path = target.relative_to(data_dir)
     except ValueError:
         public_path = Path(path)
-    return str(request.url_for("get_data_file", file_path=str(public_path)))
+    return str(request.url_for("get_project_file", file_path=str(public_path)))
 
 
 def _share_url(request: Request, note: Note, token: str | None = None) -> str | None:
@@ -180,11 +181,12 @@ def _note_response(
     is_starred: bool = False,
     share_token: str | None = None,
 ) -> NoteRead:
-    text = Path(note.note_path).read_text(encoding="utf-8")
+    note_path = note_file_path(note)
+    text = note_path.read_text(encoding="utf-8")
     source_files = [
         {
             "id": source_file.id,
-            "file_path": source_file.file_path,
+            "file_path": str(source_file_path(source_file)),
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
             "url": (
@@ -196,7 +198,7 @@ def _note_response(
                     )
                 )
                 if share_token
-                else _file_url(request, source_file.file_path)
+                else _file_url(request, source_file_path(source_file))
             ),
         }
         for source_file in note.source_files
@@ -217,7 +219,7 @@ def _note_response(
         summary=note.summary,
         shared_at=note.shared_at,
         text=text,
-        note_url=_file_url(request, note.note_path),
+        note_url=_file_url(request, note_path),
         source_files=source_files,
         comments_count=len([comment for comment in note.comments if comment.body]),
         comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
@@ -257,7 +259,7 @@ def _note_summary_needs_refresh(note: Note) -> bool:
 def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem:
     if _note_summary_needs_refresh(note):
         try:
-            note.summary = summarize_markdown_note(Path(note.note_path).read_text(encoding="utf-8"))
+            note.summary = summarize_markdown_note(note_file_path(note).read_text(encoding="utf-8"))
         except OSError:
             note.summary = ""
     return NoteListItem(
@@ -271,7 +273,8 @@ def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem
         is_published=note.is_published,
         is_starred=is_starred,
         summary=note.summary,
-        note_path=note.note_path,
+        filename=note.filename,
+        note_path=str(note_file_path(note)),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
@@ -418,7 +421,7 @@ def create_note_from_text(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_text_note(
         username=user.username,
-        project=project.slug,
+        project=project.path,
         title=title,
         text=payload.text,
         filename=note_id,
@@ -431,6 +434,7 @@ def create_note_from_text(
         title=title,
         source_type="text",
         summary=summarize_text(payload.text),
+        filename=paths.note_path.name,
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -439,6 +443,7 @@ def create_note_from_text(
         session.add(
             SourceFile(
                 note_id=note.id,
+                filename=str(paths.source_path.relative_to(paths.directory)),
                 file_path=str(paths.source_path),
                 original_filename="original.txt",
                 content_type="text/plain",
@@ -489,7 +494,7 @@ def create_note_from_file(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_uploaded_file_note(
         username=user.username,
-        project=project.slug,
+        project=project.path,
         title=note_title,
         filename=note_id,
         original_filename=file.filename,
@@ -504,6 +509,7 @@ def create_note_from_file(
         status="pending_parse",
         source_type=_source_type_from_filename(file.filename),
         summary="This uploaded file is waiting for the parsing pipeline.",
+        filename=paths.note_path.name,
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -512,6 +518,7 @@ def create_note_from_file(
     if paths.source_path is not None:
         source_file = SourceFile(
             note_id=note.id,
+            filename=str(paths.source_path.relative_to(paths.directory)),
             file_path=str(paths.source_path),
             original_filename=file.filename,
             content_type=file.content_type,
@@ -562,7 +569,7 @@ def create_note_from_url(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_url_note_placeholder(
         username=user.username,
-        project=project.slug,
+        project=project.path,
         title=title,
         filename=note_id,
         url=url,
@@ -578,12 +585,14 @@ def create_note_from_url(
         status="pending_parse",
         source_type="link",
         summary="Mia is indexing this link.",
+        filename=paths.note_path.name,
         note_path=str(paths.note_path),
     )
     session.add(note)
     session.flush()
     source_file = SourceFile(
         note_id=note.id,
+        filename=str(paths.source_path.relative_to(paths.directory)),
         file_path=str(paths.source_path),
         original_filename=url[:500],
         content_type="text/html",
@@ -635,7 +644,7 @@ def list_notes(
 ) -> list[NoteListItem]:
     statement = (
         select(Note)
-        .options(joinedload(Note.comments), joinedload(Note.tags))
+        .options(joinedload(Note.comments), joinedload(Note.project), joinedload(Note.tags))
         .order_by(Note.created_at.desc())
     )
     if user_id is not None:
@@ -675,7 +684,7 @@ def get_shared_source_file(
     )
     if source_file is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    target = Path(source_file.file_path)
+    target = source_file_path(source_file)
     if not target.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     return FileResponse(target)
@@ -780,7 +789,7 @@ def update_note(
     _ensure_can_change_note(note, user)
 
     next_title = payload.title or note.title
-    note_path = Path(note.note_path)
+    note_path = note_file_path(note)
     if payload.text is not None:
         note_path.write_text(
             render_markdown_note(title=next_title, text=payload.text),
@@ -812,8 +821,8 @@ def update_note(
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
-    paths = [Path(note.note_path)]
-    paths.extend(Path(source.file_path) for source in note.source_files)
+    paths = [note_file_path(note)]
+    paths.extend(source_file_path(source) for source in note.source_files)
     session.delete(note)
     session.commit()
     for path in paths:
@@ -853,7 +862,7 @@ def create_note_comment(
             raw_markdown = (
                 payload.markdown
                 if payload.markdown is not None
-                else Path(note.note_path).read_text(encoding="utf-8")
+                else note_file_path(note).read_text(encoding="utf-8")
             )
             result = prompt_markdown(
                 title=note.title,

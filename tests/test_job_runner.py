@@ -38,7 +38,7 @@ def _seed_note(
         user = User(email="runner@example.com", name="Runner", username="runner", is_admin=True)
         session.add(user)
         session.flush()
-        project = Project(user_id=user.id, name="Project", slug="project")
+        project = Project(user_id=user.id, name="Project", slug="project", path="project")
         session.add(project)
         session.flush()
         note = Note(

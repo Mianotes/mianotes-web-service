@@ -21,11 +21,7 @@ data/<project_slug>/<title_slug>-<note_id[:8]>.md
 data/<project_slug>/sources/<note_id[:8]>/original.<ext>
 ```
 
-The filename combines a human-readable title slug with the first eight
-characters of the note ID. Paths are written once and stored in SQLite, so later
-title edits do not rename files. Source files are grouped by note ID under the
-project's `sources/` directory, which is ignored by the project-level
-`.gitignore`.
+Project rows store their filesystem path, and note rows store their Markdown filename. The full path is derived from those two values. The filename combines a human-readable title slug with the first eight characters of the note ID. Later title edits do not rename files. Source files are grouped by note ID under the project's `sources/` directory, which is ignored by the project-level `.gitignore`.
 
 Project slugs are unique across the instance because each project owns one
 top-level storage directory.

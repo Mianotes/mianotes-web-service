@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import ProjectsReadUser, ProjectsWriteUser
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Project
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import ProjectCreate, ProjectRead, ProjectUpdate
@@ -27,10 +28,12 @@ def _read_project_or_404(session: Session, project_id: str) -> Project:
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 def create_project(payload: ProjectCreate, session: SessionDep, user: ProjectsWriteUser) -> Project:
+    slug = slugify(payload.name)
     project = Project(
         user_id=user.id,
         name=payload.name,
-        slug=slugify(payload.name),
+        slug=slug,
+        path=slug,
         is_pinned=payload.is_pinned,
     )
     session.add(project)
@@ -83,8 +86,29 @@ def update_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
     if payload.name is not None:
+        next_slug = slugify(payload.name)
+        if next_slug != project.slug:
+            existing = session.scalars(
+                select(Project).where(Project.slug == next_slug, Project.id != project.id)
+            ).one_or_none()
+            if existing is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A project with this name already exists",
+                )
+            data_dir = get_settings().data_dir
+            old_path = data_dir / project.path
+            new_path = data_dir / next_slug
+            if new_path.exists() and old_path.resolve() != new_path.resolve():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="A project folder with this name already exists",
+                )
+            if old_path.exists():
+                old_path.rename(new_path)
         project.name = payload.name
-        project.slug = slugify(payload.name)
+        project.slug = next_slug
+        project.path = next_slug
     if payload.is_pinned is not None:
         project.is_pinned = payload.is_pinned
 

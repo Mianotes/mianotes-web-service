@@ -32,9 +32,10 @@ Comments are stored in SQLite and do not use `.comments.json` sidecars.
 SQLite is the default:
 
 ```text
-MIANOTES_DATABASE_URL=sqlite:///mianotes.db
+MIANOTES_DATABASE_URL=
 ```
 
+When `MIANOTES_DATABASE_URL` is empty, Mianotes stores SQLite at `data/mia.db`.
 The app is structured so a future PostgreSQL adapter can be added without changing the API contract.
 
 ## Parser pipeline

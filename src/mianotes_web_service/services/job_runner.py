@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -17,6 +15,7 @@ from mianotes_web_service.services.parsing import (
     parse_document,
     parse_html_document,
 )
+from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import render_markdown_note, summarize_text
 
 
@@ -90,8 +89,8 @@ def _run_parse_file_job(session: Session, job: MiaJob) -> dict[str, object]:
     note.status = "parsing"
     session.flush()
 
-    parsed = parse_document(Path(source_file.file_path))
-    Path(note.note_path).write_text(
+    parsed = parse_document(source_file_path(source_file))
+    note_file_path(note).write_text(
         render_markdown_note(title=note.title, text=parsed.text),
         encoding="utf-8",
     )
@@ -115,9 +114,9 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
     note.status = "parsing"
     session.flush()
 
-    html_path = fetch_url_to_html(url, Path(source_file.file_path))
+    html_path = fetch_url_to_html(url, source_file_path(source_file))
     parsed = parse_html_document(html_path, url=url)
-    Path(note.note_path).write_text(
+    note_file_path(note).write_text(
         render_markdown_note(title=note.title, text=parsed.text),
         encoding="utf-8",
     )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
@@ -40,6 +42,9 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 )
         if "projects" in table_names:
             columns = _sqlite_columns(connection, "projects")
+            if "path" not in columns:
+                connection.execute(text("ALTER TABLE projects ADD COLUMN path TEXT"))
+                connection.execute(text("UPDATE projects SET path = slug WHERE path IS NULL"))
             if "archived_at" not in columns:
                 connection.execute(text("ALTER TABLE projects ADD COLUMN archived_at DATETIME"))
             if "archived_by_user_id" not in columns:
@@ -99,6 +104,30 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 )
             if "shared_at" not in columns:
                 connection.execute(text("ALTER TABLE notes ADD COLUMN shared_at DATETIME"))
+            if "filename" not in columns:
+                connection.execute(text("ALTER TABLE notes ADD COLUMN filename VARCHAR(500)"))
+                rows = connection.execute(
+                    text("SELECT id, note_path FROM notes WHERE note_path IS NOT NULL")
+                ).mappings()
+                for row in rows:
+                    connection.execute(
+                        text("UPDATE notes SET filename = :filename WHERE id = :id"),
+                        {"id": row["id"], "filename": Path(row["note_path"]).name},
+                    )
+        if "source_files" in table_names:
+            columns = _sqlite_columns(connection, "source_files")
+            if "filename" not in columns:
+                connection.execute(
+                    text("ALTER TABLE source_files ADD COLUMN filename VARCHAR(700)")
+                )
+                rows = connection.execute(
+                    text("SELECT id, file_path FROM source_files WHERE file_path IS NOT NULL")
+                ).mappings()
+                for row in rows:
+                    connection.execute(
+                        text("UPDATE source_files SET filename = :filename WHERE id = :id"),
+                        {"id": row["id"], "filename": Path(row["file_path"]).name},
+                    )
         if "comments" in table_names:
             columns = _sqlite_columns(connection, "comments")
             if "user_id" not in columns:

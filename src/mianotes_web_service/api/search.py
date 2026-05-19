@@ -1,23 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, NoteStar
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
+from mianotes_web_service.services.paths import note_file_path
 from mianotes_web_service.services.search import search_markdown_files
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
 def _notes_by_path(session: Session) -> dict[str, Note]:
-    notes = session.scalars(select(Note)).all()
+    notes = session.scalars(select(Note).options(joinedload(Note.project))).all()
     by_path: dict[str, Note] = {}
     for note in notes:
         note_path = _resolved_note_path(note)
@@ -28,7 +28,7 @@ def _notes_by_path(session: Session) -> dict[str, Note]:
 
 def _resolved_note_path(note: Note) -> str | None:
     try:
-        return str(Path(note.note_path).resolve())
+        return str(note_file_path(note).resolve())
     except OSError:
         return None
 
@@ -51,7 +51,8 @@ def _note_list_item(note: Note, *, is_starred: bool) -> NoteListItem:
         is_published=note.is_published,
         is_starred=is_starred,
         summary=note.summary,
-        note_path=note.note_path,
+        filename=note.filename,
+        note_path=str(note_file_path(note)),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),

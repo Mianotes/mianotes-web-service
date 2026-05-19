@@ -86,12 +86,14 @@ Environment variables use the `MIANOTES_` prefix:
 MIANOTES_HOST=0.0.0.0
 MIANOTES_PORT=8200
 MIANOTES_DATA_DIR=data
-MIANOTES_DATABASE_URL=sqlite:///mianotes.db
+MIANOTES_DATABASE_URL=
 MIANOTES_LLM_PROVIDER=openai
 MIANOTES_LLM_MODEL=gpt-4o-mini
 MIANOTES_LLM_BASE_URL=
 MIANOTES_LLM_API_KEY=
 ```
+
+When `MIANOTES_DATABASE_URL` is empty, Mianotes stores SQLite at `data/mia.db`.
 
 `MIANOTES_LLM_PROVIDER` supports `openai`, `local`, and `openai-compatible`.
 Use `local` for an Ollama-style OpenAI-compatible endpoint on your machine.

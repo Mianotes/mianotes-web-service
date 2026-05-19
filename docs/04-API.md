@@ -103,6 +103,7 @@ The API currently uses FastAPI error responses.
 | `user_id` | string | ID of the user who created the project. |
 | `name` | string | Project display name. |
 | `slug` | string | Filesystem-safe project slug. |
+| `path` | string | Project storage path under the configured data directory. |
 | `archived_at` | string \| null | ISO 8601 timestamp when the project was archived. |
 | `archived_by_user_id` | string \| null | ID of the user who archived the project. |
 | `created_at` | string | ISO 8601 creation timestamp. |
@@ -121,6 +122,7 @@ The API currently uses FastAPI error responses.
   "revision_number": 1,
   "is_published": false,
   "is_starred": false,
+  "filename": "kickoff-notes-4a95f146.md",
   "note_path": "/home/arduino/mianotes-web-service/data/holidays-mallorca/kickoff-notes-4a95f146.md",
   "created_at": "2026-05-15T10:35:00Z",
   "updated_at": "2026-05-15T10:35:00Z"
@@ -138,6 +140,7 @@ The API currently uses FastAPI error responses.
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
 | `is_starred` | boolean | Whether the note is starred by the authenticated user. |
+| `filename` | string | Markdown filename stored under the note project path. |
 | `note_path` | string | Absolute filesystem path to the Markdown note. New notes use `<title_slug>-<note_id[:8]>.md`. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
@@ -164,6 +167,7 @@ comments metadata, sharing metadata, and API action hints.
     "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "name": "Holidays Mallorca",
     "slug": "holidays-mallorca",
+    "path": "holidays-mallorca",
     "archived_at": null,
     "archived_by_user_id": null,
     "created_at": "2026-05-15T10:32:00Z",
@@ -180,13 +184,13 @@ comments metadata, sharing metadata, and API action hints.
   "published_at": null,
   "shared_at": null,
   "text": "# Kickoff notes\n\nWe agreed to build Mianotes...",
-  "note_url": "http://127.0.0.1:8200/data/holidays-mallorca/kickoff-notes-4a95f146.md",
+  "note_url": "http://127.0.0.1:8200/holidays-mallorca/kickoff-notes-4a95f146.md",
   "source_files": [
     {
       "id": "b5e20df8-bd95-45f0-a4f6-a2ee2db3f7b6",
       "original_filename": "original.txt",
       "content_type": "text/plain",
-      "url": "http://127.0.0.1:8200/data/holidays-mallorca/sources/4a95f146/original.txt"
+      "url": "http://127.0.0.1:8200/holidays-mallorca/sources/4a95f146/original.txt"
     }
   ],
   "comments_count": 0,
@@ -373,7 +377,7 @@ No request body.
   "version": "0.1.0",
   "storage": {
     "data_dir": "data",
-    "database_url": "sqlite:///mianotes.db"
+    "database_url": "sqlite:///data/mia.db"
   }
 }
 ```
@@ -1311,7 +1315,7 @@ parse `Job`.
       "file_path": "/home/arduino/mianotes-web-service/data/uploads/sources/4a95f146/original.pdf",
       "original_filename": "receipt.pdf",
       "content_type": "application/pdf",
-      "url": "http://127.0.0.1:8200/data/uploads/sources/4a95f146/original.pdf"
+      "url": "http://127.0.0.1:8200/uploads/sources/4a95f146/original.pdf"
     }
   ],
   "job": {
@@ -2140,13 +2144,20 @@ Returns a `Job`.
 | `403` | Token lacks `notes:read`, or user cannot read the job. |
 | `404` | Job does not exist. |
 
-## Get stored data file
+## Get stored project file
 
 Returns a stored Markdown or source file from the configured data directory.
+Database files are never served.
 
 ### Endpoint
 
-`GET /data/{file_path}`
+`GET /{file_path}`
+
+Example:
+
+```text
+GET /mianotes/sources/4a95f146/original.pdf
+```
 
 ### Authentication
 
@@ -2156,7 +2167,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
-| `file_path` | string | Yes | Relative path under the configured data directory. |
+| `file_path` | string | Yes | Relative path under the configured data directory, usually beginning with the project path. |
 
 ### Response
 
@@ -2168,4 +2179,4 @@ Returns file bytes.
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:read`. |
-| `404` | File does not exist or path escapes the data directory. |
+| `404` | File does not exist, path escapes the data directory, or the requested file is private service data such as `mia.db`. |

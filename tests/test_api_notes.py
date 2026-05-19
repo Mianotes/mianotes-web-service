@@ -80,9 +80,9 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
     note_filename = f"kickoff-notes-{note['id'][:8]}"
-    assert note["note_url"].endswith(f"/data/meeting-notes/{note_filename}.md")
+    assert note["note_url"].endswith(f"/meeting-notes/{note_filename}.md")
     assert note["source_files"][0]["url"].endswith(
-        f"/data/meeting-notes/sources/{note['id'][:8]}/original.txt"
+        f"/meeting-notes/sources/{note['id'][:8]}/original.txt"
     )
     assert note["comments_count"] == 0
     assert note["comments_url"].endswith(f"/api/notes/{note['id']}/comments")
@@ -111,7 +111,20 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert listed.json()[0]["source_type"] == "text"
     assert listed.json()[0]["is_starred"] is False
     assert listed.json()[0]["summary"] == "We agreed to build Mianotes with Markdown notes."
+    assert listed.json()[0]["filename"] == f"{note_filename}.md"
     assert "text" not in listed.json()[0]
+
+    note_file_response = client.get(f"/meeting-notes/{note_filename}.md")
+    assert note_file_response.status_code == 200
+    assert note_file_response.text.startswith("# Kickoff Notes")
+
+    source_file_response = client.get(f"/meeting-notes/sources/{note['id'][:8]}/original.txt")
+    assert source_file_response.status_code == 200
+    assert source_file_response.text == "We agreed to build Mianotes with Markdown notes."
+
+    assert client.get(f"/data/meeting-notes/{note_filename}.md").status_code == 404
+    (tmp_path / "data" / "mia.db").write_text("private database", encoding="utf-8")
+    assert client.get("/mia.db").status_code == 404
 
 
 def test_note_star_can_be_toggled_and_filtered(client: TestClient):
@@ -351,10 +364,10 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert "waiting for the parsing pipeline" in note["text"]
     note_filename = f"receipt-{note['id'][:8]}"
-    assert note["note_url"].endswith(f"/data/uploads/{note_filename}.md")
+    assert note["note_url"].endswith(f"/uploads/{note_filename}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/uploads/sources/{note['id'][:8]}/original.pdf"
+        f"/uploads/sources/{note['id'][:8]}/original.pdf"
     )
 
     note_path = tmp_path / "data" / "uploads" / f"{note_filename}.md"
@@ -451,7 +464,7 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     assert note_path.read_text(encoding="utf-8").startswith("# mianotes")
     assert note["source_files"][0]["original_filename"] == "https://example.com/articles/mianotes"
     assert note["source_files"][0]["url"].endswith(
-        f"/data/links/sources/{note['id'][:8]}/original.html"
+        f"/links/sources/{note['id'][:8]}/original.html"
     )
     assert not source_path.exists()
 

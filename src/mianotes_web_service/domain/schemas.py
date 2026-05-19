@@ -46,6 +46,7 @@ class ProjectRead(BaseModel):
     user_id: str
     name: str
     slug: str
+    path: str
     is_pinned: bool
     archived_at: datetime | None = None
     archived_by_user_id: str | None = None
@@ -167,6 +168,7 @@ class NoteListItem(BaseModel):
     is_published: bool
     is_starred: bool
     summary: str = ""
+    filename: str | None = None
     note_path: str
     created_at: datetime
     updated_at: datetime

@@ -44,7 +44,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     if existing_project is not None:
         return
 
-    project = Project(user_id=user.id, name="Mianotes", slug="mianotes")
+    project = Project(user_id=user.id, name="Mianotes", slug="mianotes", path="mianotes")
     session.add(project)
     session.flush()
     text = (
@@ -56,7 +56,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     note_id = new_id()
     paths = storage.write_text_note(
         username=user.username,
-        project=project.slug,
+        project=project.path,
         title="How to use Mianotes",
         text=text,
         filename=note_id,
@@ -66,6 +66,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
         user_id=user.id,
         project_id=project.id,
         title="How to use Mianotes",
+        filename=paths.note_path.name,
         note_path=str(paths.note_path),
     )
     session.add(note)
@@ -74,6 +75,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
         session.add(
             SourceFile(
                 note_id=note.id,
+                filename=str(paths.source_path.relative_to(paths.directory)),
                 file_path=str(paths.source_path),
                 original_filename="original.txt",
                 content_type="text/plain",

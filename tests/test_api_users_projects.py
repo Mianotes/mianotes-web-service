@@ -103,6 +103,7 @@ def test_project_crud_and_user_filter(client: TestClient):
     assert created.status_code == 201
     project = created.json()
     assert project["slug"] == "product-research"
+    assert project["path"] == "product-research"
     assert project["is_pinned"] is True
 
     duplicate = client.post(
@@ -127,6 +128,7 @@ def test_project_crud_and_user_filter(client: TestClient):
     assert updated.status_code == 200
     assert updated.json()["name"] == "Research Notes"
     assert updated.json()["slug"] == "research-notes"
+    assert updated.json()["path"] == "research-notes"
     assert updated.json()["is_pinned"] is False
 
     deleted = client.delete(f"/api/projects/{project['id']}")
