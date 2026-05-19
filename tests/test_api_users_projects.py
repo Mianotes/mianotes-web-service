@@ -98,11 +98,12 @@ def test_project_crud_and_user_filter(client: TestClient):
 
     created = client.post(
         "/api/projects",
-        json={"name": "Product Research"},
+        json={"name": "Product Research", "is_pinned": True},
     )
     assert created.status_code == 201
     project = created.json()
     assert project["slug"] == "product-research"
+    assert project["is_pinned"] is True
 
     duplicate = client.post(
         "/api/projects",
@@ -113,6 +114,11 @@ def test_project_crud_and_user_filter(client: TestClient):
     listed = client.get("/api/projects", params={"user_id": user["id"]})
     assert listed.status_code == 200
     assert project["id"] in [item["id"] for item in listed.json()]
+
+    unpinned = client.post("/api/projects", json={"name": "Later Project"}).json()
+    ordered = client.get("/api/projects", params={"user_id": user["id"]}).json()
+    assert ordered[0]["id"] == project["id"]
+    assert ordered[1]["id"] == unpinned["id"]
 
     deleted = client.delete(f"/api/projects/{project['id']}")
     assert deleted.status_code == 204

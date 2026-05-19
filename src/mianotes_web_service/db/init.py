@@ -46,6 +46,10 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(
                     text("ALTER TABLE projects ADD COLUMN archived_by_user_id VARCHAR(36)")
                 )
+            if "is_pinned" not in columns:
+                connection.execute(
+                    text("ALTER TABLE projects ADD COLUMN is_pinned BOOLEAN NOT NULL DEFAULT 0")
+                )
         if "notes" in table_names:
             columns = _sqlite_columns(connection, "notes")
             if "topic_id" in columns and "project_id" not in columns:

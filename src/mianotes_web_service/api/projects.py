@@ -27,7 +27,12 @@ def _read_project_or_404(session: Session, project_id: str) -> Project:
 
 @router.post("", response_model=ProjectRead, status_code=status.HTTP_201_CREATED)
 def create_project(payload: ProjectCreate, session: SessionDep, user: ProjectsWriteUser) -> Project:
-    project = Project(user_id=user.id, name=payload.name, slug=slugify(payload.name))
+    project = Project(
+        user_id=user.id,
+        name=payload.name,
+        slug=slugify(payload.name),
+        is_pinned=payload.is_pinned,
+    )
     session.add(project)
     try:
         session.commit()
@@ -48,7 +53,7 @@ def list_projects(
     user_id: Annotated[str | None, Query()] = None,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[Project]:
-    statement = select(Project).order_by(Project.created_at.desc())
+    statement = select(Project).order_by(Project.is_pinned.desc(), Project.created_at.desc())
     if user_id is not None:
         statement = statement.where(Project.user_id == user_id)
     if not include_archived:

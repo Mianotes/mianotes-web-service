@@ -33,6 +33,7 @@ class UserRead(BaseModel):
 class ProjectCreate(BaseModel):
     user_id: str | None = None
     name: str = Field(min_length=1, max_length=200)
+    is_pinned: bool = False
 
 
 class ProjectUpdate(BaseModel):
@@ -44,6 +45,7 @@ class ProjectRead(BaseModel):
     user_id: str
     name: str
     slug: str
+    is_pinned: bool
     archived_at: datetime | None = None
     archived_by_user_id: str | None = None
     created_at: datetime
