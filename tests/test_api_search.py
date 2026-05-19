@@ -56,11 +56,11 @@ def _join_admin(client: TestClient) -> None:
 
 def test_search_notes_from_markdown_and_api_token(client: TestClient):
     _join_admin(client)
-    project = client.post("/api/projects", json={"name": "Research"}).json()
+    folder = client.post("/api/folders", json={"name": "Research"}).json()
     note = client.post(
         "/api/notes/from-text",
         json={
-            "project_id": project["id"],
+            "folder_id": folder["id"],
             "title": "Mars rover",
             "text": "The Mars rover found structured field notes for future agents.",
         },

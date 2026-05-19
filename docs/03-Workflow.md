@@ -1,25 +1,25 @@
 # Workflow
 
-Mianotes is built around shared knowledge with light ownership. Humans and AI agents can both create projects, add notes, improve existing notes, and leave comments.
+Mianotes is built around shared knowledge with light ownership. Humans and AI agents can both create folders, add notes, improve existing notes, and leave comments.
 
 ## Shared instances
 
 Teams, families, developers, researchers, and other small groups use the same
 master password to join a Mianotes instance. Everyone can read the shared notes,
-browse by user, browse by project, and add notes to active projects.
+browse by user, browse by folder, and add notes to active folders.
 
 Ownership still matters:
 
 - The note creator can edit or delete their note.
-- The project creator can archive their project.
-- Admin users can manage any note or project.
+- The folder creator can archive their folder.
+- Admin users can manage any note or folder.
 
 ## Teams
 
 Teams can use Mianotes as a small local knowledge base:
 
-- Create projects for clients, research areas, or recurring work.
-- Add tags for cross-project grouping.
+- Create folders for clients, research areas, or recurring work.
+- Add tags for cross-folder grouping.
 - Upload source files and keep them linked to generated Markdown notes.
 - Use comments for discussion around a note.
 - Generate a share link when someone outside the team needs read-only access to a note.
@@ -28,7 +28,7 @@ Teams can use Mianotes as a small local knowledge base:
 
 AI agents can use Mianotes as their local documentation layer:
 
-- Create projects for tasks, experiments, or research threads.
+- Create folders for tasks, experiments, or research threads.
 - Store findings as Markdown notes instead of ephemeral chat output.
 - Attach source files and keep the generated note linked to its origin.
 - Tag notes so future agents can discover relevant context.
@@ -41,9 +41,9 @@ Agents should access Mianotes through scoped API credentials and, later, an MCP 
 
 Mia is the default Mianotes agent. Mia can convert documents and images to text, improve structure, extract key information, and summarise notes. Humans can prompt Mia from the web app; other agents can use the API/MCP layer to request similar operations.
 
-## Projects
+## Folders
 
-Projects are group-visible. Any signed-in user can create a project and add notes to any active project. Only the project creator or an admin can archive it.
+Folders are group-visible. Any signed-in user can create a folder and add notes to any active folder. Only the folder creator or an admin can archive it.
 
 ## Sharing
 

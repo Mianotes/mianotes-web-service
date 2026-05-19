@@ -23,7 +23,7 @@ sudo apt install python3 python3-venv python3-pip ripgrep ffmpeg
 
 ## Step 2: Add environment variables
 
-Create a `.env` file in the project root.
+Create a `.env` file in the folder root.
 
 For Ollama:
 
@@ -66,7 +66,7 @@ http://127.0.0.1:8200
 
 ## First run
 
-The first user joins through `POST /api/auth/join`. The service detects that no Mianotes instance has been configured, creates the first admin, stores the master password hash, and seeds the default `Mianotes` project.
+The first user joins through `POST /api/auth/join`. The service detects that no Mianotes instance has been configured, creates the first admin, stores the master password hash, and seeds the default `Mianotes` folder.
 
 The frontend can call `POST /api/auth/check-email` first. If the response contains `is_first_user: true`, it should explain that the first password becomes the master password for this instance.
 

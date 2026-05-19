@@ -16,7 +16,7 @@ The service is designed for small groups: developers, researchers, students, and
 ## What it does
 
 - Stores note text as Markdown on the filesystem.
-- Keeps users, projects, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
+- Keeps users, folders, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
 - Converts uploaded files and URLs through a MarkItDown-based parser layer.
 - Supports browser sessions and scoped API tokens for agents.
 - Exposes JSON REST APIs for the web app and external automation.

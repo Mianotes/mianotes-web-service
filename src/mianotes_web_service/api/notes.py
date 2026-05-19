@@ -32,9 +32,9 @@ from mianotes_web_service.api.dependencies import (
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import (
     Comment,
+    Folder,
     Note,
     NoteStar,
-    Project,
     SourceFile,
     Tag,
     User,
@@ -122,7 +122,7 @@ def _read_note_or_404(session: Session, note_id: str) -> Note:
         .where(Note.id == note_id)
         .options(
             joinedload(Note.user),
-            joinedload(Note.project),
+            joinedload(Note.folder),
             joinedload(Note.source_files),
             joinedload(Note.comments).joinedload(Comment.user),
             joinedload(Note.tags),
@@ -141,7 +141,7 @@ def _file_url(request: Request, path: str | Path) -> str:
         public_path = target.relative_to(data_dir)
     except ValueError:
         public_path = Path(path)
-    return str(request.url_for("get_project_file", file_path=str(public_path)))
+    return str(request.url_for("get_folder_file", file_path=str(public_path)))
 
 
 def _share_url(request: Request, note: Note, token: str | None = None) -> str | None:
@@ -206,7 +206,7 @@ def _note_response(
     return NoteRead(
         id=note.id,
         user=note.user,
-        project=note.project,
+        folder=note.folder,
         created_at=note.created_at,
         updated_at=note.updated_at,
         title=note.title,
@@ -265,7 +265,7 @@ def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
-        project_id=note.project_id,
+        folder_id=note.folder_id,
         title=note.title,
         status=note.status,
         source_type=note.source_type,
@@ -326,7 +326,7 @@ def _read_note_by_share_token(session: Session, token: str) -> Note:
         .where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
         .options(
             joinedload(Note.user),
-            joinedload(Note.project),
+            joinedload(Note.folder),
             joinedload(Note.source_files),
             joinedload(Note.comments).joinedload(Comment.user),
             joinedload(Note.tags),
@@ -412,16 +412,16 @@ def create_note_from_text(
     request: Request,
     user: NotesWriteUser,
 ) -> NoteRead:
-    project = session.get(Project, payload.project_id)
-    if project is None or project.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    folder = session.get(Folder, payload.folder_id)
+    if folder is None or folder.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
     title = payload.title or infer_title(payload.text)
     note_id = new_id()
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_text_note(
         username=user.username,
-        project=project.path,
+        folder=folder.path,
         title=title,
         text=payload.text,
         filename=note_id,
@@ -430,7 +430,7 @@ def create_note_from_text(
     note = Note(
         id=note_id,
         user_id=user.id,
-        project_id=project.id,
+        folder_id=folder.id,
         title=title,
         source_type="text",
         summary=summarize_text(payload.text),
@@ -464,13 +464,13 @@ def create_note_from_file(
     background_tasks: BackgroundTasks,
     session: SessionDep,
     user: NotesWriteUser,
-    project_id: Annotated[str, Form()],
+    folder_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
 ) -> NoteRead:
-    project = session.get(Project, project_id)
-    if project is None or project.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    folder = session.get(Folder, folder_id)
+    if folder is None or folder.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -494,7 +494,7 @@ def create_note_from_file(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_uploaded_file_note(
         username=user.username,
-        project=project.path,
+        folder=folder.path,
         title=note_title,
         filename=note_id,
         original_filename=file.filename,
@@ -504,7 +504,7 @@ def create_note_from_file(
     note = Note(
         id=note_id,
         user_id=user.id,
-        project_id=project.id,
+        folder_id=folder.id,
         title=note_title,
         status="pending_parse",
         source_type=_source_type_from_filename(file.filename),
@@ -558,9 +558,9 @@ def create_note_from_url(
     session: SessionDep,
     user: NotesWriteUser,
 ) -> NoteIngestionRead:
-    project = session.get(Project, payload.project_id)
-    if project is None or project.archived_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    folder = session.get(Folder, payload.folder_id)
+    if folder is None or folder.archived_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
     url = str(payload.url)
     parsed_url = urlparse(url)
@@ -569,7 +569,7 @@ def create_note_from_url(
     storage = FilesystemStorage(get_settings().data_dir)
     paths = storage.write_url_note_placeholder(
         username=user.username,
-        project=project.path,
+        folder=folder.path,
         title=title,
         filename=note_id,
         url=url,
@@ -580,7 +580,7 @@ def create_note_from_url(
     note = Note(
         id=note_id,
         user_id=user.id,
-        project_id=project.id,
+        folder_id=folder.id,
         title=title,
         status="pending_parse",
         source_type="link",
@@ -639,18 +639,18 @@ def list_notes(
     session: SessionDep,
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
-    project_id: Annotated[str | None, Query()] = None,
+    folder_id: Annotated[str | None, Query()] = None,
     starred: Annotated[bool | None, Query()] = None,
 ) -> list[NoteListItem]:
     statement = (
         select(Note)
-        .options(joinedload(Note.comments), joinedload(Note.project), joinedload(Note.tags))
+        .options(joinedload(Note.comments), joinedload(Note.folder), joinedload(Note.tags))
         .order_by(Note.created_at.desc())
     )
     if user_id is not None:
         statement = statement.where(Note.user_id == user_id)
-    if project_id is not None:
-        statement = statement.where(Note.project_id == project_id)
+    if folder_id is not None:
+        statement = statement.where(Note.folder_id == folder_id)
     star_exists = exists().where(NoteStar.note_id == Note.id, NoteStar.user_id == user.id)
     if starred is True:
         statement = statement.where(star_exists)
@@ -822,11 +822,18 @@ def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
     paths = [note_file_path(note)]
-    paths.extend(source_file_path(source) for source in note.source_files)
+    source_paths = [source_file_path(source) for source in note.source_files]
+    paths.extend(source_paths)
+    source_dirs = {path.parent for path in source_paths}
     session.delete(note)
     session.commit()
     for path in paths:
         path.unlink(missing_ok=True)
+    for source_dir in sorted(source_dirs, key=lambda path: len(path.parts), reverse=True):
+        try:
+            source_dir.rmdir()
+        except OSError:
+            pass
 
 
 @router.get("/{note_id}/comments")

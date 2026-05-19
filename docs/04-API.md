@@ -82,7 +82,7 @@ The API currently uses FastAPI error responses.
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
-### Project
+### Folder
 
 ```json
 {
@@ -99,13 +99,13 @@ The API currently uses FastAPI error responses.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | Unique project ID. |
-| `user_id` | string | ID of the user who created the project. |
-| `name` | string | Project display name. |
-| `slug` | string | Filesystem-safe project slug. |
-| `path` | string | Project storage path under the configured data directory. |
-| `archived_at` | string \| null | ISO 8601 timestamp when the project was archived. |
-| `archived_by_user_id` | string \| null | ID of the user who archived the project. |
+| `id` | string | Unique folder ID. |
+| `user_id` | string | ID of the user who created the folder. |
+| `name` | string | Folder display name. |
+| `slug` | string | Filesystem-safe folder slug. |
+| `path` | string | Folder storage path under the configured data directory. |
+| `archived_at` | string \| null | ISO 8601 timestamp when the folder was archived. |
+| `archived_by_user_id` | string \| null | ID of the user who archived the folder. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
@@ -115,7 +115,7 @@ The API currently uses FastAPI error responses.
 {
   "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
   "title": "Kickoff notes",
   "status": "ready",
   "source_type": "text",
@@ -133,21 +133,21 @@ The API currently uses FastAPI error responses.
 |---|---|---|
 | `id` | string | Unique note ID. |
 | `user_id` | string | ID of the user who created the note. |
-| `project_id` | string | ID of the project containing the note. |
+| `folder_id` | string | ID of the folder containing the note. |
 | `title` | string | Note title. |
 | `status` | string | Note status. Current values include `ready`, `pending_parse`, `parsing`, and `failed`. |
 | `source_type` | string | Source type such as `text`, `pdf`, `image`, `document`, or `file`. |
 | `revision_number` | number | Revision counter incremented when note text or title changes. |
 | `is_published` | boolean | Whether the note is marked as published. |
 | `is_starred` | boolean | Whether the note is starred by the authenticated user. |
-| `filename` | string | Markdown filename stored under the note project path. |
+| `filename` | string | Markdown filename stored under the note folder path. |
 | `note_path` | string | Absolute filesystem path to the Markdown note. New notes use `<title_slug>-<note_id[:8]>.md`. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 
 ### Note
 
-Full note responses include the note content, owner, project, source files, tags,
+Full note responses include the note content, owner, folder, source files, tags,
 comments metadata, sharing metadata, and API action hints.
 
 ```json
@@ -162,7 +162,7 @@ comments metadata, sharing metadata, and API action hints.
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
   },
-  "project": {
+  "folder": {
     "id": "f054964b-419b-419a-87df-de668025b0e3",
     "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
     "name": "Holidays Mallorca",
@@ -234,7 +234,7 @@ comments metadata, sharing metadata, and API action hints.
 |---|---|---|
 | `id` | string | Unique note ID. |
 | `user` | object | User who created the note. |
-| `project` | object | Project containing the note. |
+| `folder` | object | Folder containing the note. |
 | `created_at` | string | ISO 8601 creation timestamp. |
 | `updated_at` | string | ISO 8601 update timestamp. |
 | `title` | string | Note title. |
@@ -687,7 +687,7 @@ Session cookie or bearer token with `tokens:write` or `admin`.
 {
   "name": "Research agent",
   "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-  "scopes": ["notes:read", "notes:write", "projects:read"],
+  "scopes": ["notes:read", "notes:write", "folders:read"],
   "expires_at": null
 }
 ```
@@ -706,8 +706,8 @@ Supported scopes:
 ```text
 admin
 users:read
-projects:read
-projects:write
+folders:read
+folders:write
 notes:read
 notes:write
 comments:write
@@ -734,7 +734,7 @@ tokens:write
   },
   "name": "Research agent",
   "token_prefix": "mia_w1x2y3z4",
-  "scopes": ["notes:read", "notes:write", "projects:read"],
+  "scopes": ["notes:read", "notes:write", "folders:read"],
   "created_at": "2026-05-15T11:00:00Z",
   "updated_at": "2026-05-15T11:00:00Z",
   "last_used_at": null,
@@ -1021,17 +1021,17 @@ Admin session or bearer token with `admin`.
 | `403` | Admin access required. |
 | `404` | User does not exist. |
 
-## Create project
+## Create folder
 
-Creates a shared project owned by the current user.
+Creates a shared folder owned by the current user.
 
 ### Endpoint
 
-`POST /api/projects`
+`POST /api/folders`
 
 ### Authentication
 
-Session cookie or bearer token with `projects:write` or `admin`.
+Session cookie or bearer token with `folders:write` or `admin`.
 
 ### Request
 
@@ -1046,41 +1046,41 @@ Session cookie or bearer token with `projects:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `name` | string | Yes | Project name. |
-| `is_pinned` | boolean | No | Whether the project should stay above unpinned projects in project lists. Defaults to `false`. |
-| `user_id` | string \| null | No | Accepted by schema but currently ignored; the project owner is always the current user. |
+| `name` | string | Yes | Folder name. |
+| `is_pinned` | boolean | No | Whether the folder should stay above unpinned folders in folder lists. Defaults to `false`. |
+| `user_id` | string \| null | No | Accepted by schema but currently ignored; the folder owner is always the current user. |
 
 ### Response
 
-Returns a `Project`.
+Returns a `Folder`.
 
 ### Error responses
 
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `projects:write`. |
-| `409` | Current user already has a project with this name. |
+| `403` | Token lacks `folders:write`. |
+| `409` | Current user already has a folder with this name. |
 | `422` | Request validation failed. |
 
-## List projects
+## List folders
 
-Lists projects, optionally filtered by owner.
+Lists folders, optionally filtered by owner.
 
 ### Endpoint
 
-`GET /api/projects`
+`GET /api/folders`
 
 ### Authentication
 
-Session cookie or bearer token with `projects:read` or `admin`.
+Session cookie or bearer token with `folders:read` or `admin`.
 
 ### Query parameters
 
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
-| `user_id` | string | No | Return projects created by a specific user. |
-| `include_archived` | boolean | No | Include archived projects. Defaults to `false`. |
+| `user_id` | string | No | Return folders created by a specific user. |
+| `include_archived` | boolean | No | Include archived folders. Defaults to `false`. |
 
 ### Response
 
@@ -1099,45 +1099,45 @@ Session cookie or bearer token with `projects:read` or `admin`.
 ]
 ```
 
-## Get project
+## Get folder
 
-Returns one project.
+Returns one folder.
 
 ### Endpoint
 
-`GET /api/projects/{project_id}`
+`GET /api/folders/{folder_id}`
 
 ### Authentication
 
-Session cookie or bearer token with `projects:read` or `admin`.
+Session cookie or bearer token with `folders:read` or `admin`.
 
 ### Response
 
-Returns a `Project`.
+Returns a `Folder`.
 
 ### Error responses
 
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `projects:read`. |
-| `404` | Project does not exist. |
+| `403` | Token lacks `folders:read`. |
+| `404` | Folder does not exist. |
 
-## Update project
+## Update folder
 
-Updates a project name or pinned state.
+Updates a folder name or pinned state.
 
 ### Endpoint
 
-`PATCH /api/projects/{project_id}`
+`PATCH /api/folders/{folder_id}`
 
 ### Authentication
 
-Session cookie or bearer token with `projects:write` or `admin`.
+Session cookie or bearer token with `folders:write` or `admin`.
 
 ### Authorization
 
-Admins can update any project. Normal users can update only projects they created.
+Admins can update any folder. Normal users can update only folders they created.
 
 ### Request
 
@@ -1152,39 +1152,39 @@ Admins can update any project. Normal users can update only projects they create
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `name` | string | No | New project name. |
-| `is_pinned` | boolean | No | Whether the project should stay above unpinned projects in project lists. |
+| `name` | string | No | New folder name. |
+| `is_pinned` | boolean | No | Whether the folder should stay above unpinned folders in folder lists. |
 
 ### Response
 
-Returns the updated `Project`.
+Returns the updated `Folder`.
 
 ### Error responses
 
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `projects:write`, or user does not own the project. |
-| `404` | Project does not exist or has been archived. |
-| `409` | Current user already has a project with this name. |
+| `403` | Token lacks `folders:write`, or user does not own the folder. |
+| `404` | Folder does not exist or has been archived. |
+| `409` | Current user already has a folder with this name. |
 | `422` | Request validation failed. |
 
-## Archive project
+## Archive folder
 
-Archives a project. Archived projects are hidden from list responses unless
+Archives a folder. Archived folders are hidden from list responses unless
 `include_archived=true`.
 
 ### Endpoint
 
-`DELETE /api/projects/{project_id}`
+`DELETE /api/folders/{folder_id}`
 
 ### Authentication
 
-Session cookie or bearer token with `projects:write` or `admin`.
+Session cookie or bearer token with `folders:write` or `admin`.
 
 ### Authorization
 
-Admins can archive any project. Normal users can archive only projects they created.
+Admins can archive any folder. Normal users can archive only folders they created.
 
 ### Response
 
@@ -1195,8 +1195,8 @@ Admins can archive any project. Normal users can archive only projects they crea
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Token lacks `projects:write`, or user does not own the project. |
-| `404` | Project does not exist. |
+| `403` | Token lacks `folders:write`, or user does not own the folder. |
+| `404` | Folder does not exist. |
 
 ## Create note from text
 
@@ -1216,7 +1216,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 ```json
 {
-  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
   "title": "Kickoff notes",
   "text": "We agreed to build Mianotes as a filesystem-first AI note app.",
   "tags": ["research", "planning"]
@@ -1227,7 +1227,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `project_id` | string | Yes | Project ID for the note. |
+| `folder_id` | string | Yes | Folder ID for the note. |
 | `text` | string | Yes | Source text. |
 | `title` | string \| null | No | Optional title. If omitted, the API infers one from the text. |
 | `tags` | string[] | No | Tags to attach. Maximum 5 tags per note. |
@@ -1243,7 +1243,7 @@ Returns a full `Note`.
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Project does not exist or is archived. |
+| `404` | Folder does not exist or is archived. |
 | `422` | Request validation failed, including more than 5 tags. |
 
 ## Create note from file
@@ -1267,7 +1267,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `project_id` | string | Yes | Project ID for the note. |
+| `folder_id` | string | Yes | Folder ID for the note. |
 | `file` | file | Yes | Source file to upload. |
 | `title` | string | Yes | Note title to use for the Markdown note and stored note metadata. |
 
@@ -1347,7 +1347,7 @@ Clients should poll `job_api_url` until the job reaches `succeeded`, then call
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Project does not exist or is archived. |
+| `404` | Folder does not exist or is archived. |
 | `415` | Unsupported file type. |
 | `422` | File or form field validation failed. |
 
@@ -1372,7 +1372,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 ```json
 {
-  "project_id": "f054964b-419b-419a-87df-de668025b0e3",
+  "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
   "url": "https://example.com/articles/mianotes",
   "title": "Mianotes article",
   "tags": ["research", "links"]
@@ -1383,7 +1383,7 @@ Session cookie or bearer token with `notes:write` or `admin`.
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `project_id` | string | Yes | Project ID for the note. |
+| `folder_id` | string | Yes | Folder ID for the note. |
 | `url` | string | Yes | URL to fetch and convert. |
 | `title` | string \| null | No | Optional note title. If omitted, the API infers one from the URL path or host. |
 | `tags` | string[] | No | Tags to attach. Maximum 5 tags per note. |
@@ -1438,7 +1438,7 @@ Clients should poll `job_api_url` until the job reaches `succeeded`, then call
 |---:|---|
 | `401` | Not authenticated. |
 | `403` | Token lacks `notes:write`. |
-| `404` | Project does not exist or is archived. |
+| `404` | Folder does not exist or is archived. |
 | `422` | Request validation failed, including an invalid URL or more than 5 tags. |
 
 ## List notes
@@ -1458,7 +1458,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
 | `user_id` | string | No | Return notes created by a specific user. |
-| `project_id` | string | No | Return notes in a specific project. |
+| `folder_id` | string | No | Return notes in a specific folder. |
 | `starred` | boolean | No | Return only notes starred by the authenticated user when `true`, or notes not starred by that user when `false`. |
 
 ### Response
@@ -1468,7 +1468,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
   {
     "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
     "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-    "project_id": "f054964b-419b-419a-87df-de668025b0e3",
+    "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
     "title": "Kickoff notes",
     "status": "ready",
     "source_type": "text",
@@ -2032,7 +2032,7 @@ GET /api/search?q=product%20launch&limit=10
     "note": {
       "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
       "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
-      "project_id": "f054964b-419b-419a-87df-de668025b0e3",
+      "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
       "title": "Product launch meeting notes",
       "status": "ready",
       "source_type": "text",
@@ -2144,7 +2144,7 @@ Returns a `Job`.
 | `403` | Token lacks `notes:read`, or user cannot read the job. |
 | `404` | Job does not exist. |
 
-## Get stored project file
+## Get stored folder file
 
 Returns a stored Markdown or source file from the configured data directory.
 Database files are never served.
@@ -2167,7 +2167,7 @@ Session cookie or bearer token with `notes:read` or `admin`.
 
 | Parameter | Type | Required | Description |
 |---|---|---:|---|
-| `file_path` | string | Yes | Relative path under the configured data directory, usually beginning with the project path. |
+| `file_path` | string | Yes | Relative path under the configured data directory, usually beginning with the folder path. |
 
 ### Response
 

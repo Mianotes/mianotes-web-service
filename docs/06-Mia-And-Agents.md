@@ -26,7 +26,7 @@ Mia should be implemented as a backend service/agent layer, not as frontend-only
 Humans use Mianotes through the web app. They can:
 
 - Browse the shared knowledge base.
-- Add projects and notes.
+- Add folders and notes.
 - Upload files.
 - Prompt Mia from comments.
 - Comment, tag, share, and export information.
@@ -35,7 +35,7 @@ Humans use Mianotes through the web app. They can:
 
 AI agents use Mianotes programmatically. They can:
 
-- Create projects for tasks or projects.
+- Create folders for tasks or folders.
 - Add notes as they work.
 - Attach source files.
 - Update notes when new information appears.

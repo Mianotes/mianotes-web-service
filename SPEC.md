@@ -15,7 +15,7 @@ automation scripts, AI agents, and future MCP integrations.
 
 - Convert human- or agent-provided content into clean Markdown notes.
 - Store notes and source files in a transparent filesystem layout.
-- Keep an indexed record of users, projects, notes, source files, and comments.
+- Keep an indexed record of users, folders, notes, source files, and comments.
 - Keep durable Mia job records for asynchronous note creation and parsing.
 - Support a shared local instance authentication flow for the React app.
 - Support scoped API tokens for AI agents and automation scripts.
@@ -34,7 +34,7 @@ automation scripts, AI agents, and future MCP integrations.
 - Full multi-database support at runtime.
 - YouTube transcript extraction.
 - Full MCP server implementation.
-- Complex tagging or multi-project notes.
+- Complex tagging or multi-folder notes.
 - Relocating saved notes after creation.
 
 ## Repository
@@ -53,7 +53,7 @@ Mianotes will be licensed under GPL-3.0.
 
 Mianotes is a shared local knowledge base for humans and AI agents. Once a
 principal has access to the local instance, it can browse shared notes and
-projects according to its permissions. Users exist mainly for ownership,
+folders according to its permissions. Users exist mainly for ownership,
 attribution, filtering, and accountability.
 
 Human users register with:
@@ -80,7 +80,7 @@ The first visitor creates the shared instance:
 - The frontend asks for the user's name and a master password.
 - `POST /api/auth/join` lets the backend detect that this is the first instance
   user, create the admin user, store the master password hash, create a
-  long-lived cookie session, and seed the default `Mianotes` project with an
+  long-lived cookie session, and seed the default `Mianotes` folder with an
   onboarding note.
 
 When another person joins the instance:
@@ -100,16 +100,16 @@ Sessions are long-lived, browser-friendly, HTTP-only cookies.
 ### Roles and ownership
 
 - The first user is an admin.
-- Admin users can view, edit, remove, or archive any note or project.
-- Normal users can view all notes and projects.
-- Normal users can create projects visible to everyone with access to the instance.
-- Normal users can archive only projects they created.
-- Normal users can create notes in any non-archived project.
+- Admin users can view, edit, remove, or archive any note or folder.
+- Normal users can view all notes and folders.
+- Normal users can create folders visible to everyone with access to the instance.
+- Normal users can archive only folders they created.
+- Normal users can create notes in any non-archived folder.
 - Normal users can edit and remove only notes they created.
-- AI agents can create projects and notes when their token scope allows it.
+- AI agents can create folders and notes when their token scope allows it.
 
-Project deletion is archive-only in v1. Archived projects are hidden by default.
-Redistributing notes from archived shared projects is planned for v2.
+Folder deletion is archive-only in v1. Archived folders are hidden by default.
+Redistributing notes from archived shared folders is planned for v2.
 
 ### Agent and API tokens
 
@@ -123,7 +123,7 @@ API tokens are required for agent and automation access. Token rules:
 - If a user token is revoked, the app can generate a new random token.
 - API responses should never expose raw token values unless the endpoint is explicitly designed for token creation/regeneration.
 - Tokens are scoped. Supported scopes include `admin`, `users:read`,
-  `projects:read`, `projects:write`, `notes:read`, `notes:write`,
+  `folders:read`, `folders:write`, `notes:read`, `notes:write`,
   `comments:write`, `tags:read`, `tags:write`, `share:write`,
   `tokens:read`, and `tokens:write`.
 
@@ -163,16 +163,16 @@ Index storage:
 Generated notes are stored under:
 
 ```text
-/data/<project_slug>/<title_slug>-<note_id[:8]>.md
+/data/<folder_slug>/<title_slug>-<note_id[:8]>.md
 ```
 
 Source files are stored under a note-specific source folder:
 
 ```text
-/data/<project_slug>/sources/<note_id[:8]>/original.<original-extension>
+/data/<folder_slug>/sources/<note_id[:8]>/original.<original-extension>
 ```
 
-Project folders include a `.gitignore` file that ignores `/sources/`, so a project folder can be turned into a Git repository without committing original source files by default.
+Folder directories include a `.gitignore` file that ignores `/sources/`, so a folder can be turned into a Git repository without committing original source files by default.
 
 Once a Markdown note path is created, it must not change. The database stores the note path permanently to avoid maintenance overhead from moves and renames. The title slug is only used at creation time; later title edits do not rename the file.
 
@@ -181,7 +181,7 @@ Once a Markdown note path is created, it must not change. The database stores th
 For plain text note creation, v1 should save a source text file alongside the generated note when it is useful for auditability and reprocessing:
 
 ```text
-/data/<project_slug>/sources/<note_id[:8]>/original.txt
+/data/<folder_slug>/sources/<note_id[:8]>/original.txt
 ```
 
 This keeps all note types consistent: every generated note can have a traceable source file when practical.
@@ -210,7 +210,7 @@ Fields:
 
 Email must be unique. Username is autogenerated from email.
 
-### projects
+### folders
 
 Supports:
 
@@ -228,7 +228,7 @@ Fields:
 - created_at
 - updated_at
 
-Projects are visible to everyone with access to the instance. `user_id` records who created the project and who is allowed to archive it alongside admins. One note belongs to exactly one project.
+Folders are visible to everyone with access to the instance. `user_id` records who created the folder and who is allowed to archive it alongside admins. One note belongs to exactly one folder.
 
 ### notes
 
@@ -243,7 +243,7 @@ Fields:
 
 - id
 - user_id
-- project_id
+- folder_id
 - title
 - status
 - source_type
@@ -256,7 +256,7 @@ Fields:
 - created_at
 - updated_at
 
-Notes have a relationship with `users` and `projects`.
+Notes have a relationship with `users` and `folders`.
 
 Notes must include timestamps so they can be sorted in API responses and in the web app.
 
@@ -405,7 +405,7 @@ Every note creation flow follows this high-level pipeline:
 4. Send parsed content to the configured LLM provider.
 5. Generate a Markdown note.
 6. Generate or infer a note title.
-7. Save the Markdown file under `/data/<project_slug>/<title_slug>-<note_id[:8]>.md`.
+7. Save the Markdown file under `/data/<folder_slug>/<title_slug>-<note_id[:8]>.md`.
 8. Insert database records for the note, tags, comments, and source file.
 9. Return a JSON representation of the note.
 
@@ -469,8 +469,8 @@ Every returned note should include:
 - Note ID
 - User ID
 - User details needed by the frontend
-- Project ID
-- Project details needed by the frontend
+- Folder ID
+- Folder details needed by the frontend
 - Created timestamp
 - Updated timestamp
 - Title
@@ -524,12 +524,12 @@ Example shape:
 - `PATCH /api/users/{user_id}`
 - `DELETE /api/users/{user_id}`
 
-### Projects
+### Folders
 
-- `POST /api/projects`
-- `GET /api/projects`
-- `GET /api/projects/{project_id}`
-- `DELETE /api/projects/{project_id}` archives the project
+- `POST /api/folders`
+- `GET /api/folders`
+- `GET /api/folders/{folder_id}`
+- `DELETE /api/folders/{folder_id}` archives the folder
 
 ### Notes
 
@@ -586,7 +586,7 @@ Although Mianotes is designed for local servers, performance should be considere
 
 V1 should:
 
-- Keep database queries indexed around user, project, note, and timestamps.
+- Keep database queries indexed around user, folder, note, and timestamps.
 - Avoid scanning the filesystem for normal list views.
 - Read Markdown files only when full note content is needed.
 - Store stable file paths in the database.
@@ -624,5 +624,5 @@ Recommended v1 architecture:
 - MarkItDown parser adapter layer with room for future specialist or hosted parsers.
 - Link ingestion service for URL fetching and text extraction.
 - Scoped token authentication for AI agents and automation scripts.
-- MCP server exposing note, project, search, and Mia operations as tools.
+- MCP server exposing note, folder, search, and Mia operations as tools.
 - Repository interfaces that can later support PostgreSQL.

@@ -44,12 +44,12 @@ class FilesystemStorage:
     def __init__(self, data_dir: Path) -> None:
         self.data_dir = data_dir
 
-    def project_dir(self, username: str, project: str) -> Path:
-        # Keep username in the signature while storage paths move to project-first.
+    def folder_dir(self, username: str, folder: str) -> Path:
+        # Keep username in the signature while storage paths move to folder-first.
         _ = username
-        return self.data_dir / slugify(project, "project")
+        return self.data_dir / slugify(folder, "folder")
 
-    def prepare_project_directory(self, directory: Path) -> None:
+    def prepare_folder_directory(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
         gitignore_path = directory / ".gitignore"
         if not gitignore_path.exists():
@@ -59,12 +59,12 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        project: str,
+        folder: str,
         filename: str,
         title: str | None = None,
         source_extension: str | None = None,
     ) -> NotePaths:
-        base_dir = self.project_dir(username, project)
+        base_dir = self.folder_dir(username, folder)
         stem = note_stem(title, filename) if title is not None else slugify(Path(filename).stem)
         note_path = base_dir / f"{stem}.md"
         source_path = None
@@ -83,19 +83,19 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        project: str,
+        folder: str,
         title: str,
         text: str,
         filename: str | None = None,
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
-            project=project,
+            folder=folder,
             filename=filename or title,
             title=title if filename is not None else None,
             source_extension=".txt",
         )
-        self.prepare_project_directory(paths.directory)
+        self.prepare_folder_directory(paths.directory)
         paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")
         if paths.source_path is not None:
             paths.source_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        project: str,
+        folder: str,
         title: str,
         filename: str,
         original_filename: str,
@@ -115,12 +115,12 @@ class FilesystemStorage:
         extension = Path(original_filename).suffix or ".bin"
         paths = self.note_paths(
             username=username,
-            project=project,
+            folder=folder,
             filename=filename,
             title=title,
             source_extension=extension,
         )
-        self.prepare_project_directory(paths.directory)
+        self.prepare_folder_directory(paths.directory)
         paths.note_path.write_text(
             render_pending_upload_note(title=title, original_filename=original_filename),
             encoding="utf-8",
@@ -135,19 +135,19 @@ class FilesystemStorage:
         self,
         *,
         username: str,
-        project: str,
+        folder: str,
         title: str,
         filename: str,
         url: str,
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
-            project=project,
+            folder=folder,
             filename=filename,
             title=title,
             source_extension=".html",
         )
-        self.prepare_project_directory(paths.directory)
+        self.prepare_folder_directory(paths.directory)
         if paths.source_path is not None:
             paths.source_path.parent.mkdir(parents=True, exist_ok=True)
         paths.note_path.write_text(

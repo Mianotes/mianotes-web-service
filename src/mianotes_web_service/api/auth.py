@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Note, Project, SourceFile, User, new_id
+from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
 from mianotes_web_service.domain.schemas import (
     EmailCheck,
     EmailCheckResult,
@@ -38,14 +38,14 @@ def _set_session_cookie(response: Response, token: str) -> None:
 
 
 def _create_onboarding_note(session: Session, user: User) -> None:
-    existing_project = session.scalars(
-        select(Project).where(Project.slug == "mianotes")
+    existing_folder = session.scalars(
+        select(Folder).where(Folder.slug == "mianotes")
     ).one_or_none()
-    if existing_project is not None:
+    if existing_folder is not None:
         return
 
-    project = Project(user_id=user.id, name="Mianotes", slug="mianotes", path="mianotes")
-    session.add(project)
+    folder = Folder(user_id=user.id, name="Mianotes", slug="mianotes", path="mianotes")
+    session.add(folder)
     session.flush()
     text = (
         "Welcome to Mianotes. Add text, links, documents, images, and audio to turn "
@@ -56,7 +56,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     note_id = new_id()
     paths = storage.write_text_note(
         username=user.username,
-        project=project.path,
+        folder=folder.path,
         title="How to use Mianotes",
         text=text,
         filename=note_id,
@@ -64,7 +64,7 @@ def _create_onboarding_note(session: Session, user: User) -> None:
     note = Note(
         id=note_id,
         user_id=user.id,
-        project_id=project.id,
+        folder_id=folder.id,
         title="How to use Mianotes",
         filename=paths.note_path.name,
         note_path=str(paths.note_path),

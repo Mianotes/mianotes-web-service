@@ -79,7 +79,7 @@ def test_user_crud(client: TestClient):
     assert missing.status_code == 404
 
 
-def test_project_crud_and_user_filter(client: TestClient, tmp_path: Path):
+def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
         json={
@@ -91,41 +91,41 @@ def test_project_crud_and_user_filter(client: TestClient, tmp_path: Path):
     ).json()["user"]
 
     unauthenticated = TestClient(client.app).post(
-        "/api/projects",
+        "/api/folders",
         json={"user_id": "missing", "name": "Product Research"},
     )
     assert unauthenticated.status_code == 401
 
     created = client.post(
-        "/api/projects",
+        "/api/folders",
         json={"name": "Product Research", "is_pinned": True},
     )
     assert created.status_code == 201
-    project = created.json()
-    assert project["slug"] == "product-research"
-    assert project["path"] == "product-research"
-    assert project["is_pinned"] is True
-    project_dir = tmp_path / "data" / "product-research"
-    project_dir.mkdir(parents=True)
-    (project_dir / "note.md").write_text("note", encoding="utf-8")
+    folder = created.json()
+    assert folder["slug"] == "product-research"
+    assert folder["path"] == "product-research"
+    assert folder["is_pinned"] is True
+    folder_dir = tmp_path / "data" / "product-research"
+    folder_dir.mkdir(parents=True)
+    (folder_dir / "note.md").write_text("note", encoding="utf-8")
 
     duplicate = client.post(
-        "/api/projects",
+        "/api/folders",
         json={"user_id": user["id"], "name": "Product Research"},
     )
     assert duplicate.status_code == 409
 
-    listed = client.get("/api/projects", params={"user_id": user["id"]})
+    listed = client.get("/api/folders", params={"user_id": user["id"]})
     assert listed.status_code == 200
-    assert project["id"] in [item["id"] for item in listed.json()]
+    assert folder["id"] in [item["id"] for item in listed.json()]
 
-    unpinned = client.post("/api/projects", json={"name": "Later Project"}).json()
-    ordered = client.get("/api/projects", params={"user_id": user["id"]}).json()
-    assert ordered[0]["id"] == project["id"]
+    unpinned = client.post("/api/folders", json={"name": "Later Folder"}).json()
+    ordered = client.get("/api/folders", params={"user_id": user["id"]}).json()
+    assert ordered[0]["id"] == folder["id"]
     assert ordered[1]["id"] == unpinned["id"]
 
     updated = client.patch(
-        f"/api/projects/{project['id']}",
+        f"/api/folders/{folder['id']}",
         json={"name": "Research Notes", "is_pinned": False},
     )
     assert updated.status_code == 200
@@ -133,18 +133,18 @@ def test_project_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert updated.json()["slug"] == "research-notes"
     assert updated.json()["path"] == "research-notes"
     assert updated.json()["is_pinned"] is False
-    assert not project_dir.exists()
+    assert not folder_dir.exists()
     assert (tmp_path / "data" / "research-notes" / "note.md").read_text(
         encoding="utf-8"
     ) == "note"
 
-    deleted = client.delete(f"/api/projects/{project['id']}")
+    deleted = client.delete(f"/api/folders/{folder['id']}")
     assert deleted.status_code == 204
 
-    missing = client.get(f"/api/projects/{project['id']}")
+    missing = client.get(f"/api/folders/{folder['id']}")
     assert missing.status_code == 200
     assert missing.json()["archived_at"] is not None
 
-    visible = client.get("/api/projects", params={"user_id": user["id"]})
+    visible = client.get("/api/folders", params={"user_id": user["id"]})
     assert visible.status_code == 200
-    assert project["id"] not in [item["id"] for item in visible.json()]
+    assert folder["id"] not in [item["id"] for item in visible.json()]

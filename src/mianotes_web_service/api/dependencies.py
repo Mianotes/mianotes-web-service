@@ -87,8 +87,8 @@ def require_scope(scope: str):
 
 
 UsersReadUser = Annotated[User, Depends(require_scope("users:read"))]
-ProjectsReadUser = Annotated[User, Depends(require_scope("projects:read"))]
-ProjectsWriteUser = Annotated[User, Depends(require_scope("projects:write"))]
+FoldersReadUser = Annotated[User, Depends(require_scope("folders:read"))]
+FoldersWriteUser = Annotated[User, Depends(require_scope("folders:write"))]
 NotesReadUser = Annotated[User, Depends(require_scope("notes:read"))]
 NotesWriteUser = Annotated[User, Depends(require_scope("notes:write"))]
 CommentsWriteUser = Annotated[User, Depends(require_scope("comments:write"))]

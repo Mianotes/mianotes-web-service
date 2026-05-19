@@ -17,13 +17,13 @@ storage and a small relational index.
 Generated notes and source files live under the configured data directory:
 
 ```text
-data/<project_slug>/<title_slug>-<note_id[:8]>.md
-data/<project_slug>/sources/<note_id[:8]>/original.<ext>
+data/<folder_slug>/<title_slug>-<note_id[:8]>.md
+data/<folder_slug>/sources/<note_id[:8]>/original.<ext>
 ```
 
-Project rows store their filesystem path, and note rows store their Markdown filename. The full path is derived from those two values. The filename combines a human-readable title slug with the first eight characters of the note ID. Later title edits do not rename files. Source files are grouped by note ID under the project's `sources/` directory, which is ignored by the project-level `.gitignore`.
+Folder rows store their filesystem path, and note rows store their Markdown filename. The full path is derived from those two values. The filename combines a human-readable title slug with the first eight characters of the note ID. Later title edits do not rename files. Source files are grouped by note ID under the folder's `sources/` directory, which is ignored by the folder-level `.gitignore`.
 
-Project slugs are unique across the instance because each project owns one
+Folder slugs are unique across the instance because each folder owns one
 top-level storage directory.
 
 ## Database responsibilities
@@ -31,7 +31,7 @@ top-level storage directory.
 SQLite is the default database. The schema tracks:
 
 - Users
-- Projects
+- Folders
 - Notes
 - Source files
 - Comments
@@ -108,4 +108,4 @@ Saved Markdown files are searched with ripgrep. The search service joins file
 matches back to note metadata before returning JSON results.
 
 This keeps the Markdown files as the source of note text while still giving API
-clients structured note IDs, titles, users, projects, tags, and timestamps.
+clients structured note IDs, titles, users, folders, tags, and timestamps.

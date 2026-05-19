@@ -142,7 +142,7 @@ Mianotes services use the `8200` range:
 
 The first user joins through `POST /api/auth/join`. The service detects that no
 Mianotes instance has been configured, creates the first admin, stores the master password hash, and
-seeds the default `Mianotes` project.
+seeds the default `Mianotes` folder.
 
 The frontend can call `POST /api/auth/check-email` first. If the response
 contains `is_first_user: true`, it should explain that the first password

@@ -17,8 +17,8 @@ DEFAULT_API_URL = "http://127.0.0.1:8200"
 
 TOOL_DEFINITIONS: list[JsonObject] = [
     {
-        "name": "list_projects",
-        "description": "List Mianotes projects.",
+        "name": "list_folders",
+        "description": "List Mianotes folders.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -28,8 +28,8 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         },
     },
     {
-        "name": "create_project",
-        "description": "Create a Mianotes project.",
+        "name": "create_folder",
+        "description": "Create a Mianotes folder.",
         "inputSchema": {
             "type": "object",
             "required": ["name"],
@@ -42,7 +42,7 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "project_id": {"type": "string"},
+                "folder_id": {"type": "string"},
                 "user_id": {"type": "string"},
             },
         },
@@ -61,9 +61,9 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         "description": "Create a Mianotes note from text.",
         "inputSchema": {
             "type": "object",
-            "required": ["project_id", "text"],
+            "required": ["folder_id", "text"],
             "properties": {
-                "project_id": {"type": "string"},
+                "folder_id": {"type": "string"},
                 "text": {"type": "string"},
                 "title": {"type": "string"},
                 "tags": {"type": "array", "items": {"type": "string"}},
@@ -75,9 +75,9 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         "description": "Create a Mianotes note from a URL and queue parsing.",
         "inputSchema": {
             "type": "object",
-            "required": ["project_id", "url"],
+            "required": ["folder_id", "url"],
             "properties": {
-                "project_id": {"type": "string"},
+                "folder_id": {"type": "string"},
                 "url": {"type": "string"},
                 "title": {"type": "string"},
                 "tags": {"type": "array", "items": {"type": "string"}},
@@ -175,10 +175,10 @@ def _request(
 
 
 def call_tool(name: str, arguments: JsonObject) -> Any:
-    if name == "list_projects":
-        return _request("GET", "/api/projects", query=arguments)
-    if name == "create_project":
-        return _request("POST", "/api/projects", body={"name": arguments["name"]})
+    if name == "list_folders":
+        return _request("GET", "/api/folders", query=arguments)
+    if name == "create_folder":
+        return _request("POST", "/api/folders", body={"name": arguments["name"]})
     if name == "list_notes":
         return _request("GET", "/api/notes", query=arguments)
     if name == "get_note":
@@ -186,14 +186,14 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
     if name == "create_note":
         body = {
             key: arguments[key]
-            for key in ("project_id", "text", "title", "tags")
+            for key in ("folder_id", "text", "title", "tags")
             if key in arguments
         }
         return _request("POST", "/api/notes/from-text", body=body)
     if name == "create_note_from_url":
         body = {
             key: arguments[key]
-            for key in ("project_id", "url", "title", "tags")
+            for key in ("folder_id", "url", "title", "tags")
             if key in arguments
         }
         return _request("POST", "/api/notes/from-url", body=body)

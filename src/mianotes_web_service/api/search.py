@@ -17,7 +17,7 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 
 def _notes_by_path(session: Session) -> dict[str, Note]:
-    notes = session.scalars(select(Note).options(joinedload(Note.project))).all()
+    notes = session.scalars(select(Note).options(joinedload(Note.folder))).all()
     by_path: dict[str, Note] = {}
     for note in notes:
         note_path = _resolved_note_path(note)
@@ -43,7 +43,7 @@ def _note_list_item(note: Note, *, is_starred: bool) -> NoteListItem:
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
-        project_id=note.project_id,
+        folder_id=note.folder_id,
         title=note.title,
         status=note.status,
         source_type=note.source_type,

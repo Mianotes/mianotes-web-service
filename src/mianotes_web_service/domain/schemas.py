@@ -30,18 +30,18 @@ class UserRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ProjectCreate(BaseModel):
+class FolderCreate(BaseModel):
     user_id: str | None = None
     name: str = Field(min_length=1, max_length=200)
     is_pinned: bool = False
 
 
-class ProjectUpdate(BaseModel):
+class FolderUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     is_pinned: bool | None = None
 
 
-class ProjectRead(BaseModel):
+class FolderRead(BaseModel):
     id: str
     user_id: str
     name: str
@@ -58,14 +58,14 @@ class ProjectRead(BaseModel):
 
 class NoteCreateFromText(BaseModel):
     user_id: str | None = None
-    project_id: str
+    folder_id: str
     text: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
 
 class NoteCreateFromUrl(BaseModel):
-    project_id: str
+    folder_id: str
     url: HttpUrl
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
@@ -133,7 +133,7 @@ class ApiAction(BaseModel):
 class NoteRead(BaseModel):
     id: str
     user: UserRead
-    project: ProjectRead
+    folder: FolderRead
     created_at: datetime
     updated_at: datetime
     title: str
@@ -160,7 +160,7 @@ class NoteRead(BaseModel):
 class NoteListItem(BaseModel):
     id: str
     user_id: str
-    project_id: str
+    folder_id: str
     title: str
     status: str
     source_type: str

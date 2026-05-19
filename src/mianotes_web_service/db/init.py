@@ -30,8 +30,11 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
         return
     with target_engine.begin() as connection:
         table_names = _sqlite_table_names(connection)
-        if "topics" in table_names and "projects" not in table_names:
-            connection.execute(text("ALTER TABLE topics RENAME TO projects"))
+        if "projects" in table_names and "folders" not in table_names:
+            connection.execute(text("ALTER TABLE projects RENAME TO folders"))
+            table_names = _sqlite_table_names(connection)
+        if "topics" in table_names and "folders" not in table_names:
+            connection.execute(text("ALTER TABLE topics RENAME TO folders"))
             table_names = _sqlite_table_names(connection)
 
         if "users" in table_names:
@@ -40,25 +43,28 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(
                     text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0")
                 )
-        if "projects" in table_names:
-            columns = _sqlite_columns(connection, "projects")
+        if "folders" in table_names:
+            columns = _sqlite_columns(connection, "folders")
             if "path" not in columns:
-                connection.execute(text("ALTER TABLE projects ADD COLUMN path TEXT"))
-                connection.execute(text("UPDATE projects SET path = slug WHERE path IS NULL"))
+                connection.execute(text("ALTER TABLE folders ADD COLUMN path TEXT"))
+                connection.execute(text("UPDATE folders SET path = slug WHERE path IS NULL"))
             if "archived_at" not in columns:
-                connection.execute(text("ALTER TABLE projects ADD COLUMN archived_at DATETIME"))
+                connection.execute(text("ALTER TABLE folders ADD COLUMN archived_at DATETIME"))
             if "archived_by_user_id" not in columns:
                 connection.execute(
-                    text("ALTER TABLE projects ADD COLUMN archived_by_user_id VARCHAR(36)")
+                    text("ALTER TABLE folders ADD COLUMN archived_by_user_id VARCHAR(36)")
                 )
             if "is_pinned" not in columns:
                 connection.execute(
-                    text("ALTER TABLE projects ADD COLUMN is_pinned BOOLEAN NOT NULL DEFAULT 0")
+                    text("ALTER TABLE folders ADD COLUMN is_pinned BOOLEAN NOT NULL DEFAULT 0")
                 )
         if "notes" in table_names:
             columns = _sqlite_columns(connection, "notes")
-            if "topic_id" in columns and "project_id" not in columns:
-                connection.execute(text("ALTER TABLE notes RENAME COLUMN topic_id TO project_id"))
+            if "project_id" in columns and "folder_id" not in columns:
+                connection.execute(text("ALTER TABLE notes RENAME COLUMN project_id TO folder_id"))
+                columns = _sqlite_columns(connection, "notes")
+            if "topic_id" in columns and "folder_id" not in columns:
+                connection.execute(text("ALTER TABLE notes RENAME COLUMN topic_id TO folder_id"))
                 columns = _sqlite_columns(connection, "notes")
             if "status" not in columns:
                 connection.execute(

@@ -8,7 +8,7 @@ Run checks from the repository root.
 pytest
 ```
 
-The test suite covers the current API behavior, auth flow, notes, projects, tags,
+The test suite covers the current API behavior, auth flow, notes, folders, tags,
 search, MCP helpers, parser adapter behavior, and synchronous Mia prompts.
 
 ## Linting
@@ -17,7 +17,7 @@ search, MCP helpers, parser adapter behavior, and synchronous Mia prompts.
 ruff check .
 ```
 
-Ruff enforces the configured Python lint rules in `pyproject.toml`.
+Ruff enforces the configured Python lint rules in `pyfolder.toml`.
 
 ## Compile check
 

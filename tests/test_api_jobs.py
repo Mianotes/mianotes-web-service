@@ -55,10 +55,10 @@ def test_jobs_can_be_read_by_owner(app_client: tuple[TestClient, sessionmaker[Se
             "password_confirmation": "house-password",
         },
     )
-    project = client.post("/api/projects", json={"name": "Jobs"}).json()
+    folder = client.post("/api/folders", json={"name": "Jobs"}).json()
     note = client.post(
         "/api/notes/from-text",
-        json={"project_id": project["id"], "text": "A note for Mia jobs."},
+        json={"folder_id": folder["id"], "text": "A note for Mia jobs."},
     ).json()
 
     with testing_session() as session:

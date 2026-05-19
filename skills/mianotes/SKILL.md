@@ -12,7 +12,7 @@ Use Mianotes when the user says things like:
 - "Mia, save this as a note in Research"
 - "Save your last answer to Mianotes"
 - "Search Mia for the deployment notes"
-- "Add this to the Project X notes"
+- "Add this to the Research folder"
 - "Ask Mia to summarise this note"
 
 ## Connection
@@ -32,15 +32,15 @@ saved.
 
 When the user asks to save the current or previous assistant answer:
 
-1. Identify the target project by name.
-2. Fetch projects with `GET /api/projects`.
-3. If one project matches, use it.
-4. If no project matches, create it only when the user clearly asked for that project.
+1. Identify the target folder by name.
+2. Fetch folders with `GET /api/folders`.
+3. If one folder matches, use it.
+4. If no folder matches, create it only when the user clearly asked for that folder.
 5. Create the note with `POST /api/notes/from-text`.
 6. Use a short useful title.
 7. Preserve the answer text as Markdown.
 
-If the target project is ambiguous, ask a short clarification before saving.
+If the target folder is ambiguous, ask a short clarification before saving.
 
 ## Searching Notes
 
@@ -76,5 +76,5 @@ apply that response.
 Do not save secrets, API keys, passwords, private tokens, credentials, or
 private personal data unless the user explicitly confirms.
 
-For destructive actions such as deleting notes or archiving projects, ask for
+For destructive actions such as deleting notes or archiving folders, ask for
 confirmation unless the user clearly requested the exact action.

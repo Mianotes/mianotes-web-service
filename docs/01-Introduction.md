@@ -12,24 +12,24 @@ Mia is the built-in AI agent for Mianotes. Mia helps convert messy inputs into d
 - Save meeting notes, homework, receipts, trip plans, research, and reference documents.
 - Upload files and keep their original source next to the generated Markdown note.
 - Ask Mia to improve, summarise, extract, or restructure notes.
-- Browse notes by person, project, tag, or recency.
+- Browse notes by person, folder, tag, or recency.
 - Share a read-only note link with someone outside the Mianotes instance.
 - Keep content transparent on disk instead of hiding it in a database blob.
 
 ## Storage model
 
-Mianotes stores note content as Markdown files under each project directory:
+Mianotes stores note content as Markdown files under each folder directory:
 
 ```text
-data/<project_slug>/<title_slug>-<note_id[:8]>.md
+data/<folder_slug>/<title_slug>-<note_id[:8]>.md
 ```
 
-The default SQLite database lives at `data/mia.db`. It stores the index and metadata: users, projects, tags, notes, comments, source files, sessions, and share tokens.
+The default SQLite database lives at `data/mia.db`. It stores the index and metadata: users, folders, tags, notes, comments, source files, sessions, and share tokens.
 
-Project rows store their filesystem path, and note rows store their Markdown filename. Mianotes derives the full path from those two values. Filenames use the title slug plus the first eight characters of the note ID, for example `planning-trip-to-mallorca-4a95f146.md`. Source files live under `data/<project_slug>/sources/<note_id[:8]>/original.<ext>` and are ignored by the project-level `.gitignore`.
+Folder rows store their filesystem path, and note rows store their Markdown filename. Mianotes derives the full path from those two values. Filenames use the title slug plus the first eight characters of the note ID, for example `planning-trip-to-mallorca-4a95f146.md`. Source files live under `data/<folder_slug>/sources/<note_id[:8]>/original.<ext>` and are ignored by the folder-level `.gitignore`.
 
 ## Humans and agents
 
-Mianotes treats humans and AI agents as collaborators in the same workspace. A human might upload a PDF and ask Mia to turn it into a clear project note. An agent might connect through the API, create a project for a task, add notes as it works, and later update those notes with findings.
+Mianotes treats humans and AI agents as collaborators in the same workspace. A human might upload a PDF and ask Mia to turn it into a clear folder note. An agent might connect through the API, create a folder for a task, add notes as it works, and later update those notes with findings.
 
 The web app is the human control room. The API and future MCP server are the agent interface.

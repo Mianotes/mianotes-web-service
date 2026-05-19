@@ -18,7 +18,7 @@ def test_make_username_is_readable_stable_and_hides_email():
 
 
 def test_slugify_keeps_paths_safe():
-    assert slugify("Project Notes!") == "project-notes"
+    assert slugify("Folder Notes!") == "folder-notes"
     assert slugify("   ") == "untitled"
 
 
@@ -34,7 +34,7 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
 
     paths = storage.note_paths(
         username="abc123",
-        project="Meeting Notes",
+        folder="Meeting Notes",
         filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
         title="Kickoff Plan",
         source_extension=".pdf",
@@ -47,14 +47,14 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
     )
 
 
-def test_write_text_note_creates_project_gitignore_and_source_folder(tmp_path: Path):
+def test_write_text_note_creates_folder_gitignore_and_source_folder(tmp_path: Path):
     storage = FilesystemStorage(tmp_path)
 
     paths = storage.write_text_note(
         username="abc123",
-        project="Meeting Notes",
+        folder="Meeting Notes",
         title="Kickoff Plan",
-        text="Shared project note.",
+        text="Shared folder note.",
         filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
     )
 
@@ -65,4 +65,4 @@ def test_write_text_note_creates_project_gitignore_and_source_folder(tmp_path: P
     assert paths.source_path == (
         tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.txt"
     )
-    assert paths.source_path.read_text(encoding="utf-8") == "Shared project note."
+    assert paths.source_path.read_text(encoding="utf-8") == "Shared folder note."

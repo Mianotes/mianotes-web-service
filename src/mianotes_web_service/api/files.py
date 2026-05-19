@@ -22,6 +22,6 @@ def _file_response(file_path: str) -> FileResponse:
     return FileResponse(target)
 
 
-@router.get("/{file_path:path}", name="get_project_file")
-def get_project_file(file_path: str, user: NotesReadUser) -> FileResponse:
+@router.get("/{file_path:path}", name="get_folder_file")
+def get_folder_file(file_path: str, user: NotesReadUser) -> FileResponse:
     return _file_response(file_path)
