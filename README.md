@@ -45,6 +45,7 @@ The service is designed for small groups: developers, researchers, students, and
 - Alembic
 - SQLite
 - MarkItDown
+- Trafilatura
 - Local LLMs, or OpenAI
 - pytest
 - Ruff

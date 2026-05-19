@@ -221,7 +221,8 @@ def render_pending_url_note(title: str, url: str) -> str:
         "## Source\n\n"
         f"{url}\n\n"
         "## Note\n\n"
-        "Mia is indexing your link. The Markdown note will appear here when the page has been converted.\n\n"
+        "Mia is indexing your link. The Markdown note will appear here when the "
+        "page has been converted.\n\n"
         f"{url}\n"
     )
 

@@ -10,6 +10,7 @@ from mianotes_web_service.services.parsing import (
     ParserUnavailable,
     fetch_url_to_html,
     parse_document,
+    parse_html_document,
     parse_url,
 )
 
@@ -101,3 +102,51 @@ def test_parse_url_fetches_html_then_converts_local_file(
     assert parsed.source_path == tmp_path / "page.html"
     assert "Converted URL" in parsed.text
     assert "source=page.html" in parsed.text
+
+
+def test_parse_html_document_uses_trafilatura_cleaned_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "page.html"
+    source.write_text(
+        """
+        <html>
+          <body>
+            <nav>This navigation should not be converted.</nav>
+            <article>Clean article content for Mianotes. This paragraph has enough text
+            for the extractor confidence threshold and should be kept for MarkItDown.</article>
+            <footer>This footer should not be converted.</footer>
+          </body>
+        </html>
+        """,
+        encoding="utf-8",
+    )
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            return SimpleNamespace(text_content=Path(path).read_text(encoding="utf-8"))
+
+    fake_trafilatura = SimpleNamespace(
+        extract=lambda *_args, **_kwargs: (
+            "<article>Clean article content for Mianotes. This paragraph has enough text "
+            "for the extractor confidence threshold and should be kept for MarkItDown.</article>"
+        )
+    )
+
+    def fake_import_module(name: str):
+        if name == "trafilatura":
+            return fake_trafilatura
+        if name == "markitdown":
+            return SimpleNamespace(MarkItDown=FakeMarkItDown)
+        raise ModuleNotFoundError(name)
+
+    monkeypatch.setattr(parsing.importlib, "import_module", fake_import_module)
+
+    parsed = parse_html_document(source, url="https://example.com/article")
+
+    assert parsed.parser == "markitdown+trafilatura"
+    assert parsed.source_path == source
+    assert "Clean article content" in parsed.text
+    assert "navigation should not" not in parsed.text
+    assert "footer should not" not in parsed.text

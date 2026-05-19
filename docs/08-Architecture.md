@@ -55,8 +55,12 @@ for documents, images, audio, HTML, text formats, archives, URLs, and related
 source material.
 
 For web pages, Mianotes first downloads HTML using a browser-like user agent and
-then passes the local HTML file to MarkItDown. This avoids common bot-blocking
-behavior from sites that reject the default Python request user agent.
+stores that raw HTML as the source file. The parser then asks `trafilatura` to
+extract the main readable content before passing a cleaned HTML document to
+MarkItDown. This avoids common bot-blocking behavior from sites that reject the
+default Python request user agent, and it strips most navigation, header,
+footer, sidebar, and comment content from generated Mianotes. If `trafilatura`
+cannot extract enough content, Mianotes falls back to the raw saved HTML file.
 
 `ffmpeg` is optional and only needed for audio or video sources.
 

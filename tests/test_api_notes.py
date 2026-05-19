@@ -623,7 +623,10 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     assert comments.json() == []
 
 
-def test_mia_comment_prompt_can_use_unsaved_markdown(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_mia_comment_prompt_can_use_unsaved_markdown(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
     from mianotes_web_service.api import notes
     from mianotes_web_service.services.mia import MiaTextResult
 

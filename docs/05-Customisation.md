@@ -45,9 +45,12 @@ HTML, text formats, archives, YouTube URLs, and more into Markdown-friendly
 text.
 
 For normal files, Mianotes passes the local source file to MarkItDown. For web
-pages, Mianotes first downloads the HTML using a browser-like user agent and
-then passes the saved local HTML file to MarkItDown. This avoids sites that
-block the default Python request user agent.
+pages, Mianotes first downloads the HTML using a browser-like user agent, keeps
+that raw source file, and uses `trafilatura` to extract the readable page
+content before handing it to MarkItDown. This removes most navigation menus,
+headers, footers, comments, and other page chrome while preserving useful links,
+images, and tables. If extraction fails, Mianotes falls back to the saved HTML
+file so URL ingestion still works.
 
 Install `ffmpeg` separately if you plan to parse audio or video sources. HTML,
 document, and text conversion can ignore the `ffmpeg` warning. Specialist local

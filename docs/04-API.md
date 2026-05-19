@@ -1351,8 +1351,10 @@ Clients should poll `job_api_url` until the job reaches `succeeded`, then call
 
 Creates a `pending_parse` note from a URL and queues a background `parse_url`
 job. The job downloads the HTML using a browser-like user agent, stores the HTML
-source file beside the note, passes it to MarkItDown, and updates the note when
-parsing succeeds.
+source file beside the note, uses `trafilatura` to extract the main readable
+content, passes the cleaned HTML to MarkItDown, and updates the note when
+parsing succeeds. If extraction fails, the job falls back to converting the raw
+saved HTML.
 
 ### Endpoint
 
