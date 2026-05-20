@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from pathlib import Path
+from time import time_ns
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -39,7 +40,7 @@ def _ensure_can_update_profile(current_user: User, target_user: User) -> None:
 
 
 def _avatar_path(user_id: str) -> Path:
-    return Path(".profiles") / user_id / "avatar.jpg"
+    return Path(".profiles") / user_id / f"avatar-{time_ns()}.jpg"
 
 
 def _save_avatar(user_id: str, upload: UploadFile) -> str:
@@ -70,6 +71,9 @@ def _save_avatar(user_id: str, upload: UploadFile) -> str:
     target = get_settings().data_dir / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     image.save(target, format="JPEG", quality=90, optimize=True)
+    for old_avatar in target.parent.glob("avatar-*.jpg"):
+        if old_avatar != target:
+            old_avatar.unlink(missing_ok=True)
     return relative_path.as_posix()
 
 

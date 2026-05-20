@@ -159,12 +159,30 @@ def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Pat
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["photo_url"] == f"/.profiles/{user['id']}/avatar.jpg"
+    assert payload["photo_url"].startswith(f"/.profiles/{user['id']}/avatar-")
+    assert payload["photo_url"].endswith(".jpg")
 
-    avatar_path = tmp_path / "data" / ".profiles" / user["id"] / "avatar.jpg"
+    avatar_path = tmp_path / "data" / payload["photo_url"].removeprefix("/")
     assert avatar_path.is_file()
     with Image.open(avatar_path) as avatar:
         assert avatar.size == (200, 200)
+
+    second_image_bytes = BytesIO()
+    Image.new("RGB", (300, 400), "#fdc13e").save(second_image_bytes, format="PNG")
+    second_image_bytes.seek(0)
+
+    second_response = client.post(
+        f"/api/users/{user['id']}/photo",
+        files={"photo": ("avatar-2.png", second_image_bytes, "image/png")},
+    )
+
+    assert second_response.status_code == 200
+    second_payload = second_response.json()
+    assert second_payload["photo_url"].startswith(f"/.profiles/{user['id']}/avatar-")
+    assert second_payload["photo_url"].endswith(".jpg")
+    assert second_payload["photo_url"] != payload["photo_url"]
+    assert not avatar_path.exists()
+    assert (tmp_path / "data" / second_payload["photo_url"].removeprefix("/")).is_file()
 
 
 def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
