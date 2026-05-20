@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import textwrap
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -79,7 +80,34 @@ def _normalise_image_markdown(text: str) -> str | None:
     if IMAGE_DESCRIPTION_HEADING not in text:
         return None
     description = text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
+    description = _strip_outer_markdown_fence(description)
     return description or None
+
+
+def _strip_outer_markdown_fence(text: str) -> str:
+    match = re.fullmatch(
+        r"```(?:markdown|md|text)?\s*\n(?P<body>.*?)\n```",
+        text.strip(),
+        re.DOTALL,
+    )
+    if match is None:
+        return text.strip()
+    return match.group("body").strip()
+
+
+def _normalise_ocr_text(text: str) -> str:
+    text = _strip_outer_markdown_fence(text)
+    text = textwrap.dedent(text).strip()
+    lines = [line.rstrip() for line in text.splitlines()]
+    if not lines:
+        return ""
+
+    indented_lines = [line for line in lines if line.startswith(("    ", "\t"))]
+    non_empty_lines = [line for line in lines if line.strip()]
+    if non_empty_lines and len(indented_lines) / len(non_empty_lines) >= 0.5:
+        lines = [line.lstrip() if line.strip() else line for line in lines]
+
+    return "\n".join(lines).strip()
 
 
 def _convert_with_markitdown(path: Path, **options: object) -> str:
@@ -133,7 +161,7 @@ def _run_tesseract(executable: str, path: Path, *, psm: str) -> str | None:
     if completed.returncode != 0:
         return None
 
-    text = re.sub(r"\n{3,}", "\n\n", completed.stdout).strip()
+    text = _normalise_ocr_text(re.sub(r"\n{3,}", "\n\n", completed.stdout))
     if len(text) < OCR_MIN_CHARACTERS:
         return None
     return text

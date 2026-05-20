@@ -126,6 +126,81 @@ def test_image_parser_uses_tesseract_before_llm(
     assert parsed.text == "Receipt total\n\n£42.50"
 
 
+def test_image_parser_strips_ocr_code_block_indentation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "screenshot.png"
+    source.write_bytes(b"fake image")
+
+    def fake_run(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=(
+                "    # Mianotes\n\n"
+                "    ## Getting started\n\n"
+                "    Useful text from a screenshot.\n"
+            ),
+        )
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "# Mianotes\n\n## Getting started\n\nUseful text from a screenshot."
+
+
+def test_image_parser_strips_markdown_fence_from_llm_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "photo.jpeg"
+    source.write_bytes(b"fake image")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "ImageSize: 1179x1967\n\n"
+                    "# Description:\n"
+                    "```markdown\n"
+                    "# Mianotes\n\n"
+                    "## Getting started\n"
+                    "```\n"
+                )
+            )
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_openai_image_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "gpt-4o-mini",
+            "llm_prompt": "Convert this image into useful Markdown.",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "# Mianotes\n\n## Getting started"
+
+
 def test_tesseract_executable_skips_broken_path_binary(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
