@@ -11,8 +11,6 @@ The Python backend for Mianotes, providing the local REST API, filesystem-backed
 
 The service is designed for small groups: developers, researchers, students, and families who want durable knowledge stored as plain files that people, agents, and tools like OpenClaw, Claude, Codex, Copilot, Gemini, and Slack can use directly. It uses the filesystem as its main storage layer, which makes it extremely portable and easy to run locally on your computer or on a hosted server without relying on an external database server.
 
-![Mianotes overview](docs/assets/mia.png)
-
 ## What it does
 
 - Stores note text as Markdown on the filesystem.
