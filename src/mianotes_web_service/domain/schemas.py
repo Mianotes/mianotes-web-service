@@ -11,11 +11,15 @@ MAX_TAGS_PER_NOTE = 5
 class UserCreate(BaseModel):
     email: EmailStr
     name: str = Field(min_length=1, max_length=200)
+    phone: str | None = Field(default=None, max_length=64)
+    role: str | None = Field(default=None, max_length=120)
 
 
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
     name: str | None = Field(default=None, min_length=1, max_length=200)
+    phone: str | None = Field(default=None, max_length=64)
+    role: str | None = Field(default=None, max_length=120)
 
 
 class UserRead(BaseModel):
@@ -23,6 +27,8 @@ class UserRead(BaseModel):
     email: EmailStr
     name: str
     username: str
+    phone: str | None = None
+    role: str | None = None
     is_admin: bool
     created_at: datetime
     updated_at: datetime

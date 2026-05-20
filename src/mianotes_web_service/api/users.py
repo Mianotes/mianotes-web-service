@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import AdminUser, UsersReadUser
+from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, UsersReadUser
 from mianotes_web_service.db.models import User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import UserCreate, UserRead, UserUpdate
@@ -27,7 +27,13 @@ def _read_user_or_404(session: Session, user_id: str) -> User:
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, session: SessionDep, user: AdminUser) -> User:
     email = str(payload.email).lower()
-    created_user = User(email=email, name=payload.name, username=make_username(email, payload.name))
+    created_user = User(
+        email=email,
+        name=payload.name,
+        username=make_username(email, payload.name),
+        phone=payload.phone,
+        role=payload.role,
+    )
     session.add(created_user)
     try:
         session.commit()
@@ -52,14 +58,23 @@ def get_user(user_id: str, session: SessionDep, user: UsersReadUser) -> User:
 
 
 @router.patch("/{user_id}", response_model=UserRead)
-def update_user(user_id: str, payload: UserUpdate, session: SessionDep, user: AdminUser) -> User:
-    user = _read_user_or_404(session, user_id)
+def update_user(user_id: str, payload: UserUpdate, session: SessionDep, user: CurrentUser) -> User:
+    target_user = _read_user_or_404(session, user_id)
+    if not user.is_admin and user.id != target_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can update other user profiles",
+        )
     if payload.name is not None:
-        user.name = payload.name
+        target_user.name = payload.name
     if payload.email is not None:
         email = str(payload.email).lower()
-        user.email = email
-        user.username = make_username(email, payload.name or user.name)
+        target_user.email = email
+        target_user.username = make_username(email, payload.name or target_user.name)
+    if payload.phone is not None:
+        target_user.phone = payload.phone
+    if payload.role is not None:
+        target_user.role = payload.role
     try:
         session.commit()
     except IntegrityError as exc:
@@ -68,8 +83,8 @@ def update_user(user_id: str, payload: UserUpdate, session: SessionDep, user: Ad
             status_code=status.HTTP_409_CONFLICT,
             detail="A user with this email already exists",
         ) from exc
-    session.refresh(user)
-    return user
+    session.refresh(target_user)
+    return target_user
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

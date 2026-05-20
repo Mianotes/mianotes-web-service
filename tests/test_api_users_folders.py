@@ -49,24 +49,39 @@ def test_user_crud(client: TestClient):
         json={
             "email": "admin@example.com",
             "name": "Admin",
-            "password": "house-password",
-            "password_confirmation": "house-password",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
         },
     )
 
-    response = client.post("/api/users", json={"email": "ALICE@example.com", "name": "Alice"})
+    response = client.post(
+        "/api/users",
+        json={
+            "email": "ALICE@example.com",
+            "name": "Alice",
+            "phone": "+44 20 0000 0000",
+            "role": "Researcher",
+        },
+    )
     assert response.status_code == 201
     user = response.json()
     assert user["email"] == "alice@example.com"
     assert user["name"] == "Alice"
+    assert user["phone"] == "+44 20 0000 0000"
+    assert user["role"] == "Researcher"
     assert user["username"].startswith("alice-")
 
     duplicate = client.post("/api/users", json={"email": "alice@example.com", "name": "Alice Two"})
     assert duplicate.status_code == 409
 
-    updated = client.patch(f"/api/users/{user['id']}", json={"name": "Alice Morgan"})
+    updated = client.patch(
+        f"/api/users/{user['id']}",
+        json={"name": "Alice Morgan", "phone": "+44 20 1111 1111", "role": "Lead researcher"},
+    )
     assert updated.status_code == 200
     assert updated.json()["name"] == "Alice Morgan"
+    assert updated.json()["phone"] == "+44 20 1111 1111"
+    assert updated.json()["role"] == "Lead researcher"
 
     listed = client.get("/api/users")
     assert listed.status_code == 200
@@ -79,14 +94,55 @@ def test_user_crud(client: TestClient):
     assert missing.status_code == 404
 
 
+def test_user_can_update_own_profile_but_not_others(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+    other_user = client.post(
+        "/api/users",
+        json={"email": "other@example.com", "name": "Other"},
+    ).json()
+
+    client.post("/api/auth/logout")
+    joined = client.post(
+        "/api/auth/join",
+        json={"email": "member@example.com", "name": "Member", "password": "instance-password"},
+    )
+    member = joined.json()["user"]
+
+    own_update = client.patch(
+        f"/api/users/{member['id']}",
+        json={"name": "Member Updated", "phone": "123", "role": "Writer"},
+    )
+    assert own_update.status_code == 200
+    assert own_update.json()["name"] == "Member Updated"
+    assert own_update.json()["phone"] == "123"
+    assert own_update.json()["role"] == "Writer"
+
+    forbidden = client.patch(f"/api/users/{other_user['id']}", json={"name": "Nope"})
+    assert forbidden.status_code == 403
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"user_id": admin["id"], "password": "instance-password"})
+    admin_update = client.patch(f"/api/users/{other_user['id']}", json={"role": "Designer"})
+    assert admin_update.status_code == 200
+    assert admin_update.json()["role"] == "Designer"
+
+
 def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
         json={
             "email": "ben@example.com",
             "name": "Ben",
-            "password": "house-password",
-            "password_confirmation": "house-password",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
         },
     ).json()["user"]
 

@@ -35,6 +35,8 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(64))
+    role: Mapped[str | None] = mapped_column(String(120))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     folders: Mapped[list[Folder]] = relationship(
