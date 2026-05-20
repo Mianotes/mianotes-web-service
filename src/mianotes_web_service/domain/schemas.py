@@ -29,6 +29,7 @@ class UserRead(BaseModel):
     username: str
     phone: str | None = None
     role: str | None = None
+    photo_url: str | None = None
     is_admin: bool
     created_at: datetime
     updated_at: datetime

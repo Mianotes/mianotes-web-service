@@ -47,6 +47,8 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(text("ALTER TABLE users ADD COLUMN phone VARCHAR(64)"))
             if "role" not in columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN role VARCHAR(120)"))
+            if "avatar_path" not in columns:
+                connection.execute(text("ALTER TABLE users ADD COLUMN avatar_path TEXT"))
         if "folders" in table_names:
             columns = _sqlite_columns(connection, "folders")
             if "path" not in columns:

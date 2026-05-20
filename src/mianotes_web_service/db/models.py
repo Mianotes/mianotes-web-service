@@ -37,6 +37,7 @@ class User(Base, TimestampMixin):
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     phone: Mapped[str | None] = mapped_column(String(64))
     role: Mapped[str | None] = mapped_column(String(120))
+    avatar_path: Mapped[str | None] = mapped_column(Text)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     folders: Mapped[list[Folder]] = relationship(
@@ -54,6 +55,12 @@ class User(Base, TimestampMixin):
         cascade="all, delete-orphan",
     )
     jobs: Mapped[list[MiaJob]] = relationship(back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def photo_url(self) -> str | None:
+        if not self.avatar_path:
+            return None
+        return f"/{self.avatar_path}"
 
 
 class Folder(Base, TimestampMixin):

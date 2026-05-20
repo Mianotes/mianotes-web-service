@@ -158,6 +158,9 @@ comments metadata, sharing metadata, and API action hints.
     "email": "matt@example.com",
     "name": "Matt",
     "username": "matt-2d9f6b1a",
+    "phone": null,
+    "role": "Developer",
+    "photo_url": "/.profiles/c5ddebcc-e434-4e1a-bc8a-48263eb0095d/avatar.jpg",
     "is_admin": true,
     "created_at": "2026-05-15T10:30:00Z",
     "updated_at": "2026-05-15T10:30:00Z"
@@ -957,7 +960,7 @@ Returns a `User`.
 
 ## Update user
 
-Updates a user's email or display name.
+Updates a user's profile.
 
 ### Endpoint
 
@@ -965,14 +968,16 @@ Updates a user's email or display name.
 
 ### Authentication
 
-Admin session or bearer token with `admin`.
+Session cookie or bearer token for the profile owner, or an admin session or bearer token with `admin`.
 
 ### Request
 
 ```json
 {
   "email": "emily.davis@example.com",
-  "name": "Emily Davis"
+  "name": "Emily Davis",
+  "phone": "+44 20 5555 0101",
+  "role": "Research Lead"
 }
 ```
 
@@ -982,6 +987,8 @@ Admin session or bearer token with `admin`.
 |---|---|---:|---|
 | `email` | string | No | Replacement email address. |
 | `name` | string | No | Replacement display name. |
+| `phone` | string | No | Replacement phone number. |
+| `role` | string | No | Replacement job title or role label. |
 
 ### Response
 
@@ -992,9 +999,57 @@ Returns the updated `User`.
 | Status | Reason |
 |---:|---|
 | `401` | Not authenticated. |
-| `403` | Admin access required. |
+| `403` | The authenticated user cannot update this profile. |
 | `404` | User does not exist. |
 | `409` | Email already exists. |
+| `422` | Request validation failed. |
+
+## Upload user photo
+
+Uploads a profile photo for a user. The service accepts JPG or PNG files, crops and resizes the image to `200x200`, converts it to JPEG, and stores only the resized image under `data/.profiles`.
+
+### Endpoint
+
+`POST /api/users/{user_id}/photo`
+
+### Authentication
+
+Session cookie or bearer token for the profile owner, or an admin session or bearer token with `admin`.
+
+### Path parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---:|---|
+| `user_id` | string | Yes | User ID. |
+
+### Request
+
+Send a `multipart/form-data` request with a `photo` file field.
+
+```bash
+curl -X POST http://127.0.0.1:8200/api/users/c5ddebcc-e434-4e1a-bc8a-48263eb0095d/photo \
+  -F "photo=@avatar.png"
+```
+
+### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---:|---|
+| `photo` | file | Yes | JPG or PNG image to use as the profile photo. |
+
+### Response
+
+Returns the updated `User`, including `photo_url`.
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `400` | The image could not be read. |
+| `401` | Not authenticated. |
+| `403` | The authenticated user cannot update this profile. |
+| `404` | User does not exist. |
+| `415` | File type is not JPG or PNG. |
 | `422` | Request validation failed. |
 
 ## Delete user

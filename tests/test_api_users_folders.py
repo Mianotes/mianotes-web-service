@@ -1,8 +1,10 @@
 from collections.abc import Generator
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -133,6 +135,36 @@ def test_user_can_update_own_profile_but_not_others(client: TestClient):
     admin_update = client.patch(f"/api/users/{other_user['id']}", json={"role": "Designer"})
     assert admin_update.status_code == 200
     assert admin_update.json()["role"] == "Designer"
+
+
+def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Path):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+
+    image_bytes = BytesIO()
+    Image.new("RGB", (400, 300), "#1684ff").save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+
+    response = client.post(
+        f"/api/users/{user['id']}/photo",
+        files={"photo": ("avatar.png", image_bytes, "image/png")},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["photo_url"] == f"/.profiles/{user['id']}/avatar.jpg"
+
+    avatar_path = tmp_path / "data" / ".profiles" / user["id"] / "avatar.jpg"
+    assert avatar_path.is_file()
+    with Image.open(avatar_path) as avatar:
+        assert avatar.size == (200, 200)
 
 
 def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
