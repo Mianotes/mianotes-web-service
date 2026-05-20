@@ -59,6 +59,11 @@ adapter as other files. It then tries local Tesseract OCR for `.jpg`, `.jpeg`,
 `.png`, `.tif`, and `.tiff` uploads. Tesseract works well for screenshots,
 scanned pages, receipts, forms, and other text-heavy images.
 
+Before using Tesseract, Mianotes checks that the binary can actually run. This
+prevents old or incompatible binaries from silently breaking image ingestion.
+For screenshots and other UI captures, Mianotes also runs a preprocessed OCR
+pass that increases contrast and image size before choosing the best OCR result.
+
 When OpenAI is configured with a multimodal model such as `gpt-4o-mini`,
 MarkItDown sends the uploaded image as a base64 `image_url` request and asks
 the model to transcribe and structure the image as Markdown. Mianotes only uses

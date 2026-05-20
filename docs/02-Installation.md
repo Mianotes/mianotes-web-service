@@ -22,6 +22,20 @@ sudo apt install python3 python3-venv python3-pip ripgrep tesseract-ocr ffmpeg
 `ripgrep` is required for search. `tesseract` is used for local OCR on image
 uploads. `ffmpeg` is optional unless you want to parse audio or video files.
 
+On Apple Silicon Macs, make sure Tesseract is installed through the ARM
+Homebrew path. If this command prints `Bad CPU type in executable`, the old
+Intel binary is being used and image OCR will fail:
+
+```bash
+tesseract --version
+```
+
+Reinstall it with Homebrew, then restart the Mianotes service:
+
+```bash
+brew reinstall tesseract
+```
+
 ## Step 2: Add environment variables
 
 Create a `.env` file in the folder root.

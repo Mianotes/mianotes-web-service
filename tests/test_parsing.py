@@ -113,6 +113,7 @@ def test_image_parser_uses_tesseract_before_llm(
 
     monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
         parsing.importlib,
         "import_module",
@@ -123,6 +124,27 @@ def test_image_parser_uses_tesseract_before_llm(
 
     assert parsed.parser == "markitdown+tesseract"
     assert parsed.text == "Receipt total\n\n£42.50"
+
+
+def test_tesseract_executable_skips_broken_path_binary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    broken = tmp_path / "broken-tesseract"
+    working = tmp_path / "working-tesseract"
+    broken.write_text("broken", encoding="utf-8")
+    working.write_text("working", encoding="utf-8")
+
+    def fake_run(args, **_kwargs):
+        if args[0] == str(broken):
+            raise OSError("Bad CPU type in executable")
+        return SimpleNamespace(returncode=0, stdout="tesseract 5.5.0")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(broken))
+    monkeypatch.setattr(parsing, "TESSERACT_CANDIDATES", (str(working),))
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+
+    assert parsing._tesseract_executable() == str(working)
 
 
 def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
@@ -145,6 +167,7 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
 
     monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_openai_image_options",
@@ -175,6 +198,11 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
     source.write_bytes(b"fake image")
 
     monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_openai_image_options",
+        lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("OpenAI is not configured")),
+    )
     monkeypatch.setattr(
         parsing.importlib,
         "import_module",

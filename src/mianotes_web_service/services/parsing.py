@@ -45,9 +45,15 @@ IMAGE_DESCRIPTION_HEADING = "# Description:"
 OCR_MIN_CHARACTERS = 20
 IMAGE_NEEDS_CLOUD_MESSAGE = (
     "Sorry, Mia was unable to get any text from this image.\n\n"
-    "Please configure a cloud LLM to improve Mia's image reading capabilities."
+    "Please install a working Tesseract OCR binary or configure a cloud LLM to "
+    "improve Mia's image reading capabilities."
 )
 IMAGE_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this image."
+TESSERACT_CANDIDATES = (
+    "/opt/homebrew/bin/tesseract",
+    "/usr/local/bin/tesseract",
+    "/usr/bin/tesseract",
+)
 
 
 def _markitdown_class():
@@ -85,13 +91,37 @@ def _convert_with_markitdown(path: Path, **options: object) -> str:
     return result.text_content
 
 
-def _tesseract_ocr(path: Path) -> str | None:
-    if shutil.which("tesseract") is None:
-        return None
+def _tesseract_executable() -> str | None:
+    candidates: list[str] = []
+    path_candidate = shutil.which("tesseract")
+    if path_candidate:
+        candidates.append(path_candidate)
+    candidates.extend(TESSERACT_CANDIDATES)
 
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate in seen or not Path(candidate).is_file():
+            continue
+        seen.add(candidate)
+        try:
+            completed = subprocess.run(
+                [candidate, "--version"],
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError, TimeoutError):
+            continue
+        if completed.returncode == 0:
+            return candidate
+    return None
+
+
+def _run_tesseract(executable: str, path: Path, *, psm: str) -> str | None:
     try:
         completed = subprocess.run(
-            ["tesseract", str(path), "stdout"],
+            [executable, str(path), "stdout", "--psm", psm],
             capture_output=True,
             check=False,
             text=True,
@@ -107,6 +137,49 @@ def _tesseract_ocr(path: Path) -> str | None:
     if len(text) < OCR_MIN_CHARACTERS:
         return None
     return text
+
+
+def _preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | None:
+    try:
+        from PIL import Image, ImageEnhance, ImageOps
+    except ModuleNotFoundError:
+        return None
+
+    try:
+        with Image.open(source_path) as image:
+            image = ImageOps.grayscale(image)
+            image = ImageOps.autocontrast(image)
+            image = ImageEnhance.Sharpness(image).enhance(1.8)
+            if max(image.size) < 2400:
+                image = image.resize((image.width * 2, image.height * 2))
+            image.save(output_path)
+    except OSError:
+        return None
+    return output_path
+
+
+def _tesseract_ocr(path: Path) -> str | None:
+    executable = _tesseract_executable()
+    if executable is None:
+        return None
+
+    attempts: list[str] = []
+    for psm in ("6", "11"):
+        text = _run_tesseract(executable, path, psm=psm)
+        if text:
+            attempts.append(text)
+
+    with tempfile.TemporaryDirectory(prefix="mianotes-ocr-") as temp_dir:
+        processed_path = _preprocess_image_for_ocr(path, Path(temp_dir) / "image.png")
+        if processed_path is not None:
+            for psm in ("6", "11"):
+                text = _run_tesseract(executable, processed_path, psm=psm)
+                if text:
+                    attempts.append(text)
+
+    if not attempts:
+        return None
+    return max(attempts, key=len)
 
 
 class _HTMLTextExtractor(HTMLParser):
