@@ -110,11 +110,12 @@ def markitdown_llm_options() -> dict[str, object]:
         "llm_client": _client_for(config),
         "llm_model": settings.llm_image_model or config.model,
         "llm_prompt": (
-            "Convert this image into useful Markdown for a local knowledge base. "
-            "If the image contains text, transcribe the text accurately. If it is "
-            "a screenshot, document, diagram, receipt, photo, or UI, describe the "
-            "important content, structure, labels, values, and visible actions. "
-            "Return Markdown only."
+            "Perform OCR on this image and convert the result into useful Markdown "
+            "for a local knowledge base. Transcribe all visible text as accurately "
+            "as possible. Preserve important structure such as headings, tables, "
+            "line items, totals, dates, labels, and form fields. If this is not a "
+            "text-heavy image, describe the important visible content, layout, "
+            "objects, UI labels, and actions. Return Markdown only."
         ),
     }
 

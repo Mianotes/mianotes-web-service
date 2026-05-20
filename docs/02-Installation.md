@@ -51,6 +51,10 @@ MIANOTES_LLM_MODEL=gpt-4o-mini
 MIANOTES_LLM_API_KEY=sk-...
 ```
 
+With OpenAI, `gpt-4o-mini` can also be used as the image fallback. Mianotes
+tries local Tesseract OCR first, then sends the image to OpenAI as a base64
+image request when OCR is not enough.
+
 Do not add database or storage variables unless you want to change the default file locations. By default, Mianotes stores SQLite at `data/mia.db` and notes under `data/`.
 
 ## Step 3: Start the server

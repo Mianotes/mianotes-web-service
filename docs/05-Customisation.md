@@ -60,6 +60,12 @@ text-heavy images. If OCR does not find meaningful text, Mianotes falls back to
 MarkItDown with the configured LLM client. Set `MIANOTES_LLM_IMAGE_MODEL` when
 your normal text model is not a vision model.
 
+When OpenAI is configured with a multimodal model such as `gpt-4o-mini`,
+MarkItDown sends the uploaded image as a base64 `image_url` request and asks
+the model to transcribe and structure the image as Markdown. This is the
+recommended fallback for users who do not want to install a large local vision
+model.
+
 Install `ffmpeg` separately if you plan to parse audio or video sources. HTML,
 document, and text conversion can ignore the `ffmpeg` warning. Specialist local
 or hosted parsers can be added later behind the same parser adapter boundary.
