@@ -78,6 +78,10 @@ from mianotes_web_service.services.storage import (
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
+MISSING_NOTE_FILE_DETAIL = (
+    "This note still exists in the database, but its Markdown file no longer exists "
+    "in the filesystem. It may have been deleted or moved outside Mianotes."
+)
 SUPPORTED_UPLOAD_EXTENSIONS = {
     ".csv",
     ".doc",
@@ -182,7 +186,13 @@ def _note_response(
     share_token: str | None = None,
 ) -> NoteRead:
     note_path = note_file_path(note)
-    text = note_path.read_text(encoding="utf-8")
+    try:
+        text = note_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=MISSING_NOTE_FILE_DETAIL,
+        ) from exc
     source_files = [
         {
             "id": source_file.id,

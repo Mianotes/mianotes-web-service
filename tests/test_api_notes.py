@@ -127,6 +127,44 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/mia.db").status_code == 404
 
 
+def test_get_note_returns_clear_error_when_markdown_file_is_missing(
+    client: TestClient, tmp_path: Path
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "missing-file@example.com",
+            "name": "Missing File User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Missing Files"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Missing Markdown",
+            "text": "This file will be removed outside the app.",
+        },
+    ).json()
+    note_path = (
+        tmp_path
+        / "data"
+        / "missing-files"
+        / f"missing-markdown-{note['id'][:8]}.md"
+    )
+    note_path.unlink()
+
+    response = client.get(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == (
+        "This note still exists in the database, but its Markdown file no longer exists "
+        "in the filesystem. It may have been deleted or moved outside Mianotes."
+    )
+
+
 def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     admin = client.post(
         "/api/auth/join",
