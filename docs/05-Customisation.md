@@ -53,18 +53,18 @@ headers, footers, comments, and other page chrome while preserving useful links,
 images, and tables. If extraction fails, Mianotes falls back to the saved HTML
 file so URL ingestion still works.
 
-Image files are different from PDFs and office documents. Mianotes tries local
-Tesseract OCR first for `.jpg`, `.jpeg`, `.png`, `.tif`, and `.tiff` uploads.
-That works well for screenshots, scanned pages, receipts, forms, and other
-text-heavy images. If OCR does not find meaningful text, Mianotes falls back to
-MarkItDown with the configured LLM client. Set `MIANOTES_LLM_IMAGE_MODEL` when
-your normal text model is not a vision model.
+Image files are different from PDFs and office documents. Mianotes first runs
+MarkItDown's image converter so the source is handled by the same parser
+adapter as other files. It then tries local Tesseract OCR for `.jpg`, `.jpeg`,
+`.png`, `.tif`, and `.tiff` uploads. Tesseract works well for screenshots,
+scanned pages, receipts, forms, and other text-heavy images.
 
 When OpenAI is configured with a multimodal model such as `gpt-4o-mini`,
 MarkItDown sends the uploaded image as a base64 `image_url` request and asks
-the model to transcribe and structure the image as Markdown. This is the
-recommended fallback for users who do not want to install a large local vision
-model.
+the model to transcribe and structure the image as Markdown. Mianotes only uses
+this cloud image fallback when Tesseract cannot extract useful text. If OpenAI
+is not configured, the note is published with a short Mia message explaining
+that no text could be extracted and cloud image OCR can improve the result.
 
 Install `ffmpeg` separately if you plan to parse audio or video sources. HTML,
 document, and text conversion can ignore the `ffmpeg` warning. Specialist local
@@ -79,6 +79,8 @@ are supported out of the box.
 MIANOTES_LLM_PROVIDER=openai
 MIANOTES_LLM_MODEL=gpt-4o-mini
 MIANOTES_LLM_API_KEY=sk-...
+# Optional, only needed if image OCR should use a different OpenAI model.
+MIANOTES_LLM_IMAGE_MODEL=<multimodal-openai-model>
 ```
 
 For local Ollama-style servers:
@@ -88,8 +90,6 @@ MIANOTES_LLM_PROVIDER=local
 MIANOTES_LLM_MODEL=llama3.2:3b
 MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
 MIANOTES_LLM_API_KEY=ollama
-# Optional, only needed when parsing image uploads with a separate vision model.
-MIANOTES_LLM_IMAGE_MODEL=<vision-model-name>
 ```
 
 For other OpenAI-compatible servers:

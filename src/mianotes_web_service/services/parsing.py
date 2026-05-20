@@ -12,7 +12,7 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from mianotes_web_service.services.mia import MiaUnavailable, markitdown_llm_options
+from mianotes_web_service.services.mia import MiaUnavailable, markitdown_openai_image_options
 
 
 class ParserError(RuntimeError):
@@ -43,6 +43,11 @@ DEFAULT_BROWSER_USER_AGENT = (
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 IMAGE_DESCRIPTION_HEADING = "# Description:"
 OCR_MIN_CHARACTERS = 20
+IMAGE_NEEDS_CLOUD_MESSAGE = (
+    "Sorry, Mia was unable to get any text from this image.\n\n"
+    "Please configure a cloud LLM to improve Mia's image reading capabilities."
+)
+IMAGE_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this image."
 
 
 def _markitdown_class():
@@ -64,26 +69,20 @@ def _is_image(path: Path) -> bool:
     return path.suffix.lower() in IMAGE_EXTENSIONS
 
 
-def _markitdown_options(path: Path) -> dict[str, object]:
-    if not _is_image(path):
-        return {}
-    try:
-        return markitdown_llm_options()
-    except MiaUnavailable as exc:
-        raise ParserUnavailable(
-            "Image parsing needs a configured vision-capable LLM. Set "
-            "MIANOTES_LLM_PROVIDER, MIANOTES_LLM_MODEL, and MIANOTES_LLM_API_KEY, "
-            "or set MIANOTES_LLM_IMAGE_MODEL to a model that can read images."
-        ) from exc
-
-
-def _normalise_image_markdown(text: str) -> str:
+def _normalise_image_markdown(text: str) -> str | None:
     if IMAGE_DESCRIPTION_HEADING not in text:
-        raise ParserError(
-            "Image parsing returned metadata only. Configure a vision-capable model "
-            "for image uploads, for example by setting MIANOTES_LLM_IMAGE_MODEL."
-        )
-    return text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
+        return None
+    description = text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
+    return description or None
+
+
+def _convert_with_markitdown(path: Path, **options: object) -> str:
+    converter = _markitdown_class()(**options)
+    try:
+        result = converter.convert(str(path))
+    except Exception as exc:
+        raise ParserError(str(exc)) from exc
+    return result.text_content
 
 
 def _tesseract_ocr(path: Path) -> str | None:
@@ -162,19 +161,46 @@ class MarkItDownParser:
         if not path.is_file():
             raise ParserError("Source file not found")
         if _is_image(path):
-            ocr_text = _tesseract_ocr(path)
-            if ocr_text:
-                return ParsedDocument(text=ocr_text, parser="tesseract", source_path=path)
+            return self._parse_image(path)
 
-        converter = _markitdown_class()(**_markitdown_options(path))
+        return ParsedDocument(
+            text=_convert_with_markitdown(path),
+            parser=self.name,
+            source_path=path,
+        )
+
+    def _parse_image(self, path: Path) -> ParsedDocument:
+        _convert_with_markitdown(path)
+
+        ocr_text = _tesseract_ocr(path)
+        if ocr_text:
+            return ParsedDocument(text=ocr_text, parser="markitdown+tesseract", source_path=path)
+
         try:
-            result = converter.convert(str(path))
-        except Exception as exc:
-            raise ParserError(str(exc)) from exc
-        text = result.text_content
-        if _is_image(path):
-            text = _normalise_image_markdown(text)
-        return ParsedDocument(text=text, parser=self.name, source_path=path)
+            image_text = _normalise_image_markdown(
+                _convert_with_markitdown(path, **markitdown_openai_image_options())
+            )
+        except MiaUnavailable:
+            return ParsedDocument(
+                text=IMAGE_NEEDS_CLOUD_MESSAGE,
+                parser="markitdown+tesseract",
+                source_path=path,
+            )
+        except ParserError:
+            image_text = None
+
+        if image_text:
+            return ParsedDocument(
+                text=image_text,
+                parser="markitdown+tesseract+openai",
+                source_path=path,
+            )
+
+        return ParsedDocument(
+            text=IMAGE_UNREADABLE_MESSAGE,
+            parser="markitdown+tesseract+openai",
+            source_path=path,
+        )
 
 
 class ParserRegistry:

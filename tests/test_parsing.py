@@ -7,8 +7,9 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services import parsing
 from mianotes_web_service.services.parsing import (
     DEFAULT_BROWSER_USER_AGENT,
+    IMAGE_NEEDS_CLOUD_MESSAGE,
+    IMAGE_UNREADABLE_MESSAGE,
     MarkItDownParser,
-    ParserError,
     ParserUnavailable,
     fetch_url_to_html,
     parse_document,
@@ -75,13 +76,14 @@ def test_image_parser_uses_configured_llm_options(
 
     monkeypatch.setattr(
         parsing,
-        "markitdown_llm_options",
+        "markitdown_openai_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "llama3.2-vision",
             "llm_prompt": "Convert this image into useful Markdown.",
         },
     )
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing.importlib,
         "import_module",
@@ -111,10 +113,15 @@ def test_image_parser_uses_tesseract_before_llm(
 
     monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
+    )
 
     parsed = parse_document(source)
 
-    assert parsed.parser == "tesseract"
+    assert parsed.parser == "markitdown+tesseract"
     assert parsed.text == "Receipt total\n\n£42.50"
 
 
@@ -140,7 +147,7 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
     monkeypatch.setattr(
         parsing,
-        "markitdown_llm_options",
+        "markitdown_openai_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "gpt-4o-mini",
@@ -156,22 +163,44 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
     parsed = parse_document(source)
 
     assert parsed.text == "A photo of a whiteboard."
+    assert parsed.parser == "markitdown+tesseract+openai"
     assert created_with["llm_model"] == "gpt-4o-mini"
 
 
-def test_image_parser_rejects_metadata_only_result(
+def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
     source = tmp_path / "photo.png"
     source.write_bytes(b"fake image")
 
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+tesseract"
+    assert parsed.text == IMAGE_NEEDS_CLOUD_MESSAGE
+
+
+def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "photo.png"
+    source.write_bytes(b"fake image")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
-        "markitdown_llm_options",
+        "markitdown_openai_image_options",
         lambda: {
             "llm_client": object(),
-            "llm_model": "llama3.2-vision",
+            "llm_model": "gpt-4o-mini",
             "llm_prompt": "Convert this image into useful Markdown.",
         },
     )
@@ -181,8 +210,10 @@ def test_image_parser_rejects_metadata_only_result(
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
 
-    with pytest.raises(ParserError, match="metadata only"):
-        parse_document(source)
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+tesseract+openai"
+    assert parsed.text == IMAGE_UNREADABLE_MESSAGE
 
 
 def test_missing_markitdown_reports_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

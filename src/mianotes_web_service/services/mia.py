@@ -106,9 +106,28 @@ def _client_for(config: LLMConfig) -> OpenAI:
 def markitdown_llm_options() -> dict[str, object]:
     settings = get_settings()
     config = _llm_config()
+    return _markitdown_image_options(
+        client=_client_for(config),
+        model=settings.llm_image_model or config.model,
+    )
+
+
+def markitdown_openai_image_options() -> dict[str, object]:
+    settings = get_settings()
+    if settings.llm_provider.strip().lower() != "openai":
+        raise MiaUnavailable("OpenAI image OCR is not configured")
+
+    config = _llm_config()
+    return _markitdown_image_options(
+        client=_client_for(config),
+        model=settings.llm_image_model or config.model,
+    )
+
+
+def _markitdown_image_options(*, client: OpenAI, model: str) -> dict[str, object]:
     return {
-        "llm_client": _client_for(config),
-        "llm_model": settings.llm_image_model or config.model,
+        "llm_client": client,
+        "llm_model": model,
         "llm_prompt": (
             "Perform OCR on this image and convert the result into useful Markdown "
             "for a local knowledge base. Transcribe all visible text as accurately "

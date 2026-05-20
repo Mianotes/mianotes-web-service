@@ -36,12 +36,8 @@ MIANOTES_LLM_API_KEY=ollama
 ```
 
 `llama3.2:3b` is a text model. Mianotes uses Tesseract first for local image
-OCR. If you want image uploads to produce richer image descriptions when OCR
-is not enough, also configure a vision-capable model:
-
-```env
-MIANOTES_LLM_IMAGE_MODEL=<vision-model-name>
-```
+OCR, so text-heavy images can still be processed locally. If OCR is not enough,
+Mianotes only uses cloud image OCR when OpenAI is configured.
 
 For OpenAI:
 
@@ -54,6 +50,12 @@ MIANOTES_LLM_API_KEY=sk-...
 With OpenAI, `gpt-4o-mini` can also be used as the image fallback. Mianotes
 tries local Tesseract OCR first, then sends the image to OpenAI as a base64
 image request when OCR is not enough.
+
+If you want to use a different OpenAI model for image OCR, add:
+
+```env
+MIANOTES_LLM_IMAGE_MODEL=<multimodal-openai-model>
+```
 
 Do not add database or storage variables unless you want to change the default file locations. By default, Mianotes stores SQLite at `data/mia.db` and notes under `data/`.
 
@@ -126,12 +128,9 @@ ollama list
 ```
 
 Image uploads use Tesseract first, so screenshots, scanned pages, receipts, and
-other text-heavy images can be processed locally. A vision-capable model is only
-needed when you want Mia to understand or describe images that are not mostly
-text. If you use Ollama for that, pull a model that supports images, then set
-`MIANOTES_LLM_IMAGE_MODEL` to that model name. Keep
-`MIANOTES_LLM_MODEL=llama3.2:3b` for normal text prompts if you want the smaller
-model for day-to-day Mia responses.
+other text-heavy images can be processed locally. `llama3.2:3b` cannot process
+images. If Tesseract cannot extract useful text, configure OpenAI with a
+multimodal model such as `gpt-4o-mini` for the image fallback.
 
 `127.0.0.1` means the machine running the Python web service. If Mianotes and Ollama are both running on your Mac, this is the correct value.
 
