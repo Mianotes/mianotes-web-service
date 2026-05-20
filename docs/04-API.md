@@ -1172,7 +1172,9 @@ Returns the updated `Folder`.
 ## Archive folder
 
 Archives a folder. Archived folders are hidden from list responses unless
-`include_archived=true`.
+`include_archived=true`. The folder directory is moved from `data/<folder_slug>`
+to `data/.archived/<folder_slug>-<folder_id_short>` so active filesystem
+folders stay clean while the Markdown notes and source files are preserved.
 
 ### Endpoint
 

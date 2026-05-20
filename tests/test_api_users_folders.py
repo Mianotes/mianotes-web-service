@@ -143,8 +143,21 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
 
     missing = client.get(f"/api/folders/{folder['id']}")
     assert missing.status_code == 200
-    assert missing.json()["archived_at"] is not None
+    archived_folder = missing.json()
+    assert archived_folder["archived_at"] is not None
+    assert archived_folder["slug"].startswith("research-notes-")
+    assert archived_folder["path"].startswith(".archived/research-notes-")
+    assert not (tmp_path / "data" / "research-notes").exists()
+    archived_note_path = tmp_path / "data" / archived_folder["path"] / "note.md"
+    assert archived_note_path.read_text(encoding="utf-8") == "note"
 
     visible = client.get("/api/folders", params={"user_id": user["id"]})
     assert visible.status_code == 200
     assert folder["id"] not in [item["id"] for item in visible.json()]
+
+    recreated = client.post(
+        "/api/folders",
+        json={"name": "Research Notes"},
+    )
+    assert recreated.status_code == 201
+    assert recreated.json()["slug"] == "research-notes"

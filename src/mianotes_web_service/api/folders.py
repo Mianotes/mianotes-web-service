@@ -13,7 +13,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import FolderCreate, FolderRead, FolderUpdate
-from mianotes_web_service.services.storage import slugify
+from mianotes_web_service.services.storage import short_id, slugify
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -132,6 +132,22 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot archive this folder",
         )
-    folder.archived_at = datetime.now(UTC)
+    if folder.archived_at is not None:
+        return
+
+    archived_at = datetime.now(UTC)
+    archive_slug = f"{folder.slug}-{short_id(folder.id)}"
+    archive_path = f".archived/{archive_slug}"
+    data_dir = get_settings().data_dir
+    old_path = data_dir / folder.path
+    new_path = data_dir / archive_path
+
+    if old_path.exists():
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+        old_path.rename(new_path)
+
+    folder.slug = archive_slug
+    folder.path = archive_path
+    folder.archived_at = archived_at
     folder.archived_by_user_id = user.id
     session.commit()
