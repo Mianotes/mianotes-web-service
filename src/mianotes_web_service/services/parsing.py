@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 import re
+import shutil
+import subprocess
 import tempfile
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -38,8 +40,9 @@ class DocumentParser(Protocol):
 DEFAULT_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 )
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 IMAGE_DESCRIPTION_HEADING = "# Description:"
+OCR_MIN_CHARACTERS = 20
 
 
 def _markitdown_class():
@@ -81,6 +84,30 @@ def _normalise_image_markdown(text: str) -> str:
             "for image uploads, for example by setting MIANOTES_LLM_IMAGE_MODEL."
         )
     return text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
+
+
+def _tesseract_ocr(path: Path) -> str | None:
+    if shutil.which("tesseract") is None:
+        return None
+
+    try:
+        completed = subprocess.run(
+            ["tesseract", str(path), "stdout"],
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError):
+        return None
+
+    if completed.returncode != 0:
+        return None
+
+    text = re.sub(r"\n{3,}", "\n\n", completed.stdout).strip()
+    if len(text) < OCR_MIN_CHARACTERS:
+        return None
+    return text
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -134,6 +161,11 @@ class MarkItDownParser:
     def parse(self, path: Path) -> ParsedDocument:
         if not path.is_file():
             raise ParserError("Source file not found")
+        if _is_image(path):
+            ocr_text = _tesseract_ocr(path)
+            if ocr_text:
+                return ParsedDocument(text=ocr_text, parser="tesseract", source_path=path)
+
         converter = _markitdown_class()(**_markitdown_options(path))
         try:
             result = converter.convert(str(path))

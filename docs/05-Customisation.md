@@ -53,10 +53,11 @@ headers, footers, comments, and other page chrome while preserving useful links,
 images, and tables. If extraction fails, Mianotes falls back to the saved HTML
 file so URL ingestion still works.
 
-Image files are different from PDFs and office documents. MarkItDown can read
-basic image metadata on its own, but it needs a vision-capable LLM to describe
-or transcribe an image. Mianotes passes the configured LLM client to MarkItDown
-for `.jpg`, `.jpeg`, and `.png` uploads. Set `MIANOTES_LLM_IMAGE_MODEL` when
+Image files are different from PDFs and office documents. Mianotes tries local
+Tesseract OCR first for `.jpg`, `.jpeg`, `.png`, `.tif`, and `.tiff` uploads.
+That works well for screenshots, scanned pages, receipts, forms, and other
+text-heavy images. If OCR does not find meaningful text, Mianotes falls back to
+MarkItDown with the configured LLM client. Set `MIANOTES_LLM_IMAGE_MODEL` when
 your normal text model is not a vision model.
 
 Install `ffmpeg` separately if you plan to parse audio or video sources. HTML,

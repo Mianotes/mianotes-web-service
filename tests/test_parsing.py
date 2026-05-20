@@ -96,6 +96,69 @@ def test_image_parser_uses_configured_llm_options(
     assert "Convert this image into useful Markdown" in created_with["llm_prompt"]
 
 
+def test_image_parser_uses_tesseract_before_llm(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "screenshot.png"
+    source.write_bytes(b"fake image")
+
+    def fake_run(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout="Receipt total\n\n\n£42.50\n",
+        )
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "tesseract"
+    assert parsed.text == "Receipt total\n\n£42.50"
+
+
+def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "photo.png"
+    source.write_bytes(b"fake image")
+    created_with = {}
+
+    class FakeMarkItDown:
+        def __init__(self, **kwargs):
+            created_with.update(kwargs)
+
+        def convert(self, path: str):
+            return SimpleNamespace(text_content="# Description:\nA photo of a whiteboard.")
+
+    def fake_run(*_args, **_kwargs):
+        return SimpleNamespace(returncode=0, stdout="   ")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "gpt-4o-mini",
+            "llm_prompt": "Convert this image into useful Markdown.",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "A photo of a whiteboard."
+    assert created_with["llm_model"] == "gpt-4o-mini"
+
+
 def test_image_parser_rejects_metadata_only_result(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -9,17 +9,18 @@ For contributor setup, see [Development](09-Development.md). For test commands, 
 macOS:
 
 ```bash
-brew install python ripgrep ffmpeg
+brew install python ripgrep tesseract ffmpeg
 ```
 
 Linux:
 
 ```bash
 sudo apt update
-sudo apt install python3 python3-venv python3-pip ripgrep ffmpeg
+sudo apt install python3 python3-venv python3-pip ripgrep tesseract-ocr ffmpeg
 ```
 
-`ripgrep` is required for search. `ffmpeg` is optional unless you want to parse audio or video files.
+`ripgrep` is required for search. `tesseract` is used for local OCR on image
+uploads. `ffmpeg` is optional unless you want to parse audio or video files.
 
 ## Step 2: Add environment variables
 
@@ -34,8 +35,9 @@ MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
 MIANOTES_LLM_API_KEY=ollama
 ```
 
-`llama3.2:3b` is a text model. If you want image uploads to produce useful
-Markdown instead of image metadata, also configure a vision-capable model:
+`llama3.2:3b` is a text model. Mianotes uses Tesseract first for local image
+OCR. If you want image uploads to produce richer image descriptions when OCR
+is not enough, also configure a vision-capable model:
 
 ```env
 MIANOTES_LLM_IMAGE_MODEL=<vision-model-name>
@@ -119,10 +121,13 @@ To check it worked:
 ollama list
 ```
 
-Image uploads need a vision-capable model. If you use Ollama for image uploads,
-pull a model that supports images, then set `MIANOTES_LLM_IMAGE_MODEL` to that
-model name. Keep `MIANOTES_LLM_MODEL=llama3.2:3b` for normal text prompts if
-you want the smaller model for day-to-day Mia responses.
+Image uploads use Tesseract first, so screenshots, scanned pages, receipts, and
+other text-heavy images can be processed locally. A vision-capable model is only
+needed when you want Mia to understand or describe images that are not mostly
+text. If you use Ollama for that, pull a model that supports images, then set
+`MIANOTES_LLM_IMAGE_MODEL` to that model name. Keep
+`MIANOTES_LLM_MODEL=llama3.2:3b` for normal text prompts if you want the smaller
+model for day-to-day Mia responses.
 
 `127.0.0.1` means the machine running the Python web service. If Mianotes and Ollama are both running on your Mac, this is the correct value.
 
