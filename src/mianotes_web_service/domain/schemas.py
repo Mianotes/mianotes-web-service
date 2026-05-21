@@ -177,6 +177,7 @@ class NoteListItem(BaseModel):
     summary: str = ""
     filename: str | None = None
     note_path: str
+    source_files: list[dict[str, object]] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
     comments_count: int = 0

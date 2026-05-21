@@ -272,7 +272,20 @@ def _note_summary_needs_refresh(note: Note) -> bool:
     return bool(title and summary.startswith(f"{title} created:"))
 
 
-def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem:
+def _source_file_list_payload(note: Note, request: Request) -> list[dict[str, object]]:
+    return [
+        {
+            "id": source_file.id,
+            "file_path": str(source_file_path(source_file)),
+            "original_filename": source_file.original_filename,
+            "content_type": source_file.content_type,
+            "url": _file_url(request, source_file_path(source_file)),
+        }
+        for source_file in note.source_files
+    ]
+
+
+def _note_list_response(note: Note, request: Request, *, is_starred: bool = False) -> NoteListItem:
     if _note_summary_needs_refresh(note):
         try:
             note.summary = summarize_markdown_note(note_file_path(note).read_text(encoding="utf-8"))
@@ -291,6 +304,7 @@ def _note_list_response(note: Note, *, is_starred: bool = False) -> NoteListItem
         summary=note.summary,
         filename=note.filename,
         note_path=str(note_file_path(note)),
+        source_files=_source_file_list_payload(note, request),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
@@ -653,6 +667,7 @@ def create_note(
 @router.get("", response_model=list[NoteListItem])
 def list_notes(
     session: SessionDep,
+    request: Request,
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
     folder_id: Annotated[str | None, Query()] = None,
@@ -660,7 +675,12 @@ def list_notes(
 ) -> list[NoteListItem]:
     statement = (
         select(Note)
-        .options(joinedload(Note.comments), joinedload(Note.folder), joinedload(Note.tags))
+        .options(
+            joinedload(Note.comments),
+            joinedload(Note.folder),
+            joinedload(Note.source_files),
+            joinedload(Note.tags),
+        )
         .order_by(Note.created_at.desc())
     )
     if user_id is not None:
@@ -675,7 +695,9 @@ def list_notes(
     notes = list(session.scalars(statement).unique())
     needs_summary_backfill = any(_note_summary_needs_refresh(note) for note in notes)
     starred_ids = _starred_note_ids(session, [note.id for note in notes], user.id)
-    items = [_note_list_response(note, is_starred=note.id in starred_ids) for note in notes]
+    items = [
+        _note_list_response(note, request, is_starred=note.id in starred_ids) for note in notes
+    ]
     if needs_summary_backfill:
         session.commit()
     return items

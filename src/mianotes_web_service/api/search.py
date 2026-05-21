@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,14 +11,20 @@ from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, NoteStar
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
-from mianotes_web_service.services.paths import note_file_path
+from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.search import search_markdown_files
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
 def _notes_by_path(session: Session) -> dict[str, Note]:
-    notes = session.scalars(select(Note).options(joinedload(Note.folder))).all()
+    notes = (
+        session.scalars(
+            select(Note).options(joinedload(Note.folder), joinedload(Note.source_files))
+        )
+        .unique()
+        .all()
+    )
     by_path: dict[str, Note] = {}
     for note in notes:
         note_path = _resolved_note_path(note)
@@ -39,7 +46,30 @@ def _is_starred_by_user(session: Session, note_id: str, user_id: str) -> bool:
     ).first() is not None
 
 
-def _note_list_item(note: Note, *, is_starred: bool) -> NoteListItem:
+def _file_url(request: Request, path: str | Path) -> str:
+    data_dir = get_settings().data_dir.resolve()
+    target = Path(path).resolve()
+    try:
+        public_path = target.relative_to(data_dir)
+    except ValueError:
+        public_path = Path(path)
+    return str(request.url_for("get_folder_file", file_path=str(public_path)))
+
+
+def _source_file_list_payload(note: Note, request: Request) -> list[dict[str, object]]:
+    return [
+        {
+            "id": source_file.id,
+            "file_path": str(source_file_path(source_file)),
+            "original_filename": source_file.original_filename,
+            "content_type": source_file.content_type,
+            "url": _file_url(request, source_file_path(source_file)),
+        }
+        for source_file in note.source_files
+    ]
+
+
+def _note_list_item(note: Note, request: Request, *, is_starred: bool) -> NoteListItem:
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
@@ -53,6 +83,7 @@ def _note_list_item(note: Note, *, is_starred: bool) -> NoteListItem:
         summary=note.summary,
         filename=note.filename,
         note_path=str(note_file_path(note)),
+        source_files=_source_file_list_payload(note, request),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
@@ -63,6 +94,7 @@ def _note_list_item(note: Note, *, is_starred: bool) -> NoteListItem:
 @router.get("", response_model=list[SearchResult])
 def search_notes(
     session: SessionDep,
+    request: Request,
     user: NotesReadUser,
     q: Annotated[str, Query(min_length=1, max_length=500)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -85,6 +117,7 @@ def search_notes(
             SearchResult(
                 note=_note_list_item(
                     note,
+                    request,
                     is_starred=_is_starred_by_user(session, note.id, user.id),
                 ),
                 line_number=match.line_number,

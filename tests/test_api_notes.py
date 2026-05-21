@@ -408,6 +408,14 @@ def test_create_note_from_file_stores_source_and_pending_note(
         f"/uploads/sources/{note['id'][:8]}/original.pdf"
     )
 
+    listed = client.get("/api/notes")
+    assert listed.status_code == 200
+    listed_note = next(item for item in listed.json() if item["id"] == note["id"])
+    assert listed_note["source_files"][0]["original_filename"] == "receipt.pdf"
+    assert listed_note["source_files"][0]["url"].endswith(
+        f"/uploads/sources/{note['id'][:8]}/original.pdf"
+    )
+
     note_path = tmp_path / "data" / "uploads" / f"{note_filename}.md"
     source_path = tmp_path / "data" / "uploads" / "sources" / note["id"][:8] / "original.pdf"
     assert note_path.read_text(encoding="utf-8").startswith("# Receipt")
@@ -536,6 +544,16 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
         f"/links/sources/{note['id'][:8]}/original.html"
     )
     assert not source_path.exists()
+
+    listed = client.get("/api/notes")
+    assert listed.status_code == 200
+    listed_note = next(item for item in listed.json() if item["id"] == note["id"])
+    assert listed_note["source_files"][0]["original_filename"] == (
+        "https://example.com/articles/mianotes"
+    )
+    assert listed_note["source_files"][0]["url"].endswith(
+        f"/links/sources/{note['id'][:8]}/original.html"
+    )
 
 
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
