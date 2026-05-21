@@ -116,3 +116,7 @@ mia_<token>` from agent clients.
 For MCP clients, set `MIANOTES_API_URL` and `MIANOTES_API_TOKEN`, then run
 `python -m mianotes_web_service.mcp_server` or the installed `mianotes-mcp`
 console script.
+
+Remember that the Mianotes service `.env` is local to the web service process.
+External API clients and MCP clients need their own environment variables. For
+regular use, add them to `~/.zshrc` or `~/.bashrc`.

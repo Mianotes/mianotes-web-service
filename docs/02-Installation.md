@@ -73,6 +73,47 @@ MIANOTES_LLM_IMAGE_MODEL=<multimodal-openai-model>
 
 Do not add database or storage variables unless you want to change the default file locations. By default, Mianotes stores SQLite at `data/mia.db` and notes under `data/`.
 
+### Agent and API client variables
+
+The `.env` file above is read by the Mianotes web service. Other processes do
+not automatically inherit it. If you want Codex, Claude, curl, scripts, or MCP
+clients to call the API, also expose the API URL and an API token to the shell
+where those tools run:
+
+```bash
+export MIANOTES_API_URL=http://127.0.0.1:8200
+export MIANOTES_API_TOKEN=mia_your_token
+```
+
+For a permanent setup on macOS or Linux, add those two lines to your shell file:
+
+```bash
+~/.zshrc
+```
+
+or:
+
+```bash
+~/.bashrc
+```
+
+Then reload the shell:
+
+```bash
+source ~/.zshrc
+```
+
+For a one-off command from the web service folder, you can load the local
+`.env` before calling the API:
+
+```bash
+set -a
+. ./.env
+set +a
+curl -H "Authorization: Bearer ${MIANOTES_API_TOKEN}" \
+  "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/search?q=settings"
+```
+
 ## Step 3: Start the server
 
 ```bash

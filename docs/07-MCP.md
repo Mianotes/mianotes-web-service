@@ -22,6 +22,29 @@ MIANOTES_API_TOKEN=mia_your_token \
 mianotes-mcp
 ```
 
+The Mianotes service `.env` file configures the web service only. MCP clients
+run as separate processes, so they also need `MIANOTES_API_URL` and
+`MIANOTES_API_TOKEN` in their own environment.
+
+For a permanent local setup, add the API variables to your shell file:
+
+```bash
+export MIANOTES_API_URL=http://127.0.0.1:8200
+export MIANOTES_API_TOKEN=mia_your_token
+```
+
+On macOS this is usually:
+
+```bash
+~/.zshrc
+```
+
+Then reload the shell:
+
+```bash
+source ~/.zshrc
+```
+
 ## Authentication
 
 MCP clients should use scoped API tokens, not browser cookies. Create tokens

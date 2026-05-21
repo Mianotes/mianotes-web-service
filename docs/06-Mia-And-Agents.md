@@ -47,6 +47,11 @@ Agents should use scoped API tokens and MCP tools, not browser cookies. The
 stdio MCP server is started with `MIANOTES_API_URL` and `MIANOTES_API_TOKEN`,
 then calls the same REST API as any other agent client.
 
+Those variables must be visible to the agent process. The web service `.env`
+file is not automatically loaded by Codex, Claude, shell scripts, or MCP
+clients. For regular agent use, add `MIANOTES_API_URL` and
+`MIANOTES_API_TOKEN` to the shell environment that starts the agent.
+
 ## Design principle
 
 The backend is the brain. The web app explains context and collects input, but the web service decides permissions, ownership, roles, parsing behaviour, share access, and agent capabilities.
