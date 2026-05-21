@@ -34,6 +34,7 @@ The service is designed for small groups: developers, researchers, students, and
 - [Development](docs/09-Development.md)
 - [Testing](docs/10-Testing.md)
 - [Comments](docs/11-Comments.md)
+- [Security](docs/12-Security.md)
 
 ## Technology
 
