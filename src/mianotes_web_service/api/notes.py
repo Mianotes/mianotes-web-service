@@ -90,8 +90,10 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".html",
     ".jpeg",
     ".jpg",
+    ".m4a",
     ".md",
     ".markdown",
+    ".mp3",
     ".odt",
     ".pdf",
     ".png",
@@ -99,6 +101,7 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".tif",
     ".tiff",
     ".txt",
+    ".wav",
 }
 SOURCE_TYPE_BY_EXTENSION = {
     ".csv": "spreadsheet",
@@ -108,8 +111,10 @@ SOURCE_TYPE_BY_EXTENSION = {
     ".html": "html",
     ".jpeg": "image",
     ".jpg": "image",
+    ".m4a": "audio",
     ".md": "markdown",
     ".markdown": "markdown",
+    ".mp3": "audio",
     ".odt": "document",
     ".pdf": "pdf",
     ".png": "image",
@@ -117,6 +122,7 @@ SOURCE_TYPE_BY_EXTENSION = {
     ".tif": "image",
     ".tiff": "image",
     ".txt": "text",
+    ".wav": "audio",
 }
 
 

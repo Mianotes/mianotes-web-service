@@ -420,6 +420,31 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert not source_path.parent.exists()
 
 
+@pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav"])
+def test_create_note_from_file_accepts_audio_files(client: TestClient, filename: str):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": f"{Path(filename).stem}@example.com",
+            "name": "Audio User",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Audio"}).json()
+
+    response = client.post(
+        "/api/notes/from-file",
+        data={"folder_id": folder["id"], "title": "Voice note"},
+        files={"file": (filename, b"audio bytes", "audio/mpeg")},
+    )
+
+    assert response.status_code == 201
+    note = response.json()
+    assert note["source_type"] == "audio"
+    assert note["status"] == "pending_parse"
+
+
 def test_create_note_from_file_requires_title(client: TestClient):
     client.post(
         "/api/auth/join",
