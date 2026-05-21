@@ -80,7 +80,7 @@ def update_folder(
     if not user.is_admin and folder.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot change this folder",
+            detail="Only the folder owner or an admin can change this folder",
         )
     if folder.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
