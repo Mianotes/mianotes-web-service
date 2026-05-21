@@ -226,6 +226,7 @@ class StorageCapacityRead(BaseModel):
     total_bytes: int
     used_bytes: int
     free_bytes: int
+    data_size_bytes: int
     used_percent: float
     cache_seconds: int
     refreshed_at: datetime

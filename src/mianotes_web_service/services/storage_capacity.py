@@ -29,6 +29,16 @@ def _read_disk_usage(data_dir: Path) -> dict[str, int]:
     }
 
 
+def _read_data_dir_size(data_dir: Path) -> int:
+    data_dir.mkdir(parents=True, exist_ok=True)
+    total = 0
+    for path in data_dir.rglob("*"):
+        if not path.is_file() or path.is_symlink():
+            continue
+        total += path.stat().st_size
+    return total
+
+
 def _decode_snapshot(setting: AppSetting) -> dict[str, object] | None:
     try:
         payload = json.loads(setting.value)
@@ -59,6 +69,7 @@ def get_storage_capacity(session: Session, data_dir: Path) -> dict[str, object]:
     snapshot = {
         "data_dir": str(data_dir),
         **usage,
+        "data_size_bytes": _read_data_dir_size(data_dir),
         "used_percent": used_percent,
         "cache_seconds": STORAGE_CAPACITY_TTL_SECONDS,
     }

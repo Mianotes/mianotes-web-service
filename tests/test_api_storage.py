@@ -61,6 +61,7 @@ def test_storage_capacity_is_authenticated_and_cached(client: TestClient):
     assert payload["total_bytes"] > 0
     assert payload["free_bytes"] >= 0
     assert payload["used_bytes"] >= 0
+    assert payload["data_size_bytes"] >= 0
     assert payload["cache_seconds"] == 3600
     assert payload["refreshed_at"]
     assert payload["cache_expires_at"]
