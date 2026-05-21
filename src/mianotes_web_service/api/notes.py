@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
@@ -59,7 +61,11 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
-from mianotes_web_service.services.paths import note_file_path, source_file_path
+from mianotes_web_service.services.paths import (
+    note_file_path,
+    note_image_directory,
+    source_file_path,
+)
 from mianotes_web_service.services.share import (
     generate_share_token,
     get_share_secret,
@@ -102,6 +108,19 @@ SUPPORTED_UPLOAD_EXTENSIONS = {
     ".tiff",
     ".txt",
     ".wav",
+}
+SUPPORTED_EDITOR_IMAGE_EXTENSIONS = {
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".webp",
+}
+EDITOR_IMAGE_EXTENSION_BY_CONTENT_TYPE = {
+    "image/gif": ".gif",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
 }
 SOURCE_TYPE_BY_EXTENSION = {
     ".csv": "spreadsheet",
@@ -664,6 +683,43 @@ def create_note(
     return create_note_from_text(payload, session, request, user)
 
 
+@router.post("/{note_id}/images", status_code=status.HTTP_201_CREATED)
+def upload_note_image(
+    note_id: str,
+    session: SessionDep,
+    request: Request,
+    user: NotesWriteUser,
+    image: Annotated[UploadFile, File()],
+) -> dict[str, str]:
+    note = _read_note_or_404(session, note_id)
+    _ensure_can_change_note(note, user)
+    if not image.filename:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Image required",
+        )
+
+    content_type = (image.content_type or "").split(";", 1)[0].strip().lower()
+    extension = Path(image.filename).suffix.lower()
+    if extension == ".jpeg":
+        extension = ".jpg"
+    if extension not in SUPPORTED_EDITOR_IMAGE_EXTENSIONS:
+        extension = EDITOR_IMAGE_EXTENSION_BY_CONTENT_TYPE.get(content_type, extension)
+    if extension not in SUPPORTED_EDITOR_IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported image type",
+        )
+
+    directory = note_image_directory(note)
+    directory.mkdir(parents=True, exist_ok=True)
+    stem = slugify(Path(image.filename).stem, "image")[:80]
+    target = directory / f"{stem}-{secrets.token_hex(4)}{extension}"
+    with target.open("wb") as output:
+        shutil.copyfileobj(image.file, output)
+    return {"url": _file_url(request, target)}
+
+
 @router.get("", response_model=list[NoteListItem])
 def list_notes(
     session: SessionDep,
@@ -863,10 +919,12 @@ def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None
     source_paths = [source_file_path(source) for source in note.source_files]
     paths.extend(source_paths)
     source_dirs = {path.parent for path in source_paths}
+    image_dir = note_image_directory(note)
     session.delete(note)
     session.commit()
     for path in paths:
         path.unlink(missing_ok=True)
+    shutil.rmtree(image_dir, ignore_errors=True)
     for source_dir in sorted(source_dirs, key=lambda path: len(path.parts), reverse=True):
         try:
             source_dir.rmdir()

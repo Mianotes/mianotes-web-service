@@ -428,6 +428,49 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert not source_path.parent.exists()
 
 
+def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: Path):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "editor-image@example.com",
+            "name": "Editor Image User",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Editor Images"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Diagram note",
+            "text": "This note needs a diagram.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/images",
+        files={"image": ("diagram.png", b"fake image bytes", "image/png")},
+    )
+
+    assert response.status_code == 201
+    image_url = response.json()["url"]
+    assert f"/editor-images/images/{note['id'][:8]}/diagram-" in image_url
+    assert image_url.endswith(".png")
+    image_response = client.get(image_url)
+    assert image_response.status_code == 200
+    assert image_response.content == b"fake image bytes"
+
+    image_directory = tmp_path / "data" / "editor-images" / "images" / note["id"][:8]
+    image_files = list(image_directory.glob("*.png"))
+    assert len(image_files) == 1
+
+    deleted = client.delete(f"/api/notes/{note['id']}")
+    assert deleted.status_code == 204
+    assert not image_files[0].exists()
+    assert not image_files[0].parent.exists()
+
+
 @pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav"])
 def test_create_note_from_file_accepts_audio_files(client: TestClient, filename: str):
     client.post(

@@ -27,5 +27,11 @@ def source_file_path(source_file: SourceFile) -> Path:
     return Path(source_file.file_path)
 
 
+def note_image_directory(note: Note) -> Path:
+    if note.folder is not None:
+        return folder_directory(note.folder) / "images" / note.id[:8]
+    return Path(note.note_path).parent / "images" / note.id[:8]
+
+
 def relative_to_folder(folder: Folder, path: Path) -> str:
     return str(path.relative_to(folder_directory(folder)))
