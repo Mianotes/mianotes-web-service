@@ -31,17 +31,11 @@ For example, if an agent can read a private key, credentials file, or `.env` fil
 
 ## File uploads and parsing
 
-Mianotes uses MarkItDown as part of its file parsing pipeline. MarkItDown runs with the privileges of the Mianotes service process. For that reason, Mianotes should only pass MarkItDown files that are controlled by Mianotes, such as uploaded source files saved under the Mianotes data directory.
+Mianotes uses MarkItDown as part of its file parsing pipeline. Uploaded files are first saved into the Mianotes data directory, then parsed from that controlled location. This keeps parsing inside the Mianotes storage model instead of allowing clients to ask the service to read arbitrary paths from the host machine.
 
-Mianotes should not expose APIs or MCP tools that accept arbitrary local filesystem paths such as:
+Mianotes APIs and MCP tools accept uploaded file bytes, URLs, text, or existing Mianotes source file IDs. They do not provide a general-purpose endpoint for reading local filesystem paths from the server.
 
-```text
-/Users/example/.ssh/id_rsa
-/etc/passwd
-../../secrets.env
-```
-
-API and MCP clients should upload file bytes, submit URLs, submit text, or reference existing Mianotes source files by ID. They should not be able to ask Mianotes to parse arbitrary paths outside the Mianotes data directory.
+This is important because Mianotes is often used with local agents and automation. A trusted agent can upload content that it is allowed to read, but Mianotes does not expand that access by exposing a server-side file browser or arbitrary path parser.
 
 ## URL indexing
 
@@ -60,18 +54,7 @@ Hosted deployments should also consider blocking private network ranges unless t
 
 Admins can configure blocked file paths to reduce the risk of accidental or agent-driven uploads from sensitive locations.
 
-Examples of paths commonly worth blocking:
-
-```text
-~/.ssh
-~/.aws
-~/.config
-~/.kube
-*.pem
-*.key
-.env
-credentials.json
-```
+Common candidates include credentials directories, local configuration folders, private key formats, environment files, and any internal workspace that should never be indexed into shared notes.
 
 Path blocklists are a safety net, not a complete sandbox. A trusted local agent that can read a blocked file may still copy the contents elsewhere and upload them under a different name.
 
