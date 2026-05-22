@@ -267,3 +267,19 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     )
     assert recreated.status_code == 201
     assert recreated.json()["slug"] == "research-notes"
+
+    restored = client.post(f"/api/folders/{folder['id']}/restore", json={})
+    assert restored.status_code == 200
+    restored_folder = restored.json()
+    assert restored_folder["archived_at"] is None
+    assert restored_folder["archived_by_user_id"] is None
+    assert restored_folder["name"] == "Research Notes"
+    assert restored_folder["slug"].startswith("research-notes-")
+    assert restored_folder["path"] == restored_folder["slug"]
+    assert not archived_note_path.exists()
+    restored_note_path = tmp_path / "data" / restored_folder["path"] / "note.md"
+    assert restored_note_path.read_text(encoding="utf-8") == "note"
+
+    restored_visible = client.get("/api/folders", params={"user_id": user["id"]})
+    assert restored_visible.status_code == 200
+    assert folder["id"] in [item["id"] for item in restored_visible.json()]

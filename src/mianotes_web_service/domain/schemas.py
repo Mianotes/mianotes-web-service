@@ -48,6 +48,11 @@ class FolderUpdate(BaseModel):
     is_pinned: bool | None = None
 
 
+class FolderRestore(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    is_pinned: bool | None = None
+
+
 class FolderRead(BaseModel):
     id: str
     user_id: str

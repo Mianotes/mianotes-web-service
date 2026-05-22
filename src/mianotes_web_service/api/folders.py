@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteU
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import FolderCreate, FolderRead, FolderUpdate
+from mianotes_web_service.domain.schemas import FolderCreate, FolderRead, FolderRestore, FolderUpdate
 from mianotes_web_service.services.storage import short_id, slugify
 
 router = APIRouter(prefix="/folders", tags=["folders"])
@@ -24,6 +25,47 @@ def _read_folder_or_404(session: Session, folder_id: str) -> Folder:
     if folder is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
     return folder
+
+
+def _folder_slug_exists(session: Session, slug: str, folder_id: str | None = None) -> bool:
+    statement = select(Folder).where(Folder.slug == slug)
+    if folder_id is not None:
+        statement = statement.where(Folder.id != folder_id)
+    return session.scalars(statement).first() is not None
+
+
+def _unique_folder_slug(session: Session, slug: str, folder_id: str) -> str:
+    if not _folder_slug_exists(session, slug, folder_id):
+        return slug
+
+    base_candidate = f"{slug}-{short_id(folder_id)}"
+    if not _folder_slug_exists(session, base_candidate, folder_id):
+        return base_candidate
+
+    index = 2
+    candidate = f"{base_candidate}-{index}"
+    while _folder_slug_exists(session, candidate, folder_id):
+        index += 1
+        candidate = f"{base_candidate}-{index}"
+    return candidate
+
+
+def _ensure_folder_gitignore(folder_path: Path) -> None:
+    gitignore_path = folder_path / ".gitignore"
+    if not gitignore_path.exists():
+        gitignore_path.write_text("sources/*\n", encoding="utf-8")
+
+
+def _replace_path_prefix(value: str, old_roots: tuple[Path, ...], new_root: Path) -> str:
+    path = Path(value)
+    for old_root in old_roots:
+        try:
+            return str(new_root / path.relative_to(old_root))
+        except ValueError:
+            old_text = str(old_root)
+            if value.startswith(old_text):
+                return str(new_root) + value[len(old_text) :]
+    return value
 
 
 @router.post("", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
@@ -106,6 +148,13 @@ def update_folder(
                 )
             if old_path.exists():
                 old_path.rename(new_path)
+                _ensure_folder_gitignore(new_path)
+                for note in folder.notes:
+                    note.note_path = _replace_path_prefix(note.note_path, (old_path,), new_path)
+                    for source_file in note.source_files:
+                        source_file.file_path = _replace_path_prefix(
+                            source_file.file_path, (old_path,), new_path
+                        )
         folder.name = payload.name
         folder.slug = next_slug
         folder.path = next_slug
@@ -120,6 +169,64 @@ def update_folder(
             status_code=status.HTTP_409_CONFLICT,
             detail="A folder with this name already exists",
         ) from exc
+    session.refresh(folder)
+    return folder
+
+
+@router.post("/{folder_id}/restore", response_model=FolderRead)
+def restore_folder(
+    folder_id: str,
+    session: SessionDep,
+    user: FoldersWriteUser,
+    payload: Annotated[FolderRestore | None, Body()] = None,
+) -> Folder:
+    folder = _read_folder_or_404(session, folder_id)
+    if not user.is_admin and folder.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the folder owner or an admin can restore this folder",
+        )
+    if folder.archived_at is None:
+        return folder
+
+    payload = payload or FolderRestore()
+    restore_name = payload.name or folder.name
+    restore_slug = _unique_folder_slug(session, slugify(restore_name), folder.id)
+    data_dir = get_settings().data_dir
+    archived_path = data_dir / folder.path
+    restored_path = data_dir / restore_slug
+    previous_live_path = data_dir / slugify(folder.name)
+
+    if not archived_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archived folder no longer exists in the filesystem",
+        )
+    if restored_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A folder with this name already exists",
+        )
+
+    restored_path.parent.mkdir(parents=True, exist_ok=True)
+    archived_path.rename(restored_path)
+    _ensure_folder_gitignore(restored_path)
+
+    old_roots = (archived_path, previous_live_path)
+    for note in folder.notes:
+        note.note_path = _replace_path_prefix(note.note_path, old_roots, restored_path)
+        for source_file in note.source_files:
+            source_file.file_path = _replace_path_prefix(source_file.file_path, old_roots, restored_path)
+
+    folder.name = restore_name
+    folder.slug = restore_slug
+    folder.path = restore_slug
+    folder.archived_at = None
+    folder.archived_by_user_id = None
+    if payload.is_pinned is not None:
+        folder.is_pinned = payload.is_pinned
+
+    session.commit()
     session.refresh(folder)
     return folder
 
@@ -145,6 +252,11 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
     if old_path.exists():
         new_path.parent.mkdir(parents=True, exist_ok=True)
         old_path.rename(new_path)
+
+        for note in folder.notes:
+            note.note_path = _replace_path_prefix(note.note_path, (old_path,), new_path)
+            for source_file in note.source_files:
+                source_file.file_path = _replace_path_prefix(source_file.file_path, (old_path,), new_path)
 
     folder.slug = archive_slug
     folder.path = archive_path
