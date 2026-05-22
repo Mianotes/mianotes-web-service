@@ -92,7 +92,12 @@ def test_publish_draft_returns_editable_blocks(client: TestClient):
     draft = response.json()
     assert draft["theme"] == "mianotes"
     assert draft["folder_id"] == folder["id"]
+    assert draft["tag_id"] is None
     assert draft["site_configuration"]["brand"] == "mianotes"
+    assert draft["site_configuration"]["headerLinks"] == [
+        {"title": "GitHub", "url": "https://github.com/Mianotes"},
+        {"title": "Contact", "url": "mailto:mianotes@proton.me"},
+    ]
     assert draft["site_configuration"]["footerHtml"] == "Copyright © Your Name Here."
     assert draft["navigation"] == [
         {
@@ -105,35 +110,7 @@ def test_publish_draft_returns_editable_blocks(client: TestClient):
             ],
         }
     ]
-    assert draft["updated_notes"] == [
-        {
-            "title": "Architecture",
-            "path": f"architecture-{note['id'][:8]}.html",
-        }
-    ]
-
-
-def test_preview_publish_reports_output_path(client: TestClient, tmp_path: Path):
-    _join(client)
-    folder = client.post("/api/folders", json={"name": "Research"}).json()
-    note = _create_note(client, folder["id"], "Servers", "MCP servers expose tools.")
-    payload = {
-        "folder_id": folder["id"],
-        "theme": "minimal",
-        "site_configuration": {"brand": "Mia Docs", "version": "0.1.0"},
-        "navigation": [
-            {"title": "Research", "items": [{"title": note["title"], "path": "x.html"}]}
-        ],
-        "updated_notes": [],
-    }
-
-    response = client.post("/api/publish/preview", json=payload)
-
-    assert response.status_code == 200
-    preview = response.json()
-    assert preview["note_count"] == 1
-    assert preview["theme"] == "minimal"
-    assert preview["output_path"] == str(tmp_path / "data" / "html" / "research")
+    assert draft["updated_notes"] == []
 
 
 def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient, tmp_path: Path):
@@ -152,6 +129,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
         "site_configuration": {
             "brand": "Mia Docs",
             "version": "0.1.1",
+            "headerLinks": [{"title": "GitHub", "url": "https://github.com/Mianotes"}],
             "footerHtml": "Copyright © Test.",
         },
         "navigation": [{"title": "About MCP", "items": [{"title": "Clients", "path": note_path}]}],
@@ -165,25 +143,30 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert published["theme"] == "mianotes"
     assert published["version"] == "0.1.1"
     assert published["folder_id"] == folder["id"]
+    assert published["tag_id"] is None
     assert published["note_count"] == 1
-    assert published["html_path"] == "html/about-mcp"
-    assert published["markdown_path"] == "markdown/about-mcp"
-    assert published["url_path"] == "html/about-mcp/index.html"
-    assert published["site_url"].endswith("/html/about-mcp/index.html")
+    assert published["html_path"] == "html/0.1.1"
+    assert published["markdown_path"] == ""
+    assert published["url_path"] == "html/0.1.1/index.html"
+    assert published["site_url"].endswith("/html/0.1.1/index.html")
 
-    html_root = tmp_path / "data" / "html" / "about-mcp"
-    markdown_root = tmp_path / "data" / "markdown" / "about-mcp"
+    html_root = tmp_path / "data" / "html" / "0.1.1"
     assert (html_root / "index.html").is_file()
     assert (html_root / "assets" / "styles.css").is_file()
     assert (html_root / "assets" / "site.js").is_file()
     assert (html_root / note_path).read_text(encoding="utf-8").find("assets/styles.css") > -1
-    assert (markdown_root / f"clients-{note['id'][:8]}.md").is_file()
+    assert not (tmp_path / "data" / "markdown").exists()
 
     listed_note = client.get(f"/api/notes/{note['id']}").json()
     assert listed_note["is_published"] is True
     assert listed_note["published_at"] is not None
 
-    published_file = client.get("/html/about-mcp/index.html")
+    published_file = client.get("/html/0.1.1/index.html")
     assert published_file.status_code == 200
     assert "Mia Docs" in published_file.text
     assert "Updated notes" in published_file.text
+    assert "https://github.com/Mianotes" in published_file.text
+
+    next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
+    assert next_draft["site_configuration"]["brand"] == "Mia Docs"
+    assert next_draft["navigation"] == payload["navigation"]

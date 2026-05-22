@@ -146,6 +146,24 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                 connection.execute(text("ALTER TABLE comments ADD COLUMN user_id VARCHAR(36)"))
             if "body" not in columns:
                 connection.execute(text("ALTER TABLE comments ADD COLUMN body TEXT"))
+        if "published_sites" in table_names:
+            columns = _sqlite_columns(connection, "published_sites")
+            if "tag_id" not in columns:
+                connection.execute(text("ALTER TABLE published_sites ADD COLUMN tag_id VARCHAR(36)"))
+            if "site_configuration" not in columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE published_sites ADD COLUMN site_configuration "
+                        "TEXT NOT NULL DEFAULT '{}'"
+                    )
+                )
+            if "navigation" not in columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE published_sites ADD COLUMN navigation "
+                        "TEXT NOT NULL DEFAULT '[]'"
+                    )
+                )
         table_names = _sqlite_table_names(connection)
         if "note_stars" in table_names and "notes" in table_names:
             connection.execute(

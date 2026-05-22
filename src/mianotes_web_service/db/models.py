@@ -126,15 +126,19 @@ class PublishedSite(Base, TimestampMixin):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     folder_id: Mapped[str | None] = mapped_column(ForeignKey("folders.id"), index=True)
+    tag_id: Mapped[str | None] = mapped_column(ForeignKey("tags.id"), index=True)
     theme: Mapped[str] = mapped_column(String(80), nullable=False)
     version: Mapped[str] = mapped_column(String(80), nullable=False)
     html_path: Mapped[str] = mapped_column(Text, nullable=False)
     markdown_path: Mapped[str] = mapped_column(Text, nullable=False)
     url_path: Mapped[str] = mapped_column(Text, nullable=False)
+    site_configuration: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    navigation: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     note_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     user: Mapped[User] = relationship()
     folder: Mapped[Folder | None] = relationship()
+    tag: Mapped[Tag | None] = relationship()
 
 
 class SourceFile(Base):

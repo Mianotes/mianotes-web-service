@@ -349,6 +349,7 @@ class PublishThemeRead(BaseModel):
 class PublishDraftRead(BaseModel):
     theme: str
     folder_id: str | None = None
+    tag_id: str | None = None
     site_configuration: dict[str, object]
     navigation: list[dict[str, object]]
     updated_notes: list[dict[str, object]]
@@ -357,17 +358,11 @@ class PublishDraftRead(BaseModel):
 
 class PublishRequest(BaseModel):
     folder_id: str | None = None
+    tag_id: str | None = None
     theme: str = Field(default="mianotes", min_length=1, max_length=80)
     site_configuration: dict[str, object]
     navigation: list[dict[str, object]]
     updated_notes: list[dict[str, object]]
-
-
-class PublishPreviewRead(BaseModel):
-    theme: str
-    folder_id: str | None = None
-    note_count: int
-    output_path: str
 
 
 class PublishRead(BaseModel):
@@ -375,6 +370,7 @@ class PublishRead(BaseModel):
     theme: str
     version: str
     folder_id: str | None = None
+    tag_id: str | None = None
     note_count: int
     html_path: str
     markdown_path: str

@@ -13,12 +13,21 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Folder, Note, PublishedSite, User
+from mianotes_web_service.db.models import Folder, Note, PublishedSite, Tag, User
 from mianotes_web_service.domain.schemas import PublishRequest
 from mianotes_web_service.services.paths import note_file_path
 from mianotes_web_service.services.storage import markdown_note_body, short_id, slugify
 
 THEMES_DIR = Path(__file__).resolve().parents[1] / "publishing" / "themes"
+DEFAULT_SITE_CONFIGURATION: dict[str, object] = {
+    "brand": "mianotes",
+    "version": "0.1.0",
+    "headerLinks": [
+        {"title": "GitHub", "url": "https://github.com/Mianotes"},
+        {"title": "Contact", "url": "mailto:mianotes@proton.me"},
+    ],
+    "footerHtml": "Copyright © Your Name Here.",
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +43,7 @@ class PublishTheme:
 class PublishDraft:
     theme: str
     folder_id: str | None
+    tag_id: str | None
     site_configuration: dict[str, object]
     navigation: list[dict[str, object]]
     updated_notes: list[dict[str, object]]
@@ -73,52 +83,58 @@ def build_publish_draft(
     *,
     theme_id: str = "mianotes",
     folder_id: str | None = None,
+    tag_id: str | None = None,
 ) -> PublishDraft:
     theme = read_publish_theme(theme_id)
     folder = _read_folder(session, folder_id) if folder_id else None
-    notes = _read_publishable_notes(session, folder_id=folder_id)
-    latest_publish = _read_latest_publish(session, theme_id=theme.id, folder_id=folder_id)
+    tag = _read_tag(session, tag_id) if tag_id else None
+    notes = _read_publishable_notes(session, folder_id=folder_id, tag_id=tag_id)
+    latest_publish = _read_latest_publish(session, folder_id=folder_id, tag_id=tag_id)
     since = latest_publish.created_at if latest_publish else None
     include_folder = folder_id is None
-    updated_notes = _updated_notes(notes, since=since, include_folder=include_folder)
+    site_configuration = (
+        _load_json_object(latest_publish.site_configuration, DEFAULT_SITE_CONFIGURATION)
+        if latest_publish
+        else _default_site_configuration(theme)
+    )
+    navigation = (
+        _load_json_list(latest_publish.navigation, [])
+        if latest_publish
+        else _navigation_for_notes(notes, include_folder=include_folder)
+    )
+    updated_notes = [] if since is None else _updated_notes(
+        notes,
+        since=since,
+        include_folder=include_folder,
+    )
     return PublishDraft(
         theme=theme.id,
         folder_id=folder.id if folder else None,
-        site_configuration={
-            "brand": "mianotes",
-            "version": theme.version,
-            "footerHtml": "Copyright © Your Name Here.",
-        },
-        navigation=_navigation_for_notes(notes, include_folder=include_folder),
+        tag_id=tag.id if tag else None,
+        site_configuration=site_configuration,
+        navigation=navigation,
         updated_notes=updated_notes,
         generated_at=datetime.now(UTC),
     )
 
 
-def preview_publish(session: Session, payload: PublishRequest) -> tuple[int, str]:
-    read_publish_theme(payload.theme)
-    _read_folder(session, payload.folder_id) if payload.folder_id else None
-    notes = _read_publishable_notes(session, folder_id=payload.folder_id)
-    output_path = get_settings().data_dir / "html" / _site_slug(session, payload.folder_id)
-    return len(notes), str(output_path)
-
-
 def publish_site(session: Session, user: User, payload: PublishRequest) -> PublishedSite:
     theme = read_publish_theme(payload.theme)
     folder = _read_folder(session, payload.folder_id) if payload.folder_id else None
-    notes = _read_publishable_notes(session, folder_id=payload.folder_id)
-    site_slug = _site_slug(session, payload.folder_id)
+    tag = _read_tag(session, payload.tag_id) if payload.tag_id else None
+    notes = _read_publishable_notes(session, folder_id=payload.folder_id, tag_id=payload.tag_id)
+    version = str(payload.site_configuration.get("version") or theme.version)
+    version_slug = _version_slug(version)
     data_dir = get_settings().data_dir
-    html_dir = data_dir / "html" / site_slug
-    markdown_dir = data_dir / "markdown" / site_slug
+    html_dir = data_dir / "html" / version_slug
+    if html_dir.exists():
+        shutil.rmtree(html_dir)
     html_dir.mkdir(parents=True, exist_ok=True)
-    markdown_dir.mkdir(parents=True, exist_ok=True)
     _copy_theme_assets(theme, html_dir / "assets")
 
     note_pages = _write_note_pages(
         notes,
         html_dir=html_dir,
-        markdown_dir=markdown_dir,
         include_folder=payload.folder_id is None,
     )
     _write_index(
@@ -136,11 +152,14 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     published_site = PublishedSite(
         user_id=user.id,
         folder_id=folder.id if folder else None,
+        tag_id=tag.id if tag else None,
         theme=theme.id,
-        version=str(payload.site_configuration.get("version") or theme.version),
-        html_path=f"html/{site_slug}",
-        markdown_path=f"markdown/{site_slug}",
-        url_path=f"html/{site_slug}/index.html",
+        version=version,
+        html_path=f"html/{version_slug}",
+        markdown_path="",
+        url_path=f"html/{version_slug}/index.html",
+        site_configuration=json.dumps(payload.site_configuration),
+        navigation=json.dumps(payload.navigation),
         note_count=len(notes),
     )
     session.add(published_site)
@@ -156,7 +175,19 @@ def _read_folder(session: Session, folder_id: str | None) -> Folder:
     return folder
 
 
-def _read_publishable_notes(session: Session, *, folder_id: str | None) -> list[Note]:
+def _read_tag(session: Session, tag_id: str | None) -> Tag:
+    tag = session.get(Tag, tag_id)
+    if tag is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+    return tag
+
+
+def _read_publishable_notes(
+    session: Session,
+    *,
+    folder_id: str | None,
+    tag_id: str | None,
+) -> list[Note]:
     statement = (
         select(Note)
         .join(Note.folder)
@@ -166,20 +197,26 @@ def _read_publishable_notes(session: Session, *, folder_id: str | None) -> list[
     )
     if folder_id:
         statement = statement.where(Note.folder_id == folder_id)
+    if tag_id:
+        statement = statement.where(Note.tags.any(Tag.id == tag_id))
     return list(session.scalars(statement).unique())
 
 
 def _read_latest_publish(
     session: Session,
     *,
-    theme_id: str,
     folder_id: str | None,
+    tag_id: str | None,
 ) -> PublishedSite | None:
-    statement = select(PublishedSite).where(PublishedSite.theme == theme_id)
+    statement = select(PublishedSite)
     if folder_id:
         statement = statement.where(PublishedSite.folder_id == folder_id)
     else:
         statement = statement.where(PublishedSite.folder_id.is_(None))
+    if tag_id:
+        statement = statement.where(PublishedSite.tag_id == tag_id)
+    else:
+        statement = statement.where(PublishedSite.tag_id.is_(None))
     return session.scalars(statement.order_by(PublishedSite.created_at.desc())).first()
 
 
@@ -253,7 +290,6 @@ def _write_note_pages(
     notes: list[Note],
     *,
     html_dir: Path,
-    markdown_dir: Path,
     include_folder: bool,
 ) -> list[dict[str, object]]:
     note_pages: list[dict[str, object]] = []
@@ -269,12 +305,9 @@ def _write_note_pages(
             )
         body = markdown_note_body(source_path.read_text(encoding="utf-8"))
         relative_path = Path(_published_note_path(note, include_folder=include_folder))
-        markdown_path = markdown_dir / relative_path.with_suffix(".md")
         page_path = html_dir / relative_path
         nested_page = len(relative_path.parts) > 1
-        markdown_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.parent.mkdir(parents=True, exist_ok=True)
-        markdown_path.write_text(body, encoding="utf-8")
         page_path.write_text(
             _render_page(
                 title=note.title,
@@ -304,6 +337,7 @@ def _write_index(
 ) -> None:
     brand = html.escape(str(config.get("brand") or "mianotes"))
     footer_html = str(config.get("footerHtml") or "")
+    header_links = _render_header_links(config.get("headerLinks"))
     nav_html = _render_navigation(navigation)
     updated_html = _render_updated_notes(updated_notes)
     first_note = note_pages[0] if note_pages else None
@@ -324,6 +358,7 @@ def _write_index(
                 '<div class="site">'
                 f'<aside class="sidebar"><h1 class="brand">{brand}</h1>{nav_html}</aside>'
                 '<main class="content">'
+                f"{header_links}"
                 f"{updated_html}"
                 f'<article class="article"><h1>{brand}</h1>{intro}</article>'
                 f"<footer>{footer_html}</footer>"
@@ -389,6 +424,21 @@ def _render_navigation(navigation: list[dict[str, object]]) -> str:
                 links.append(f'<a href="{path}">{item_title}</a>')
         groups.append(f'<section class="nav-group"><h2>{title}</h2>{"".join(links)}</section>')
     return "".join(groups)
+
+
+def _render_header_links(header_links: object) -> str:
+    if not isinstance(header_links, list):
+        return ""
+    links: list[str] = []
+    for item in header_links:
+        if not isinstance(item, dict):
+            continue
+        title = html.escape(str(item.get("title") or "Link"))
+        url = html.escape(str(item.get("url") or "#"))
+        links.append(f'<a href="{url}">{title}</a>')
+    if not links:
+        return ""
+    return f'<nav class="top-links">{"".join(links)}</nav>'
 
 
 def _render_updated_notes(updated_notes: list[dict[str, object]]) -> str:
@@ -474,3 +524,34 @@ def _inline_markdown(text: str) -> str:
     escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
     escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', escaped)
     return escaped
+
+
+def _default_site_configuration(theme: PublishTheme) -> dict[str, object]:
+    configuration = json.loads(json.dumps(DEFAULT_SITE_CONFIGURATION))
+    configuration["version"] = theme.version
+    return configuration
+
+
+def _load_json_object(value: str, fallback: dict[str, object]) -> dict[str, object]:
+    try:
+        loaded = json.loads(value)
+    except json.JSONDecodeError:
+        return json.loads(json.dumps(fallback))
+    if not isinstance(loaded, dict):
+        return json.loads(json.dumps(fallback))
+    return loaded
+
+
+def _load_json_list(value: str, fallback: list[dict[str, object]]) -> list[dict[str, object]]:
+    try:
+        loaded = json.loads(value)
+    except json.JSONDecodeError:
+        return json.loads(json.dumps(fallback))
+    if not isinstance(loaded, list):
+        return json.loads(json.dumps(fallback))
+    return [item for item in loaded if isinstance(item, dict)]
+
+
+def _version_slug(version: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", version.strip()).strip(".-_")
+    return slug or "site"

@@ -5,7 +5,6 @@ from fastapi import APIRouter, Request, status
 from mianotes_web_service.api.dependencies import NotesReadUser, NotesWriteUser, SessionDep
 from mianotes_web_service.domain.schemas import (
     PublishDraftRead,
-    PublishPreviewRead,
     PublishRead,
     PublishRequest,
     PublishThemeRead,
@@ -13,7 +12,6 @@ from mianotes_web_service.domain.schemas import (
 from mianotes_web_service.services.publishing import (
     build_publish_draft,
     list_publish_themes,
-    preview_publish,
     publish_site,
 )
 
@@ -40,32 +38,18 @@ def read_publish_draft(
     user: NotesReadUser,
     theme: str = "mianotes",
     folder_id: str | None = None,
+    tag_id: str | None = None,
 ) -> PublishDraftRead:
     _ = user
-    draft = build_publish_draft(session, theme_id=theme, folder_id=folder_id)
+    draft = build_publish_draft(session, theme_id=theme, folder_id=folder_id, tag_id=tag_id)
     return PublishDraftRead(
         theme=draft.theme,
         folder_id=draft.folder_id,
+        tag_id=draft.tag_id,
         site_configuration=draft.site_configuration,
         navigation=draft.navigation,
         updated_notes=draft.updated_notes,
         generated_at=draft.generated_at,
-    )
-
-
-@router.post("/preview", response_model=PublishPreviewRead)
-def preview_publish_site(
-    payload: PublishRequest,
-    session: SessionDep,
-    user: NotesReadUser,
-) -> PublishPreviewRead:
-    _ = user
-    note_count, output_path = preview_publish(session, payload)
-    return PublishPreviewRead(
-        theme=payload.theme,
-        folder_id=payload.folder_id,
-        note_count=note_count,
-        output_path=output_path,
     )
 
 
@@ -83,6 +67,7 @@ def publish_site_endpoint(
         theme=published_site.theme,
         version=published_site.version,
         folder_id=published_site.folder_id,
+        tag_id=published_site.tag_id,
         note_count=published_site.note_count,
         html_path=published_site.html_path,
         markdown_path=published_site.markdown_path,
