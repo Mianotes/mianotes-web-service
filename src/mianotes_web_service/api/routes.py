@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from .auth import router as auth_router
+from .context import router as context_router
 from .files import router as files_router
 from .folders import router as folders_router
 from .jobs import router as jobs_router
@@ -25,4 +26,5 @@ api_router.include_router(tokens_router, prefix="/api")
 api_router.include_router(jobs_router, prefix="/api")
 api_router.include_router(notes_router, prefix="/api")
 api_router.include_router(search_router, prefix="/api")
+api_router.include_router(context_router, prefix="/api")
 api_router.include_router(files_router)

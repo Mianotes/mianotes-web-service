@@ -54,6 +54,11 @@ def _join_admin(client: TestClient) -> None:
     assert response.status_code == 201
 
 
+def _folder_by_name(client: TestClient, name: str) -> dict:
+    folders = client.get("/api/folders").json()
+    return next(folder for folder in folders if folder["name"] == name)
+
+
 def test_search_notes_from_markdown_and_api_token(client: TestClient):
     _join_admin(client)
     folder = client.post("/api/folders", json={"name": "Research"}).json()
@@ -85,6 +90,73 @@ def test_search_notes_from_markdown_and_api_token(client: TestClient):
     )
     assert token_search.status_code == 200
     assert token_search.json()[0]["note"]["id"] == note["id"]
+
+
+def test_context_returns_full_note_text_from_folder_and_title(client: TestClient):
+    _join_admin(client)
+    mianotes = _folder_by_name(client, "Mianotes")
+    other = client.post("/api/folders", json={"name": "Work"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": mianotes["id"],
+            "title": "Settings Page",
+            "text": "Settings page context for profile, model, and local folder controls.",
+        },
+    ).json()
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": other["id"],
+            "title": "Settings Page",
+            "text": "This note should not be returned because it belongs to Work.",
+        },
+    )
+
+    response = client.get(
+        "/api/context",
+        params={"folder": "Mianotes", "title": "Settings Page", "limit": 5},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["folder"] == "Mianotes"
+    assert payload["title"] == "Settings Page"
+    assert payload["total"] == 1
+    assert payload["results"][0]["note"]["id"] == note["id"]
+    assert payload["results"][0]["matched_by"] == "title"
+    assert "Settings page context" in payload["results"][0]["text"]
+
+
+def test_context_works_with_api_token_and_search_fallback(client: TestClient):
+    _join_admin(client)
+    folder = _folder_by_name(client, "Mianotes")
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Profile screen",
+            "text": "The settings page should include profile controls and model preferences.",
+        },
+    ).json()
+    token = client.post(
+        "/api/tokens",
+        json={"name": "Context agent", "scopes": ["notes:read"]},
+    ).json()["token"]
+    agent_client = TestClient(client.app)
+
+    response = agent_client.get(
+        "/api/context",
+        params={"folder": "Mianotes", "title": "settings page", "limit": 5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 1
+    assert payload["results"][0]["note"]["id"] == note["id"]
+    assert payload["results"][0]["matched_by"] == "search"
+    assert "profile controls" in payload["results"][0]["text"]
 
 
 def test_search_service_ignores_non_markdown_files(tmp_path: Path):

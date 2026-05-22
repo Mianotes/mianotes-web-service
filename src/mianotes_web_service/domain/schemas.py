@@ -198,6 +198,22 @@ class SearchResult(BaseModel):
     excerpt: str
 
 
+class ContextResult(BaseModel):
+    note: NoteListItem
+    text: str
+    matched_by: Literal["title", "search"]
+    line_number: int | None = None
+    excerpt: str | None = None
+
+
+class ContextResponse(BaseModel):
+    folder: str
+    title: str
+    limit: int
+    total: int
+    results: list[ContextResult]
+
+
 class EmailCheck(BaseModel):
     email: EmailStr
 

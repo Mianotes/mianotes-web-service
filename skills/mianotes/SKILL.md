@@ -91,6 +91,36 @@ REST fallback:
 
 Do not invent search results or imply Mia knows something that was not returned.
 
+## Context Shorthand
+
+When the user writes `Mia(Folder > Title)`, treat it as an explicit request to retrieve context from that folder and note title before continuing.
+
+Examples:
+
+- "Here's some context: Mia(Mianotes > Settings Page)"
+- "Read the docs here Mia(Mianotes > Settings Page)"
+- "Use this before answering Mia(Work > Deployment Notes)"
+- "Add this to the plan Mia(Mianotes > Settings Page)"
+
+Expected behavior:
+
+1. Parse the folder name before `>` and the title after `>`.
+2. Query Mia for matching context.
+3. Use the returned note text as context for the user's request.
+4. Do not claim context exists unless Mia returns it.
+
+REST fallback:
+
+`GET /api/context?folder=<folder>&title=<title>&limit=<n>`
+
+Example:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer ${MIANOTES_API_TOKEN}" \
+  "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/context?folder=Mianotes&title=Settings%20Page&limit=5"
+```
+
 ## Saving Notes
 
 When the user asks to save content:

@@ -2124,6 +2124,98 @@ GET /api/search?q=product%20launch&limit=10
 | `422` | Missing or invalid query parameters. |
 | `503` | `ripgrep` is not installed or search failed. |
 
+## Get context
+
+Retrieves full Markdown context from notes in a specific folder. This endpoint
+is designed for agents using shorthand such as `Mia(Mianotes > Settings Page)`.
+
+The service first looks for matching note titles in the requested folder. If no
+title match is found, it searches Markdown files in that folder and returns the
+matching notes.
+
+### Endpoint
+
+`GET /api/context`
+
+### Authentication
+
+Session cookie or bearer token with `notes:read` or `admin`.
+
+### Query parameters
+
+| Parameter | Type | Required | Description |
+|---|---|---:|---|
+| `folder` | string | Yes | Folder name or slug, for example `Mianotes` or `mianotes`. |
+| `title` | string | Yes | Note title or context phrase to retrieve, for example `Settings Page`. |
+| `limit` | number | No | Maximum number of notes to return. Defaults to `5`. Maximum is `20`. |
+
+### Request
+
+```text
+GET /api/context?folder=Mianotes&title=Settings%20Page&limit=5
+```
+
+### Response
+
+```json
+{
+  "folder": "Mianotes",
+  "title": "Settings Page",
+  "limit": 5,
+  "total": 1,
+  "results": [
+    {
+      "note": {
+        "id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
+        "user_id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
+        "folder_id": "f054964b-419b-419a-87df-de668025b0e3",
+        "title": "Settings Page",
+        "status": "ready",
+        "source_type": "text",
+        "revision_number": 1,
+        "is_published": false,
+        "is_starred": false,
+        "summary": "Settings page requirements for profile, model, and local folder controls.",
+        "filename": "settings-page-4a95f146.md",
+        "note_path": "/home/arduino/mianotes-web-service/data/mianotes/settings-page-4a95f146.md",
+        "source_files": [],
+        "created_at": "2026-05-15T10:35:00Z",
+        "updated_at": "2026-05-15T10:35:00Z",
+        "comments_count": 0,
+        "tags": []
+      },
+      "text": "# Settings Page\n\nSettings page requirements...",
+      "matched_by": "title",
+      "line_number": null,
+      "excerpt": null
+    }
+  ]
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|---|---|---|
+| `folder` | string | Folder requested by the client. |
+| `title` | string | Title or context phrase requested by the client. |
+| `limit` | number | Maximum number of notes requested. |
+| `total` | number | Number of context results returned. |
+| `results` | array | Matching context notes. |
+| `results[].note` | object | Matching note metadata. |
+| `results[].text` | string | Full Markdown text from the note file. |
+| `results[].matched_by` | string | Match type. Either `title` or `search`. |
+| `results[].line_number` | number or null | 1-based line number when matched by search. |
+| `results[].excerpt` | string or null | Matching line text when matched by search. |
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Token lacks `notes:read`. |
+| `422` | Missing or invalid query parameters. |
+
 ## List jobs
 
 Lists Mia jobs visible to the current user. Admins can see all jobs. Normal
