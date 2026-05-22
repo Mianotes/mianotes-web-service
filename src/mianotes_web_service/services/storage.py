@@ -93,7 +93,7 @@ class FilesystemStorage:
             folder=folder,
             filename=filename or title,
             title=title if filename is not None else None,
-            source_extension=".txt",
+            source_extension=".txt" if text.strip() else None,
         )
         self.prepare_folder_directory(paths.directory)
         paths.note_path.write_text(render_markdown_note(title=title, text=text), encoding="utf-8")

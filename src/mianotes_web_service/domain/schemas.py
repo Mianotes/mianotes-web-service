@@ -71,7 +71,7 @@ class FolderRead(BaseModel):
 class NoteCreateFromText(BaseModel):
     user_id: str | None = None
     folder_id: str
-    text: str = Field(min_length=1)
+    text: str = ""
     title: str | None = Field(default=None, max_length=300)
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 

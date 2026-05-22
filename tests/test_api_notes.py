@@ -127,6 +127,47 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/mia.db").status_code == 404
 
 
+def test_create_empty_text_note_does_not_create_source_file(
+    client: TestClient, tmp_path: Path
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "draft@example.com",
+            "name": "Draft User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Drafts"}).json()
+
+    response = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Draft Note",
+            "text": "",
+        },
+    )
+
+    assert response.status_code == 201
+    note = response.json()
+    note_filename = f"draft-note-{note['id'][:8]}"
+    note_path = tmp_path / "data" / "drafts" / f"{note_filename}.md"
+    source_dir = tmp_path / "data" / "drafts" / "sources" / note["id"][:8]
+
+    assert note["source_type"] == "text"
+    assert note["source_files"] == []
+    assert note_path.exists()
+    assert note_path.read_text(encoding="utf-8").startswith("# Draft Note")
+    assert not source_dir.exists()
+
+    listed = client.get("/api/notes", params={"folder_id": folder["id"]})
+    assert listed.status_code == 200
+    assert listed.json()[0]["id"] == note["id"]
+    assert listed.json()[0]["source_files"] == []
+
+
 def test_get_note_returns_clear_error_when_markdown_file_is_missing(
     client: TestClient, tmp_path: Path
 ):

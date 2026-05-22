@@ -66,3 +66,19 @@ def test_write_text_note_creates_folder_gitignore_and_source_folder(tmp_path: Pa
         tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.txt"
     )
     assert paths.source_path.read_text(encoding="utf-8") == "Shared folder note."
+
+
+def test_write_empty_text_note_does_not_create_source_file(tmp_path: Path):
+    storage = FilesystemStorage(tmp_path)
+
+    paths = storage.write_text_note(
+        username="abc123",
+        folder="Meeting Notes",
+        title="Draft Note",
+        text="   ",
+        filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
+    )
+
+    assert paths.note_path == tmp_path / "meeting-notes" / "draft-note-4a95f146.md"
+    assert paths.source_path is None
+    assert not (tmp_path / "meeting-notes" / "sources" / "4a95f146").exists()
