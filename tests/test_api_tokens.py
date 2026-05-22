@@ -9,8 +9,12 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base
+from mianotes_web_service.db.models import AppSetting, Base
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services.auth import (
+    INSTANCE_API_TOKEN_PUBLIC_KEY,
+    hash_api_token,
+)
 
 
 @pytest.fixture
@@ -52,6 +56,59 @@ def _join_admin(client: TestClient) -> dict[str, object]:
     )
     assert response.status_code == 201
     return response.json()["user"]
+
+
+def _read_app_setting(client: TestClient, key: str) -> str | None:
+    session_gen = client.app.dependency_overrides[get_session]()
+    session = next(session_gen)
+    try:
+        setting = session.get(AppSetting, key)
+        return setting.value if setting is not None else None
+    finally:
+        session_gen.close()
+
+
+def test_service_api_token_authenticates_as_database_admin(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    _join_admin(client)
+    raw_token = "service-private-token"
+    monkeypatch.setenv("MIANOTES_API_TOKEN", raw_token)
+    get_settings.cache_clear()
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
+    stored_public_key = _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY)
+    assert stored_public_key == hash_api_token(raw_token)
+    assert stored_public_key != raw_token
+
+
+def test_service_api_token_requires_initialized_database(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    raw_token = "service-private-token"
+    monkeypatch.setenv("MIANOTES_API_TOKEN", raw_token)
+    get_settings.cache_clear()
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 403
+    assert "no admin user yet" in response.json()["detail"]
+    assert _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY) == hash_api_token(raw_token)
+
+
+def test_service_api_token_rejects_wrong_bearer_token(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    _join_admin(client)
+    monkeypatch.setenv("MIANOTES_API_TOKEN", "service-private-token")
+    get_settings.cache_clear()
+
+    response = client.get("/api/users", headers={"Authorization": "Bearer wrong-token"})
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid API token"
 
 
 def test_api_token_auth_scope_and_revocation(client: TestClient):

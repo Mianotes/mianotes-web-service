@@ -6,52 +6,39 @@ permission checks still apply.
 
 ## Running the MCP server
 
-Set the API URL and an agent token, then start the server:
+Load the service `.env`, set the API URL if needed, then start the server:
 
 ```bash
-MIANOTES_API_URL=http://127.0.0.1:8200 \
-MIANOTES_API_TOKEN=mia_your_token \
+set -a
+. ./.env
+set +a
+MIANOTES_API_URL=${MIANOTES_API_URL:-http://127.0.0.1:8200} \
 python -m mianotes_web_service.mcp_server
 ```
 
 Fresh package installs also expose the `mianotes-mcp` console script:
 
 ```bash
-MIANOTES_API_URL=http://127.0.0.1:8200 \
-MIANOTES_API_TOKEN=mia_your_token \
+set -a
+. ./.env
+set +a
+MIANOTES_API_URL=${MIANOTES_API_URL:-http://127.0.0.1:8200} \
 mianotes-mcp
 ```
 
-The Mianotes service `.env` file configures the web service only. MCP clients
-run as separate processes, so they also need `MIANOTES_API_URL` and
-`MIANOTES_API_TOKEN` in their own environment.
-
-For a permanent local setup, add the API variables to your shell file:
-
-```bash
-export MIANOTES_API_URL=http://127.0.0.1:8200
-export MIANOTES_API_TOKEN=mia_your_token
-```
-
-On macOS this is usually:
-
-```bash
-~/.zshrc
-```
-
-Then reload the shell:
-
-```bash
-source ~/.zshrc
-```
+The MCP process needs `MIANOTES_API_TOKEN` in its environment. The simplest way
+is to source the same `.env` file used by the web service. Do not copy the token
+into extra files unless you have to.
 
 ## Authentication
 
-MCP clients should use scoped API tokens, not browser cookies. Create tokens
-through the REST API or web app, then pass the raw token as `MIANOTES_API_TOKEN`.
+By default, MCP clients use the service-wide `MIANOTES_API_TOKEN`. The raw token
+stays in `.env`; each `mia.db` stores only a derived public hash. The token acts
+as the first admin user in the selected database, after that database has been
+set up.
 
-The token should include only the scopes the agent needs. Use `admin` only for
-trusted local automation.
+Scoped per-user API tokens are still available for narrower automations. Use
+scoped tokens when an agent should only read notes or work in a limited role.
 
 ## Tools
 

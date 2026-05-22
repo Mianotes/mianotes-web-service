@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
 
 MASTER_PASSWORD_KEY = "master_password_hash"
+INSTANCE_API_TOKEN_PUBLIC_KEY = "instance_api_token_public_key"
 SESSION_COOKIE_NAME = "mianotes_session"
 SESSION_DAYS = 90
 API_TOKEN_PREFIX = "mia"
@@ -131,6 +132,30 @@ def generate_api_token() -> str:
 
 def hash_api_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def sync_instance_api_token_public_key(session: Session, raw_token: str) -> str:
+    """Store the public hash for the service-wide API token in this database."""
+
+    token_hash = hash_api_token(raw_token)
+    setting = session.get(AppSetting, INSTANCE_API_TOKEN_PUBLIC_KEY)
+    if setting is None:
+        session.add(AppSetting(key=INSTANCE_API_TOKEN_PUBLIC_KEY, value=token_hash))
+        session.commit()
+        return token_hash
+    if setting.value != token_hash:
+        setting.value = token_hash
+        session.commit()
+    return token_hash
+
+
+def verify_instance_api_token(session: Session, raw_token: str | None) -> bool:
+    if not raw_token:
+        return False
+    setting = session.get(AppSetting, INSTANCE_API_TOKEN_PUBLIC_KEY)
+    if setting is None:
+        return False
+    return hmac.compare_digest(hash_api_token(raw_token), setting.value)
 
 
 def create_api_token(

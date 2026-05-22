@@ -75,36 +75,15 @@ Do not add database or storage variables unless you want to change the default f
 
 ### Agent and API client variables
 
-The `.env` file above is read by the Mianotes web service. Other processes do
-not automatically inherit it. If you want Codex, Claude, curl, scripts, or MCP
-clients to call the API, also expose the API URL and an API token to the shell
-where those tools run:
+Add one private API token to the web service `.env`. This token belongs to the
+running Mianotes service, not to a single database. Mianotes stores only a
+derived public hash in each `mia.db` it opens.
 
-```bash
-export MIANOTES_API_URL=http://127.0.0.1:8200
-export MIANOTES_API_TOKEN=mia_your_token
+```env
+MIANOTES_API_TOKEN=<create-a-long-random-secret>
 ```
 
-For a permanent setup on macOS or Linux, add those two lines to your shell file:
-
-```bash
-~/.zshrc
-```
-
-or:
-
-```bash
-~/.bashrc
-```
-
-Then reload the shell:
-
-```bash
-source ~/.zshrc
-```
-
-For a one-off command from the web service folder, you can load the local
-`.env` before calling the API:
+Agents, scripts, and MCP clients send that same value as a bearer token:
 
 ```bash
 set -a
@@ -113,6 +92,10 @@ set +a
 curl -H "Authorization: Bearer ${MIANOTES_API_TOKEN}" \
   "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/search?q=settings"
 ```
+
+You can still create scoped per-user API tokens later when you want narrower
+credentials for a specific automation, but `MIANOTES_API_TOKEN` is the default
+service-wide token for local agents.
 
 ## Step 3: Start the server
 

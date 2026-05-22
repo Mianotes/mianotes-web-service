@@ -1,15 +1,21 @@
 # Security
 
-Mianotes supports two ways to access protected APIs:
+Mianotes supports three ways to access protected APIs:
 
 - Browser users sign in through the dashboard and use a cookie-based session created by the login flow.
-- Agents and API clients use a per-user API token sent as a bearer token:
+- Local agents can use the service-wide `MIANOTES_API_TOKEN` from `.env`, sent as a bearer token.
+- Narrower automations can use scoped per-user API tokens created through the API or dashboard.
 
 ```http
-Authorization: Bearer mia_...
+Authorization: Bearer <token>
 ```
 
-Protected APIs, including file uploads, require either a valid browser session or a valid API token with the required scope. This authenticates the caller, but it does not sandbox the caller.
+The service-wide token is private. Mianotes stores only a derived public hash in
+each `mia.db`, so the same running service can switch databases without storing
+the raw token in any database. Protected APIs, including file uploads, require a
+valid browser session, the service-wide token, or a scoped API token with the
+required scope. This authenticates the caller, but it does not sandbox the
+caller.
 
 ## Agent access
 
@@ -24,7 +30,7 @@ For example, if an agent can read a private key, credentials file, or `.env` fil
 - Do not give untrusted agents filesystem access to sensitive files.
 - Run agents with the least filesystem access they need.
 - Give agents project-specific working directories instead of access to a whole home directory.
-- Use scoped API tokens for agents instead of sharing browser sessions.
+- Use `MIANOTES_API_TOKEN` for trusted local agents, or scoped per-user API tokens when an automation needs narrower access.
 - Revoke an agent token when the agent no longer needs access.
 - Avoid giving hosted or third-party agents direct access to local folders unless you trust the agent and its operator.
 - Review activity logs after allowing a new agent or automation to use Mianotes.
@@ -91,7 +97,7 @@ Recommended deployment practices:
 Mianotes can:
 
 - Require authentication for protected APIs.
-- Require scoped API tokens for agents.
+- Require bearer API tokens for agents.
 - Store source metadata for auditability.
 - Restrict parsing to Mianotes-controlled files.
 - Block configured file paths and domains.

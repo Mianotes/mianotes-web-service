@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     port: int = 8200
     data_dir: Path = Field(default=Path("data"))
     database_url: str | None = None
+    api_token: str | None = None
     storage_config_path: Path = Field(default=Path("storage.json"))
     llm_provider: str = "openai"
     llm_model: str | None = None

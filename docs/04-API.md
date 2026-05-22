@@ -3,15 +3,18 @@
 This document describes the current Mianotes web service API.
 
 All endpoints return JSON unless the endpoint explicitly returns a stored file.
-Protected endpoints accept either the browser session cookie created by the auth
-flow or an agent API token sent as a bearer token.
+Protected endpoints accept the browser session cookie created by the auth
+flow, the service-wide API token configured with `MIANOTES_API_TOKEN`, or a
+scoped per-user API token sent as a bearer token.
 
 ```text
 Authorization: Bearer mia_<token>
 ```
 
 Browser sessions represent an interactive user and bypass token scope
-checks. Bearer tokens must include the required scope, or the `admin` scope.
+checks. The service-wide bearer token acts as the first admin user in the
+current database. Scoped bearer tokens must include the required scope, or the
+`admin` scope.
 
 ## Base URL
 
