@@ -211,7 +211,7 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert folder["slug"] == "product-research"
     assert folder["path"] == "product-research"
     assert folder["is_pinned"] is True
-    folder_dir = tmp_path / "data" / "product-research"
+    folder_dir = tmp_path / "data" / "markdown" / "product-research"
     folder_dir.mkdir(parents=True)
     (folder_dir / "note.md").write_text("note", encoding="utf-8")
 
@@ -240,7 +240,7 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert updated.json()["path"] == "research-notes"
     assert updated.json()["is_pinned"] is False
     assert not folder_dir.exists()
-    assert (tmp_path / "data" / "research-notes" / "note.md").read_text(
+    assert (tmp_path / "data" / "markdown" / "research-notes" / "note.md").read_text(
         encoding="utf-8"
     ) == "note"
 
@@ -253,8 +253,8 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert archived_folder["archived_at"] is not None
     assert archived_folder["slug"].startswith("research-notes-")
     assert archived_folder["path"].startswith(".archived/research-notes-")
-    assert not (tmp_path / "data" / "research-notes").exists()
-    archived_note_path = tmp_path / "data" / archived_folder["path"] / "note.md"
+    assert not (tmp_path / "data" / "markdown" / "research-notes").exists()
+    archived_note_path = tmp_path / "data" / "markdown" / archived_folder["path"] / "note.md"
     assert archived_note_path.read_text(encoding="utf-8") == "note"
 
     visible = client.get("/api/folders", params={"user_id": user["id"]})
@@ -277,7 +277,7 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert restored_folder["slug"].startswith("research-notes-")
     assert restored_folder["path"] == restored_folder["slug"]
     assert not archived_note_path.exists()
-    restored_note_path = tmp_path / "data" / restored_folder["path"] / "note.md"
+    restored_note_path = tmp_path / "data" / "markdown" / restored_folder["path"] / "note.md"
     assert restored_note_path.read_text(encoding="utf-8") == "note"
 
     restored_visible = client.get("/api/folders", params={"user_id": user["id"]})

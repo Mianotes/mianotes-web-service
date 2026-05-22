@@ -18,6 +18,8 @@ from mianotes_web_service.domain.schemas import PublishRequest
 from mianotes_web_service.services.paths import note_file_path
 from mianotes_web_service.services.storage import markdown_note_body, short_id, slugify
 
+PUBLISHABLE_NOTE_STATUSES = ("ready", "published")
+
 THEMES_DIR = Path(__file__).resolve().parents[1] / "publishing" / "themes"
 DEFAULT_SITE_CONFIGURATION: dict[str, object] = {
     "brand": "mianotes",
@@ -191,7 +193,7 @@ def _read_publishable_notes(
     statement = (
         select(Note)
         .join(Note.folder)
-        .where(Note.status == "ready", Folder.archived_at.is_(None))
+        .where(Note.status.in_(PUBLISHABLE_NOTE_STATUSES), Folder.archived_at.is_(None))
         .options(joinedload(Note.folder), joinedload(Note.user), joinedload(Note.tags))
         .order_by(Folder.name.asc(), Note.title.asc())
     )

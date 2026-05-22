@@ -11,7 +11,7 @@ from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, NoteStar
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
-from mianotes_web_service.services.paths import note_file_path, source_file_path
+from mianotes_web_service.services.paths import markdown_root, note_file_path, source_file_path
 from mianotes_web_service.services.search import search_markdown_files
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -100,7 +100,7 @@ def search_notes(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[SearchResult]:
     try:
-        matches = search_markdown_files(get_settings().data_dir, q, limit=limit)
+        matches = search_markdown_files(markdown_root(), q, limit=limit)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

@@ -8,10 +8,9 @@ from sqlalchemy.orm import joinedload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.api.search import _is_starred_by_user, _note_list_item
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note
 from mianotes_web_service.domain.schemas import ContextResponse, ContextResult
-from mianotes_web_service.services.paths import note_file_path
+from mianotes_web_service.services.paths import markdown_root, note_file_path
 from mianotes_web_service.services.search import search_markdown_files
 from mianotes_web_service.services.storage import slugify
 
@@ -96,7 +95,7 @@ def get_context(
     if len(results) < limit:
         notes_by_path = {str(note_file_path(note).resolve()): note for note in notes}
         try:
-            matches = search_markdown_files(get_settings().data_dir, title, limit=limit * 10)
+            matches = search_markdown_files(markdown_root(), title, limit=limit * 10)
         except RuntimeError:
             matches = []
         for match in matches:

@@ -4,10 +4,15 @@ from pathlib import Path
 
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile
+from mianotes_web_service.services.storage import MARKDOWN_DIRNAME
+
+
+def markdown_root() -> Path:
+    return get_settings().data_dir / MARKDOWN_DIRNAME
 
 
 def folder_directory(folder: Folder) -> Path:
-    return get_settings().data_dir / folder.path
+    return markdown_root() / folder.path
 
 
 def note_file_path(note: Note) -> Path:

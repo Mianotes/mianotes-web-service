@@ -149,7 +149,9 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
         if "published_sites" in table_names:
             columns = _sqlite_columns(connection, "published_sites")
             if "tag_id" not in columns:
-                connection.execute(text("ALTER TABLE published_sites ADD COLUMN tag_id VARCHAR(36)"))
+                connection.execute(
+                    text("ALTER TABLE published_sites ADD COLUMN tag_id VARCHAR(36)")
+                )
             if "site_configuration" not in columns:
                 connection.execute(
                     text(

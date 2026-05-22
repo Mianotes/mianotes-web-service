@@ -40,10 +40,10 @@ def test_note_paths_follow_storage_convention(tmp_path: Path):
         source_extension=".pdf",
     )
 
-    assert paths.directory == tmp_path / "meeting-notes"
-    assert paths.note_path == tmp_path / "meeting-notes" / "kickoff-plan-4a95f146.md"
+    assert paths.directory == tmp_path / "markdown" / "meeting-notes"
+    assert paths.note_path == tmp_path / "markdown" / "meeting-notes" / "kickoff-plan-4a95f146.md"
     assert paths.source_path == (
-        tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.pdf"
+        tmp_path / "markdown" / "meeting-notes" / "sources" / "4a95f146" / "original.pdf"
     )
 
 
@@ -58,12 +58,12 @@ def test_write_text_note_creates_folder_gitignore_and_source_folder(tmp_path: Pa
         filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
     )
 
-    assert (tmp_path / "meeting-notes" / ".gitignore").read_text(encoding="utf-8") == (
+    assert (tmp_path / "markdown" / "meeting-notes" / ".gitignore").read_text(encoding="utf-8") == (
         "/sources/\n"
     )
-    assert paths.note_path == tmp_path / "meeting-notes" / "kickoff-plan-4a95f146.md"
+    assert paths.note_path == tmp_path / "markdown" / "meeting-notes" / "kickoff-plan-4a95f146.md"
     assert paths.source_path == (
-        tmp_path / "meeting-notes" / "sources" / "4a95f146" / "original.txt"
+        tmp_path / "markdown" / "meeting-notes" / "sources" / "4a95f146" / "original.txt"
     )
     assert paths.source_path.read_text(encoding="utf-8") == "Shared folder note."
 
@@ -79,6 +79,6 @@ def test_write_empty_text_note_does_not_create_source_file(tmp_path: Path):
         filename="4a95f146-9d27-4c79-b7d8-34739aef8998",
     )
 
-    assert paths.note_path == tmp_path / "meeting-notes" / "draft-note-4a95f146.md"
+    assert paths.note_path == tmp_path / "markdown" / "meeting-notes" / "draft-note-4a95f146.md"
     assert paths.source_path is None
-    assert not (tmp_path / "meeting-notes" / "sources" / "4a95f146").exists()
+    assert not (tmp_path / "markdown" / "meeting-notes" / "sources" / "4a95f146").exists()

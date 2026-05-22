@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base
+from mianotes_web_service.db.models import Base, Note
 from mianotes_web_service.db.session import get_session
 
 
@@ -33,6 +33,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
             session.close()
 
     app = create_app()
+    app.state.testing_session = testing_session
     app.dependency_overrides[get_session] = override_session
     with TestClient(app) as test_client:
         yield test_client
@@ -155,7 +156,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert (html_root / "assets" / "styles.css").is_file()
     assert (html_root / "assets" / "site.js").is_file()
     assert (html_root / note_path).read_text(encoding="utf-8").find("assets/styles.css") > -1
-    assert not (tmp_path / "data" / "markdown").exists()
+    assert (tmp_path / "data" / "markdown" / "about-mcp").is_dir()
 
     listed_note = client.get(f"/api/notes/{note['id']}").json()
     assert listed_note["is_published"] is True
@@ -170,3 +171,35 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
     assert next_draft["site_configuration"]["brand"] == "Mia Docs"
     assert next_draft["navigation"] == payload["navigation"]
+
+
+def test_publish_draft_includes_published_status_notes(client: TestClient):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Published Docs"}).json()
+    note = _create_note(
+        client,
+        folder["id"],
+        "Published Note",
+        "Already published text.",
+    )
+    with client.app.state.testing_session() as session:
+        stored = session.get(Note, note["id"])
+        assert stored is not None
+        stored.status = "published"
+        stored.is_published = True
+        session.commit()
+
+    response = client.get("/api/publish/draft", params={"folder_id": folder["id"]})
+
+    assert response.status_code == 200
+    assert response.json()["navigation"] == [
+        {
+            "title": "Published Docs",
+            "items": [
+                {
+                    "title": "Published Note",
+                    "path": f"published-note-{note['id'][:8]}.html",
+                }
+            ],
+        }
+    ]

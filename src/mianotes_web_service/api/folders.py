@@ -10,10 +10,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import FolderCreate, FolderRead, FolderRestore, FolderUpdate
+from mianotes_web_service.domain.schemas import (
+    FolderCreate,
+    FolderRead,
+    FolderRestore,
+    FolderUpdate,
+)
+from mianotes_web_service.services.paths import folder_directory, markdown_root
 from mianotes_web_service.services.storage import short_id, slugify
 
 router = APIRouter(prefix="/folders", tags=["folders"])
@@ -138,9 +143,8 @@ def update_folder(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="A folder with this name already exists",
                 )
-            data_dir = get_settings().data_dir
-            old_path = data_dir / folder.path
-            new_path = data_dir / next_slug
+            old_path = folder_directory(folder)
+            new_path = markdown_root() / next_slug
             if new_path.exists() and old_path.resolve() != new_path.resolve():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -192,10 +196,9 @@ def restore_folder(
     payload = payload or FolderRestore()
     restore_name = payload.name or folder.name
     restore_slug = _unique_folder_slug(session, slugify(restore_name), folder.id)
-    data_dir = get_settings().data_dir
-    archived_path = data_dir / folder.path
-    restored_path = data_dir / restore_slug
-    previous_live_path = data_dir / slugify(folder.name)
+    archived_path = folder_directory(folder)
+    restored_path = markdown_root() / restore_slug
+    previous_live_path = markdown_root() / slugify(folder.name)
 
     if not archived_path.exists():
         raise HTTPException(
@@ -216,7 +219,11 @@ def restore_folder(
     for note in folder.notes:
         note.note_path = _replace_path_prefix(note.note_path, old_roots, restored_path)
         for source_file in note.source_files:
-            source_file.file_path = _replace_path_prefix(source_file.file_path, old_roots, restored_path)
+            source_file.file_path = _replace_path_prefix(
+                source_file.file_path,
+                old_roots,
+                restored_path,
+            )
 
     folder.name = restore_name
     folder.slug = restore_slug
@@ -245,9 +252,8 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
     archived_at = datetime.now(UTC)
     archive_slug = f"{folder.slug}-{short_id(folder.id)}"
     archive_path = f".archived/{archive_slug}"
-    data_dir = get_settings().data_dir
-    old_path = data_dir / folder.path
-    new_path = data_dir / archive_path
+    old_path = folder_directory(folder)
+    new_path = markdown_root() / archive_path
 
     if old_path.exists():
         new_path.parent.mkdir(parents=True, exist_ok=True)
@@ -256,7 +262,11 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
         for note in folder.notes:
             note.note_path = _replace_path_prefix(note.note_path, (old_path,), new_path)
             for source_file in note.source_files:
-                source_file.file_path = _replace_path_prefix(source_file.file_path, (old_path,), new_path)
+                source_file.file_path = _replace_path_prefix(
+                    source_file.file_path,
+                    (old_path,),
+                    new_path,
+                )
 
     folder.slug = archive_slug
     folder.path = archive_path

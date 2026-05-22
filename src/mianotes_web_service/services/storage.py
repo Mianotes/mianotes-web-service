@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
+MARKDOWN_DIRNAME = "markdown"
 
 
 def make_username(email: str, name: str | None = None) -> str:
@@ -47,7 +48,7 @@ class FilesystemStorage:
     def folder_dir(self, username: str, folder: str) -> Path:
         # Keep username in the signature while storage paths move to folder-first.
         _ = username
-        return self.data_dir / slugify(folder, "folder")
+        return self.data_dir / MARKDOWN_DIRNAME / slugify(folder, "folder")
 
     def prepare_folder_directory(self, directory: Path) -> None:
         directory.mkdir(parents=True, exist_ok=True)
