@@ -28,6 +28,7 @@ The service is designed for small groups: developers, researchers, students, and
 - [Workflow](docs/03-Workflow.md)
 - [APIs](docs/04-API.md)
 - [Customisation](docs/05-Customisation.md)
+- [Database](docs/13-Database.md)
 - [Mia and agents](docs/06-Mia-And-Agents.md)
 - [MCP](docs/07-MCP.md)
 - [Architecture](docs/08-Architecture.md)

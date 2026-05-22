@@ -254,6 +254,40 @@ class StorageCapacityRead(BaseModel):
     cache_expires_at: datetime
 
 
+class StorageLocationRead(BaseModel):
+    id: str
+    name: str
+    folder_path: str
+    database_path: str
+    is_active: bool
+    database_exists: bool
+    notes_count: int | None = None
+    users_count: int | None = None
+    last_updated_at: datetime | None = None
+
+
+class StorageLocationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    folder_path: str = Field(min_length=1, max_length=1000)
+
+
+class StorageSettingsRead(BaseModel):
+    active_location: str
+    database_file: str
+    data_dir: str
+    database_path: str
+    locations: list[StorageLocationRead]
+
+
+class StorageSwitchRequest(BaseModel):
+    location_id: str = Field(min_length=1)
+
+
+class StorageSwitchRead(BaseModel):
+    storage: StorageSettingsRead
+    session_ended: bool = True
+
+
 class ApiTokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     user_id: str | None = None

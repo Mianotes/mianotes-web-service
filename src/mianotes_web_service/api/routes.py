@@ -9,6 +9,7 @@ from .folders import router as folders_router
 from .jobs import router as jobs_router
 from .notes import router as notes_router
 from .search import router as search_router
+from .settings import router as settings_router
 from .storage import router as storage_router
 from .tags import router as tags_router
 from .tokens import router as tokens_router
@@ -21,6 +22,7 @@ api_router.include_router(auth_router, prefix="/api")
 api_router.include_router(users_router, prefix="/api")
 api_router.include_router(folders_router, prefix="/api")
 api_router.include_router(storage_router, prefix="/api")
+api_router.include_router(settings_router, prefix="/api")
 api_router.include_router(tags_router, prefix="/api")
 api_router.include_router(tokens_router, prefix="/api")
 api_router.include_router(jobs_router, prefix="/api")

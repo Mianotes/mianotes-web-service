@@ -23,7 +23,9 @@ data/<folder_slug>/sources/<note_id[:8]>/original.<ext>
 
 Folder directories are filesystem-safe slugs and are unique across the instance. Note filenames are readable enough for GitHub while still carrying a stable note ID prefix. Source files live under each folder's `sources/` directory, and Mianotes writes a folder-level `.gitignore` that ignores `/sources/` so generated Git backups can keep Markdown notes without committing original uploads.
 
-Set `MIANOTES_DATA_DIR` to change the storage location.
+Admins can switch between local Mianotes databases from the Settings screen.
+The allowed database folders are stored in `storage.json` in the web service
+root. Keep that file private to each installation.
 
 Comments are stored in SQLite and do not use `.comments.json` sidecars.
 
@@ -37,6 +39,8 @@ MIANOTES_DATABASE_URL=
 
 When `MIANOTES_DATABASE_URL` is empty, Mianotes stores SQLite at `data/mia.db`.
 The app is structured so a future PostgreSQL adapter can be added without changing the API contract.
+
+Database switching is documented in [Database](13-Database.md).
 
 ## Parser pipeline
 

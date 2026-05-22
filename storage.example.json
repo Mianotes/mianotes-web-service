@@ -1,0 +1,17 @@
+{
+  "activeLocation": "default",
+  "databaseFile": "mia.db",
+  "defaultFolderPath": "./data",
+  "allowedStorageLocations": [
+    {
+      "id": "default",
+      "name": "Main workspace",
+      "folderPath": "./data"
+    },
+    {
+      "id": "work",
+      "name": "Work",
+      "folderPath": "/Users/you/Mianotes/work"
+    }
+  ]
+}
