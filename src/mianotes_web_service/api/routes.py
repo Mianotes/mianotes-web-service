@@ -8,6 +8,7 @@ from .files import router as files_router
 from .folders import router as folders_router
 from .jobs import router as jobs_router
 from .notes import router as notes_router
+from .publish import router as publish_router
 from .search import router as search_router
 from .settings import router as settings_router
 from .storage import router as storage_router
@@ -29,4 +30,5 @@ api_router.include_router(jobs_router, prefix="/api")
 api_router.include_router(notes_router, prefix="/api")
 api_router.include_router(search_router, prefix="/api")
 api_router.include_router(context_router, prefix="/api")
+api_router.include_router(publish_router, prefix="/api")
 api_router.include_router(files_router)
