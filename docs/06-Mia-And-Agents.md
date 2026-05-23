@@ -71,5 +71,5 @@ In v1, Mia is prompted through the comments endpoint. When the request body
 starts with `@mia`, the backend treats it as a private prompt, sends the prompt
 and note Markdown to the configured LLM provider, and returns Markdown directly.
 This does not create a job, does not save a shared comment, and does not update
-the note. See [Comments](11-Comments.md) for the exact request and response
-shape.
+the note. See [Prompting Mia](11-Prompting-Mia.md) for the exact request and
+response shape.

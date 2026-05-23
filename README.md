@@ -34,8 +34,9 @@ The service is designed for small groups: developers, researchers, students, and
 - [Architecture](docs/08-Architecture.md)
 - [Development](docs/09-Development.md)
 - [Testing](docs/10-Testing.md)
-- [Comments](docs/11-Comments.md)
+- [Prompting Mia](docs/11-Prompting-Mia.md)
 - [Security](docs/12-Security.md)
+- [API token](docs/14-API-token.md)
 
 ## Technology
 

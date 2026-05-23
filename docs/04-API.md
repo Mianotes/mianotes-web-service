@@ -864,9 +864,9 @@ Session cookie or bearer token with `tokens:write` or `admin`.
 ## Create service API key
 
 Creates the service-wide API key used by local agents and MCP clients. This is
-the same key concept as `MIANOTES_API_KEY`; Mianotes stores the raw key in the
-service storage configuration and stores only a derived public hash in the
-active `mia.db`.
+the same key concept as `MIANOTES_API_KEY`. Mianotes compares bearer tokens by
+hashing the presented token and checking it against the derived public verifier
+stored in the active `mia.db`.
 
 The raw key is returned only once.
 
