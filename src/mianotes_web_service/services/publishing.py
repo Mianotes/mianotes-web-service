@@ -4,12 +4,13 @@ import html
 import json
 import re
 import shutil
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.core.config import get_settings
@@ -128,29 +129,44 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     version = str(payload.site_configuration.get("version") or theme.version)
     version_slug = _version_slug(version)
     data_dir = get_settings().data_dir
-    html_dir = data_dir / "html" / version_slug
-    if html_dir.exists():
-        shutil.rmtree(html_dir)
-    html_dir.mkdir(parents=True, exist_ok=True)
-    _copy_theme_assets(theme, html_dir / "assets")
+    html_root = data_dir / "html"
+    version_dir = html_root / version_slug
+    if version_dir.exists():
+        shutil.rmtree(version_dir)
+    version_dir.mkdir(parents=True, exist_ok=True)
 
-    note_pages = _write_note_pages(
+    note_pages, search_index = _write_note_pages(
         notes,
-        html_dir=html_dir,
+        version_dir=version_dir,
+        config=payload.site_configuration,
         include_folder=payload.folder_id is None,
     )
-    _write_index(
-        html_dir=html_dir,
+    _write_theme_assets(
+        theme,
+        version_dir=version_dir,
         config=payload.site_configuration,
         navigation=payload.navigation,
-        updated_notes=payload.updated_notes,
+        search_index=search_index,
+    )
+    _write_version_index(
+        version_dir=version_dir,
+        config=payload.site_configuration,
         note_pages=note_pages,
     )
+    _write_root_index(html_root=html_root, version_slug=version_slug)
 
     now = datetime.now(UTC)
-    for note in notes:
-        note.is_published = True
-        note.published_at = now
+    note_ids = [note.id for note in notes]
+    if note_ids:
+        session.execute(
+            update(Note)
+            .where(Note.id.in_(note_ids))
+            .values(
+                is_published=True,
+                published_at=now,
+                updated_at=Note.updated_at,
+            )
+        )
     published_site = PublishedSite(
         user_id=user.id,
         folder_id=folder.id if folder else None,
@@ -167,6 +183,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     session.add(published_site)
     session.commit()
     session.refresh(published_site)
+    _write_navigation_js(session=session, html_root=html_root, current_site=published_site)
     return published_site
 
 
@@ -247,14 +264,18 @@ def _updated_notes(
     since: datetime | None,
     include_folder: bool,
 ) -> list[dict[str, object]]:
-    return [
-        {
-            "title": note.title,
-            "path": _published_note_path(note, include_folder=include_folder),
-        }
-        for note in notes
-        if since is None or _as_utc(note.updated_at) > _as_utc(since)
-    ]
+    updated_notes: list[dict[str, object]] = []
+    for note in notes:
+        cutoff = note.published_at or since
+        if cutoff is not None and _as_utc(note.updated_at) <= _as_utc(cutoff):
+            continue
+        updated_notes.append(
+            {
+                "title": note.title,
+                "path": _published_note_path(note, include_folder=include_folder),
+            }
+        )
+    return updated_notes
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -270,31 +291,42 @@ def _published_note_path(note: Note, *, include_folder: bool) -> str:
     return filename
 
 
-def _copy_theme_assets(theme: PublishTheme, target_dir: Path) -> None:
-    if target_dir.exists():
-        shutil.rmtree(target_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-    for filename in ("styles.css", "site.js"):
-        source = theme.directory / filename
-        if source.exists():
-            shutil.copy2(source, target_dir / filename)
+def _write_theme_assets(
+    theme: PublishTheme,
+    *,
+    version_dir: Path,
+    config: dict[str, object],
+    navigation: list[dict[str, object]],
+    search_index: list[dict[str, object]],
+) -> None:
+    shutil.copy2(theme.directory / "styles.css", version_dir / "styles.css")
+    site_runtime = (theme.directory / "site.js").read_text(encoding="utf-8")
+    (version_dir / "site.js").write_text(
+        (
+            f"const SITE_CONFIGURATION = {_json_for_script(config)};\n"
+            f"const DOCS = {_json_for_script({'groups': navigation})};\n"
+            f"{site_runtime.rstrip()}\n"
+        ),
+        encoding="utf-8",
+    )
+    (version_dir / "search.js").write_text(
+        f"const SEARCH_INDEX = {_json_for_script(search_index)};\n",
+        encoding="utf-8",
+    )
     assets_dir = theme.directory / "assets"
     if assets_dir.exists():
-        for source in assets_dir.iterdir():
-            target = target_dir / source.name
-            if source.is_dir():
-                shutil.copytree(source, target, dirs_exist_ok=True)
-            else:
-                shutil.copy2(source, target)
+        shutil.copytree(assets_dir, version_dir / "assets", dirs_exist_ok=True)
 
 
 def _write_note_pages(
     notes: list[Note],
     *,
-    html_dir: Path,
+    version_dir: Path,
+    config: dict[str, object],
     include_folder: bool,
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     note_pages: list[dict[str, object]] = []
+    search_index: list[dict[str, object]] = []
     for note in notes:
         source_path = note_file_path(note)
         if not source_path.exists():
@@ -307,154 +339,216 @@ def _write_note_pages(
             )
         body = markdown_note_body(source_path.read_text(encoding="utf-8"))
         relative_path = Path(_published_note_path(note, include_folder=include_folder))
-        page_path = html_dir / relative_path
-        nested_page = len(relative_path.parts) > 1
+        page_path = version_dir / relative_path
         page_path.parent.mkdir(parents=True, exist_ok=True)
         page_path.write_text(
-            _render_page(
-                title=note.title,
+            _render_published_page(
+                note=note,
+                config=config,
+                relative_path=relative_path,
                 content_html=_markdown_to_html(body),
-                asset_prefix="../assets" if nested_page else "assets",
-                index_href="../index.html" if nested_page else "index.html",
             ),
             encoding="utf-8",
         )
+        path = relative_path.as_posix()
         note_pages.append(
             {
                 "title": note.title,
-                "path": relative_path.as_posix(),
+                "path": path,
                 "folder": note.folder.name,
             }
         )
-    return note_pages
+        search_index.append(
+            {
+                "section": note.folder.name,
+                "folder": note.folder.name,
+                "title": note.title,
+                "path": path,
+                "text": _compact_text(body),
+            }
+        )
+    return note_pages, search_index
 
 
-def _write_index(
+def _render_published_page(
     *,
-    html_dir: Path,
+    note: Note,
     config: dict[str, object],
-    navigation: list[dict[str, object]],
-    updated_notes: list[dict[str, object]],
+    relative_path: Path,
+    content_html: str,
+) -> str:
+    depth = len(relative_path.parts) - 1
+    version_prefix = "../" * depth
+    root_prefix = "../" * (depth + 1)
+    brand = str(config.get("brand") or "mianotes")
+    footer_html = str(config.get("footerHtml") or "")
+    return _html_shell(
+        title=f"{note.title} | {brand}",
+        stylesheet=f"{version_prefix}styles.css" if version_prefix else "styles.css",
+        navigation_script=f"{root_prefix}navigation.js",
+        search_script=f"{version_prefix}search.js" if version_prefix else "search.js",
+        site_script=f"{version_prefix}site.js" if version_prefix else "site.js",
+        body=(
+            "<header data-header></header>\n"
+            '<main class="layout">\n'
+            '  <aside class="sidebar" data-sidebar></aside>\n'
+            '  <section class="article-wrap">\n'
+            '    <article class="article">\n'
+            f'      <p class="eyebrow">{html.escape(note.folder.name)}</p>\n'
+            f"      <h1>{html.escape(note.title)}</h1>\n"
+            f"      {content_html}\n"
+            '      <nav class="article-footer" data-article-footer></nav>\n'
+            f'      <footer class="site-footer">{footer_html}</footer>\n'
+            "    </article>\n"
+            "  </section>\n"
+            "</main>\n"
+        ),
+    )
+
+
+def _write_version_index(
+    *,
+    version_dir: Path,
+    config: dict[str, object],
     note_pages: list[dict[str, object]],
 ) -> None:
     brand = html.escape(str(config.get("brand") or "mianotes"))
-    footer_html = str(config.get("footerHtml") or "")
-    header_links = _render_header_links(config.get("headerLinks"))
-    nav_html = _render_navigation(navigation)
-    updated_html = _render_updated_notes(updated_notes)
-    first_note = note_pages[0] if note_pages else None
-    intro = (
-        f'<p>Your static site contains {len(note_pages)} published notes.</p>'
-        if first_note is None
-        else (
-            f'<p>Your static site contains {len(note_pages)} published notes. '
-            f'Start with <a href="{html.escape(str(first_note["path"]))}">'
-            f'{html.escape(str(first_note["title"]))}</a>.</p>'
-        )
-    )
-    (html_dir / "index.html").write_text(
-        _html_document(
-            title=brand,
-            asset_prefix="assets",
-            body=(
-                '<div class="site">'
-                f'<aside class="sidebar"><h1 class="brand">{brand}</h1>{nav_html}</aside>'
-                '<main class="content">'
-                f"{header_links}"
-                f"{updated_html}"
-                f'<article class="article"><h1>{brand}</h1>{intro}</article>'
-                f"<footer>{footer_html}</footer>"
-                "</main></div>"
-            ),
+    first_path = str(note_pages[0]["path"]) if note_pages else ""
+    if first_path:
+        body = f'<a href="./{html.escape(first_path)}">Open documentation</a>'
+        refresh = f'    <meta http-equiv="refresh" content="0; url=./{html.escape(first_path)}">\n'
+    else:
+        body = "<p>No notes were published.</p>"
+        refresh = ""
+    (version_dir / "index.html").write_text(
+        (
+            "<!doctype html>\n"
+            '<html lang="en">\n'
+            "  <head>\n"
+            '    <meta charset="utf-8">\n'
+            '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            f"{refresh}"
+            f"    <title>{brand} documentation</title>\n"
+            "  </head>\n"
+            f"  <body>{body}</body>\n"
+            "</html>\n"
         ),
         encoding="utf-8",
     )
 
 
-def _render_page(
-    *,
-    title: str,
-    content_html: str,
-    asset_prefix: str,
-    index_href: str,
-) -> str:
-    escaped_index_href = html.escape(index_href)
-    return _html_document(
-        title=title,
-        asset_prefix=asset_prefix,
-        body=(
-            '<div class="site">'
-            '<aside class="sidebar"><h1 class="brand">'
-            f'<a href="{escaped_index_href}">mianotes</a></h1></aside>'
-            f'<main class="content"><article class="article"><h1>{html.escape(title)}</h1>'
-            f"{content_html}</article></main></div>"
+def _write_root_index(*, html_root: Path, version_slug: str) -> None:
+    html_root.mkdir(parents=True, exist_ok=True)
+    (html_root / "index.html").write_text(
+        (
+            "<!doctype html>\n"
+            '<html lang="en">\n'
+            "  <head>\n"
+            '    <meta charset="utf-8">\n'
+            '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            "    <title>mianotes documentation</title>\n"
+            '    <script src="./navigation.js"></script>\n'
+            "    <script>\n"
+            "      const latestPath = `./${SITE_NAVIGATION.latest}/index.html`;\n"
+            "      window.location.replace(latestPath);\n"
+            "    </script>\n"
+            "  </head>\n"
+            f'  <body><a id="latest-link" href="./{html.escape(version_slug)}/index.html">'
+            "Latest version</a><script>"
+            "document.getElementById('latest-link').href = latestPath;"
+            "</script>"
+            "</body>\n"
+            "</html>\n"
         ),
+        encoding="utf-8",
     )
 
 
-def _html_document(*, title: str, body: str, asset_prefix: str) -> str:
+def _write_navigation_js(
+    *,
+    session: Session,
+    html_root: Path,
+    current_site: PublishedSite,
+) -> None:
+    entries = _site_navigation_entries(
+        session.scalars(select(PublishedSite).order_by(PublishedSite.created_at.desc())).all()
+    )
+    if not entries:
+        entries = [
+            {
+                "label": f"{_site_brand(current_site)} {current_site.version}",
+                "path": f"{_version_slug(current_site.version)}/index.html",
+                "key": _version_slug(current_site.version),
+            }
+        ]
+    payload = {"latest": entries[0]["key"], "navigation": entries}
+    (html_root / "navigation.js").write_text(
+        f"const SITE_NAVIGATION = {_json_for_script(payload)};\n",
+        encoding="utf-8",
+    )
+
+
+def _site_navigation_entries(sites: Iterable[PublishedSite]) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for site in sites:
+        version_slug = _version_slug(site.version)
+        if version_slug in seen:
+            continue
+        seen.add(version_slug)
+        label = f"{_site_brand(site)} {site.version}" if not entries else site.version
+        entries.append(
+            {
+                "label": label,
+                "path": f"{version_slug}/index.html",
+                "key": version_slug,
+            }
+        )
+    return entries
+
+
+def _site_brand(site: PublishedSite) -> str:
+    configuration = _load_json_object(site.site_configuration, DEFAULT_SITE_CONFIGURATION)
+    return str(configuration.get("brand") or "mianotes")
+
+
+def _html_shell(
+    *,
+    title: str,
+    stylesheet: str,
+    navigation_script: str,
+    search_script: str,
+    site_script: str,
+    body: str,
+) -> str:
     escaped_title = html.escape(title)
-    escaped_asset_prefix = html.escape(asset_prefix)
     return (
         "<!doctype html>\n"
         '<html lang="en">\n'
-        "<head>\n"
-        '  <meta charset="utf-8">\n'
-        '  <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"  <title>{escaped_title}</title>\n"
-        f'  <link rel="stylesheet" href="{escaped_asset_prefix}/styles.css">\n'
-        "</head>\n"
-        f'<body>{body}<script src="{escaped_asset_prefix}/site.js"></script></body>\n'
+        "  <head>\n"
+        '    <meta charset="utf-8">\n'
+        '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"    <title>{escaped_title}</title>\n"
+        f'    <link rel="stylesheet" href="{html.escape(stylesheet)}">\n'
+        f'    <script src="{html.escape(navigation_script)}" defer></script>\n'
+        f'    <script src="{html.escape(search_script)}" defer></script>\n'
+        f'    <script src="{html.escape(site_script)}" defer></script>\n'
+        "  </head>\n"
+        f"  <body>\n{body}  </body>\n"
         "</html>\n"
     )
 
 
-def _render_navigation(navigation: list[dict[str, object]]) -> str:
-    groups: list[str] = []
-    for group in navigation:
-        title = html.escape(str(group.get("title") or "Notes"))
-        items = group.get("items")
-        links: list[str] = []
-        if isinstance(items, list):
-            for item in items:
-                if not isinstance(item, dict):
-                    continue
-                item_title = html.escape(
-                    str(item.get("title") or item.get("pageTitle") or "Untitled")
-                )
-                path = html.escape(str(item.get("path") or "#"))
-                links.append(f'<a href="{path}">{item_title}</a>')
-        groups.append(f'<section class="nav-group"><h2>{title}</h2>{"".join(links)}</section>')
-    return "".join(groups)
+def _compact_text(markdown: str) -> str:
+    text = re.sub(r"```.*?```", " ", markdown, flags=re.DOTALL)
+    text = re.sub(r"!\[[^\]]*\]\([^)]+\)", " ", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"[#>*_`~-]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
 
 
-def _render_header_links(header_links: object) -> str:
-    if not isinstance(header_links, list):
-        return ""
-    links: list[str] = []
-    for item in header_links:
-        if not isinstance(item, dict):
-            continue
-        title = html.escape(str(item.get("title") or "Link"))
-        url = html.escape(str(item.get("url") or "#"))
-        links.append(f'<a href="{url}">{title}</a>')
-    if not links:
-        return ""
-    return f'<nav class="top-links">{"".join(links)}</nav>'
-
-
-def _render_updated_notes(updated_notes: list[dict[str, object]]) -> str:
-    if not updated_notes:
-        return ""
-    items = []
-    for note in updated_notes:
-        title = html.escape(str(note.get("title") or "Untitled"))
-        path = html.escape(str(note.get("path") or "#"))
-        items.append(f'<li><a href="{path}">{title}</a></li>')
-    return (
-        '<section class="updated"><h2>Updated notes</h2>'
-        f'<ul>{"".join(items)}</ul></section>'
-    )
+def _json_for_script(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, indent=2).replace("</", "<\\/")
 
 
 def _markdown_to_html(markdown: str) -> str:

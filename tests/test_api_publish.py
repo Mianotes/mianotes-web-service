@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -153,9 +154,11 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
 
     html_root = tmp_path / "data" / "html" / "0.1.1"
     assert (html_root / "index.html").is_file()
-    assert (html_root / "assets" / "styles.css").is_file()
-    assert (html_root / "assets" / "site.js").is_file()
-    assert (html_root / note_path).read_text(encoding="utf-8").find("assets/styles.css") > -1
+    assert (html_root / "styles.css").is_file()
+    assert (html_root / "site.js").is_file()
+    assert (html_root / "search.js").is_file()
+    assert (tmp_path / "data" / "html" / "navigation.js").is_file()
+    assert (html_root / note_path).read_text(encoding="utf-8").find("styles.css") > -1
     assert (tmp_path / "data" / "markdown" / "about-mcp").is_dir()
 
     listed_note = client.get(f"/api/notes/{note['id']}").json()
@@ -164,13 +167,81 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
 
     published_file = client.get("/html/0.1.1/index.html")
     assert published_file.status_code == 200
-    assert "Mia Docs" in published_file.text
-    assert "Updated notes" in published_file.text
-    assert "https://github.com/Mianotes" in published_file.text
+    note_file = client.get(f"/html/0.1.1/{note_path}")
+    assert note_file.status_code == 200
+    assert "Mia Docs" in note_file.text
+    assert "MCP clients" in note_file.text
+    assert "https://github.com/Mianotes" in (html_root / "site.js").read_text(encoding="utf-8")
 
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
     assert next_draft["site_configuration"]["brand"] == "Mia Docs"
     assert next_draft["navigation"] == payload["navigation"]
+    assert next_draft["updated_notes"] == []
+
+
+def test_publish_draft_reuses_saved_navigation_and_stages_later_updates(client: TestClient):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Publish staging"}).json()
+    first_note = _create_note(
+        client,
+        folder["id"],
+        "Architecture",
+        "Architecture notes.",
+    )
+    first_path = f"architecture-{first_note['id'][:8]}.html"
+    saved_navigation = [
+        {
+            "title": "Publish staging",
+            "items": [
+                {
+                    "title": "Architecture",
+                    "path": first_path,
+                }
+            ],
+        }
+    ]
+    published_at = datetime.now(UTC) - timedelta(hours=1)
+
+    with client.app.state.testing_session() as session:
+        stored = session.get(Note, first_note["id"])
+        assert stored is not None
+        stored.updated_at = published_at
+        session.commit()
+
+    publish_response = client.post(
+        "/api/publish",
+        json={
+            "folder_id": folder["id"],
+            "theme": "mianotes",
+            "site_configuration": {
+                "brand": "mianotes",
+                "version": "0.1.0",
+                "headerLinks": [],
+                "footerHtml": "Copyright © Test.",
+            },
+            "navigation": saved_navigation,
+            "updated_notes": [],
+        },
+    )
+    assert publish_response.status_code == 201
+
+    second_note = _create_note(
+        client,
+        folder["id"],
+        "Settings page",
+        "New settings page notes.",
+    )
+    second_path = f"settings-page-{second_note['id'][:8]}.html"
+
+    next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
+
+    assert next_draft["navigation"] == saved_navigation
+    assert next_draft["updated_notes"] == [
+        {
+            "title": "Settings page",
+            "path": second_path,
+        }
+    ]
 
 
 def test_publish_draft_includes_published_status_notes(client: TestClient):
