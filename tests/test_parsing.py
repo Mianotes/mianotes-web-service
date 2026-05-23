@@ -99,6 +99,87 @@ def test_document_parser_retries_blank_document_with_ocr_plugin(
     ]
 
 
+def test_document_parser_unwraps_markitdown_ocr_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "## Page 1\n\n"
+                    "*[Image OCR]\n"
+                    "```markdown\n"
+                    "# THE PRODUCT-LED GROWTH MANIFESTO\n\n"
+                    "**Building a SaaS product that sells itself.**\n"
+                    "```\n"
+                    "[End OCR]*\n\n"
+                    "## Page 2\n\n"
+                    "*[Image OCR]\n"
+                    "```markdown\n"
+                    "# Three forces threatening traditional SaaS.\n"
+                    "```\n"
+                    "[End OCR]*\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "## Page 1\n\n"
+        "# THE PRODUCT-LED GROWTH MANIFESTO\n\n"
+        "**Building a SaaS product that sells itself.**\n\n"
+        "## Page 2\n\n"
+        "# Three forces threatening traditional SaaS."
+    )
+    assert "[Image OCR]" not in parsed.text
+    assert "```" not in parsed.text
+
+
+def test_document_parser_preserves_regular_markdown_code_blocks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "code.md"
+    source.write_text("# Code example", encoding="utf-8")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "# Code example\n\n"
+                    "```python\n"
+                    "print('hello')\n"
+                    "```\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "# Code example\n\n```python\nprint('hello')\n```\n"
+
+
 def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

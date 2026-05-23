@@ -89,6 +89,10 @@ conversion returns no text, Mianotes retries MarkItDown with plugins and the
 configured LLM client. This enables OCR support from packages such as
 `markitdown-ocr` without adding a new parser API surface.
 
+Some OCR plugins wrap extracted page text in `[Image OCR]` markers and fenced
+Markdown code blocks. Mianotes removes that wrapper before saving the note so
+the extracted headings, lists, and paragraphs render as normal Markdown.
+
 If a file still cannot be parsed, Mianotes saves a friendly message instead of
 an empty note:
 
