@@ -22,7 +22,7 @@ router = APIRouter(tags=["files"])
 PRIVATE_DATA_FILENAMES = {"mia.db", "mia.db-wal", "mia.db-shm", "mia.db-journal"}
 
 
-def _file_response(file_path: str) -> FileResponse:
+def _file_response(file_path: str, *, no_store: bool = False) -> FileResponse:
     data_dir = get_settings().data_dir.resolve()
     target = (data_dir / file_path).resolve()
     if data_dir not in target.parents and target != data_dir:
@@ -31,7 +31,8 @@ def _file_response(file_path: str) -> FileResponse:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     if not target.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    return FileResponse(target)
+    headers = {"Cache-Control": "no-store"} if no_store else None
+    return FileResponse(target, headers=headers)
 
 
 def _clean_file_path(file_path: str) -> str:
@@ -113,12 +114,12 @@ def _published_source_response(file_path: str, session: Session) -> FileResponse
 @router.get("/html", include_in_schema=False)
 @router.get("/html/", include_in_schema=False)
 def get_published_html_root() -> FileResponse:
-    return _file_response("html/index.html")
+    return _file_response("html/index.html", no_store=True)
 
 
 @router.get("/html/{file_path:path}", include_in_schema=False)
 def get_published_html_file(file_path: str) -> FileResponse:
-    return _file_response(f"html/{_clean_file_path(file_path)}")
+    return _file_response(f"html/{_clean_file_path(file_path)}", no_store=True)
 
 
 @router.get("/markdown", include_in_schema=False)

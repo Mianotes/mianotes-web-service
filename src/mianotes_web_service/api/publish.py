@@ -95,12 +95,18 @@ def download_published_site(
     _ = user
     site = session.get(PublishedSite, site_id)
     if site is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Published site not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Published site not found",
+        )
 
     html_root = (get_settings().data_dir / "html").resolve()
     site_dir = (get_settings().data_dir / site.html_path).resolve()
     if html_root not in site_dir.parents or not site_dir.is_dir():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Published site files not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Published site files not found",
+        )
 
     archive = BytesIO()
     archive_root = f"{_archive_name(site)}-static-site"
@@ -109,7 +115,10 @@ def download_published_site(
             if file_path.is_file():
                 zip_file.write(file_path, f"{archive_root}/{file_path.name}")
         for file_path in sorted(path for path in site_dir.rglob("*") if path.is_file()):
-            zip_file.write(file_path, f"{archive_root}/{file_path.relative_to(html_root).as_posix()}")
+            zip_file.write(
+                file_path,
+                f"{archive_root}/{file_path.relative_to(html_root).as_posix()}",
+            )
     archive.seek(0)
 
     filename = f"{archive_root}.zip"

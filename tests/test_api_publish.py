@@ -200,8 +200,10 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
 
     published_file = client.get("/html/0.1.1/index.html")
     assert published_file.status_code == 200
+    assert published_file.headers["cache-control"] == "no-store"
     note_file = client.get(f"/html/0.1.1/{note_path}")
     assert note_file.status_code == 200
+    assert note_file.headers["cache-control"] == "no-store"
     assert "Mia Docs" in note_file.text
     assert "MCP clients" in note_file.text
     site_js = (html_root / "site.js").read_text(encoding="utf-8")
@@ -240,6 +242,53 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert next_draft["site_configuration"]["showPreviousVersions"] is True
     assert next_draft["navigation"] == payload["navigation"]
     assert next_draft["updated_notes"] == []
+
+
+def test_publish_site_replaces_same_version_html(client: TestClient, tmp_path: Path):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Release Notes"}).json()
+    note = _create_note(client, folder["id"], "Changelog", "First published body.")
+    note_path = f"changelog-{note['id'][:8]}.html"
+    payload = {
+        "folder_id": folder["id"],
+        "theme": "mialight",
+        "site_configuration": {
+            "brand": "Mia Docs",
+            "version": "1.0.0",
+            "headerLinks": [],
+            "footerHtml": "",
+        },
+        "navigation": [
+            {"title": "Release Notes", "items": [{"title": "Changelog", "path": note_path}]}
+        ],
+        "updated_notes": [{"title": "Changelog", "path": note_path}],
+    }
+
+    first_response = client.post("/api/publish", json=payload)
+    assert first_response.status_code == 201
+    first_html = (tmp_path / "data" / "html" / "1.0.0" / note_path).read_text(
+        encoding="utf-8"
+    )
+    assert "First published body." in first_html
+
+    update_response = client.patch(
+        f"/api/notes/{note['id']}",
+        json={"text": "Second published body."},
+    )
+    assert update_response.status_code == 200
+
+    second_response = client.post("/api/publish", json=payload)
+    assert second_response.status_code == 201
+    second_html = (tmp_path / "data" / "html" / "1.0.0" / note_path).read_text(
+        encoding="utf-8"
+    )
+    assert "Second published body." in second_html
+    assert "First published body." not in second_html
+
+    served_html = client.get(f"/html/1.0.0/{note_path}")
+    assert served_html.status_code == 200
+    assert served_html.headers["cache-control"] == "no-store"
+    assert "Second published body." in served_html.text
 
 
 def test_publish_draft_regenerates_navigation_and_stages_new_navigation_items(

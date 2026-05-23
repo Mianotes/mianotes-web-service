@@ -828,7 +828,11 @@ def _inline_markdown(text: str) -> str:
     escaped = html.escape(text)
     escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
     escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
-    escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a class="inline-link" href="\2">\1</a>', escaped)
+    escaped = re.sub(
+        r"\[([^\]]+)\]\(([^)]+)\)",
+        r'<a class="inline-link" href="\2">\1</a>',
+        escaped,
+    )
     return escaped
 
 
