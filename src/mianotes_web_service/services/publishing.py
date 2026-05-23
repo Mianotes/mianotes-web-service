@@ -98,10 +98,11 @@ def build_publish_draft(
     latest_publish = _read_latest_publish(session, folder_id=folder_id, tag_id=tag_id)
     has_previous_publish = latest_publish is not None
     include_folder = folder_id is None
+    default_site_configuration = _default_site_configuration(theme)
     site_configuration = (
-        _load_json_object(latest_publish.site_configuration, DEFAULT_SITE_CONFIGURATION)
+        _load_json_object(latest_publish.site_configuration, default_site_configuration)
         if latest_publish
-        else _default_site_configuration(theme)
+        else default_site_configuration
     )
     navigation = _navigation_for_notes(notes, include_folder=include_folder)
     previous_navigation_paths = (
