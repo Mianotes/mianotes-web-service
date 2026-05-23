@@ -125,6 +125,15 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert source_file_response.status_code == 200
     assert source_file_response.text == "We agreed to build Mianotes with Markdown notes."
 
+    public_client = TestClient(client.app)
+    assert public_client.get(f"/markdown/meeting-notes/{note_filename}.md").status_code == 404
+    assert (
+        public_client.get(
+            f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
+        ).status_code
+        == 404
+    )
+
     assert client.get(f"/data/meeting-notes/{note_filename}.md").status_code == 404
     (tmp_path / "data" / "mia.db").write_text("private database", encoding="utf-8")
     assert client.get("/mia.db").status_code == 404

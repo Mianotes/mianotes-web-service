@@ -173,6 +173,24 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert "MCP clients" in note_file.text
     assert "https://github.com/Mianotes" in (html_root / "site.js").read_text(encoding="utf-8")
 
+    public_client = TestClient(client.app)
+    public_root = public_client.get("/html")
+    assert public_root.status_code == 200
+    public_published_file = public_client.get("/html/0.1.1/index.html")
+    assert public_published_file.status_code == 200
+    public_note_file = public_client.get(f"/html/0.1.1/{note_path}")
+    assert public_note_file.status_code == 200
+    public_markdown = public_client.get(f"/markdown/about-mcp/clients-{note['id'][:8]}.md")
+    assert public_markdown.status_code == 200
+    assert "MCP clients" in public_markdown.text
+    assert (
+        public_client.get(
+            f"/markdown/about-mcp/sources/{note['id'][:8]}/original.txt"
+        ).status_code
+        == 404
+    )
+    assert public_client.get("/markdown").status_code == 404
+
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
     assert next_draft["site_configuration"]["brand"] == "Mia Docs"
     assert next_draft["navigation"] == payload["navigation"]
