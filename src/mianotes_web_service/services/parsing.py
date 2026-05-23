@@ -49,12 +49,20 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 IMAGE_DESCRIPTION_HEADING = "# Description:"
 OCR_MIN_CHARACTERS = 20
 IMAGE_NEEDS_CLOUD_MESSAGE = (
-    "Sorry, Mia was unable to get any text from this image.\n\n"
-    "Please install a working Tesseract OCR binary or configure a cloud LLM to "
-    "improve Mia's image reading capabilities."
+    "Mia could not extract readable text from this image with the built-in parser.\n\n"
+    "Images like this usually need OCR or visual understanding. Connect Mia to a "
+    "local or cloud model with vision/OCR support, then upload the image again."
 )
-IMAGE_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this image."
-DOCUMENT_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this file."
+IMAGE_UNREADABLE_MESSAGE = (
+    "Mia could not extract readable text from this image.\n\n"
+    "Try a clearer image, or connect Mia to a local or cloud model with vision/OCR "
+    "support and upload it again."
+)
+DOCUMENT_UNREADABLE_MESSAGE = (
+    "Mia could not extract readable text from this file with the built-in parser.\n\n"
+    "This file likely needs OCR or visual understanding. Connect Mia to a local or "
+    "cloud model with vision/OCR support, then upload the file again."
+)
 TESSERACT_CANDIDATES = (
     "/opt/homebrew/bin/tesseract",
     "/usr/local/bin/tesseract",
