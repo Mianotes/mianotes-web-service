@@ -9,9 +9,9 @@
       "folderPath": "./data"
     },
     {
-      "id": "work",
-      "name": "Work",
-      "folderPath": "/Users/you/Mianotes/work"
+      "id": "project",
+      "name": "Project",
+      "folderPath": "/Users/name/Documents/project/docs"
     }
   ]
 }
