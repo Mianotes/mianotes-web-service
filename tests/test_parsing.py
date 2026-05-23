@@ -296,6 +296,8 @@ def test_image_parser_uses_tesseract_before_llm(
 ):
     source = tmp_path / "screenshot.png"
     source.write_bytes(b"fake image")
+    tesseract = tmp_path / "tesseract"
+    tesseract.write_text("fake executable", encoding="utf-8")
 
     def fake_run(*_args, **_kwargs):
         return SimpleNamespace(
@@ -303,7 +305,7 @@ def test_image_parser_uses_tesseract_before_llm(
             stdout="Receipt total\n\n\n£42.50\n",
         )
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(tesseract))
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
     monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
@@ -324,6 +326,8 @@ def test_image_parser_strips_ocr_code_block_indentation(
 ):
     source = tmp_path / "screenshot.png"
     source.write_bytes(b"fake image")
+    tesseract = tmp_path / "tesseract"
+    tesseract.write_text("fake executable", encoding="utf-8")
 
     def fake_run(*_args, **_kwargs):
         return SimpleNamespace(
@@ -335,7 +339,7 @@ def test_image_parser_strips_ocr_code_block_indentation(
             ),
         )
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(tesseract))
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
     monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
