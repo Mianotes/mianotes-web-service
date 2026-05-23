@@ -139,6 +139,57 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/mia.db").status_code == 404
 
 
+def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path: Path):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "move-note@example.com",
+            "name": "Move Note User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    inbox = client.post("/api/folders", json={"name": "Inbox"}).json()
+    archive = client.post("/api/folders", json={"name": "Archive"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": inbox["id"],
+            "title": "Move Me",
+            "text": "This note should move folders.",
+        },
+    ).json()
+    note_filename = f"move-me-{note['id'][:8]}.md"
+    source_filename = f"sources/{note['id'][:8]}/original.txt"
+    old_note_path = tmp_path / "data" / "markdown" / "inbox" / note_filename
+    old_source_path = tmp_path / "data" / "markdown" / "inbox" / source_filename
+    new_note_path = tmp_path / "data" / "markdown" / "archive" / note_filename
+    new_source_path = tmp_path / "data" / "markdown" / "archive" / source_filename
+
+    response = client.patch(
+        f"/api/notes/{note['id']}",
+        json={"folder_id": archive["id"]},
+    )
+
+    assert response.status_code == 200
+    moved_note = response.json()
+    assert moved_note["folder"]["id"] == archive["id"]
+    assert moved_note["folder_id"] == archive["id"]
+    assert moved_note["note_url"].endswith(f"/markdown/archive/{note_filename}")
+    assert moved_note["source_files"][0]["url"].endswith(
+        f"/markdown/archive/{source_filename}"
+    )
+    assert not old_note_path.exists()
+    assert not old_source_path.exists()
+    assert new_note_path.read_text(encoding="utf-8").startswith("# Move Me")
+    assert new_source_path.read_text(encoding="utf-8") == "This note should move folders."
+
+    old_folder_notes = client.get("/api/notes", params={"folder_id": inbox["id"]})
+    new_folder_notes = client.get("/api/notes", params={"folder_id": archive["id"]})
+    assert old_folder_notes.json() == []
+    assert new_folder_notes.json()[0]["id"] == note["id"]
+
+
 def test_create_empty_text_note_does_not_create_source_file(
     client: TestClient, tmp_path: Path
 ):

@@ -86,12 +86,13 @@ TOOL_DEFINITIONS: list[JsonObject] = [
     },
     {
         "name": "update_note",
-        "description": "Update a Mianotes note title, text, published state, or tags.",
+        "description": "Update a Mianotes note folder, title, text, published state, or tags.",
         "inputSchema": {
             "type": "object",
             "required": ["note_id"],
             "properties": {
                 "note_id": {"type": "string"},
+                "folder_id": {"type": "string"},
                 "title": {"type": "string"},
                 "text": {"type": "string"},
                 "is_published": {"type": "boolean"},
@@ -201,7 +202,7 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
         note_id = arguments["note_id"]
         body = {
             key: arguments[key]
-            for key in ("title", "text", "is_published", "tags")
+            for key in ("folder_id", "title", "text", "is_published", "tags")
             if key in arguments
         }
         return _request("PATCH", f"/api/notes/{note_id}", body=body)

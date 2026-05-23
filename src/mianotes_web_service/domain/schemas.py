@@ -84,6 +84,7 @@ class NoteCreateFromUrl(BaseModel):
 
 
 class NoteUpdate(BaseModel):
+    folder_id: str | None = None
     title: str | None = Field(default=None, min_length=1, max_length=300)
     text: str | None = Field(default=None, min_length=1)
     is_published: bool | None = None
@@ -145,6 +146,7 @@ class ApiAction(BaseModel):
 class NoteRead(BaseModel):
     id: str
     user: UserRead
+    folder_id: str
     folder: FolderRead
     created_at: datetime
     updated_at: datetime

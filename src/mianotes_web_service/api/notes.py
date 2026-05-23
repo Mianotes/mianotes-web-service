@@ -62,6 +62,7 @@ from mianotes_web_service.domain.schemas import (
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
 from mianotes_web_service.services.paths import (
+    folder_directory,
     note_file_path,
     note_image_directory,
     source_file_path,
@@ -241,6 +242,7 @@ def _note_response(
     return NoteRead(
         id=note.id,
         user=note.user,
+        folder_id=note.folder_id,
         folder=note.folder,
         created_at=note.created_at,
         updated_at=note.updated_at,
@@ -452,6 +454,90 @@ def _note_ingestion_response(
 
 def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: str) -> None:
     request.app.state.job_runner.enqueue(background_tasks, job_id)
+
+
+def _validate_stored_moves(moves: list[tuple[Path, Path]]) -> None:
+    for current_path, target_path in moves:
+        if current_path.resolve() == target_path.resolve():
+            continue
+        if not current_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note file not found",
+            )
+        if target_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A file already exists in the target folder",
+            )
+
+
+def _move_stored_path(current_path: Path, target_path: Path) -> None:
+    if current_path.resolve() == target_path.resolve():
+        return
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(current_path), str(target_path))
+
+
+def _move_note_to_folder(note: Note, target_folder: Folder) -> None:
+    if note.folder_id == target_folder.id:
+        return
+
+    current_folder = note.folder
+    current_folder_dir = folder_directory(current_folder) if current_folder else None
+    target_folder_dir = folder_directory(target_folder)
+    FilesystemStorage(get_settings().data_dir).prepare_folder_directory(target_folder_dir)
+
+    current_note_path = note_file_path(note)
+    note_filename = note.filename or current_note_path.name
+    target_note_path = target_folder_dir / note_filename
+    source_moves: list[tuple[SourceFile, Path, Path, str]] = []
+
+    for source_file in note.source_files:
+        current_source_path = source_file_path(source_file)
+        source_filename = source_file.filename
+        if not source_filename and current_folder_dir is not None:
+            try:
+                source_filename = current_source_path.relative_to(current_folder_dir).as_posix()
+            except ValueError:
+                source_filename = None
+        if not source_filename:
+            continue
+        source_moves.append(
+            (
+                source_file,
+                current_source_path,
+                target_folder_dir / source_filename,
+                source_filename,
+            )
+        )
+
+    current_image_dir = note_image_directory(note)
+    target_image_dir = target_folder_dir / "images" / note.id[:8]
+
+    path_moves = [
+        (current_note_path, target_note_path),
+        *[
+            (current_source_path, target_source_path)
+            for _, current_source_path, target_source_path, _ in source_moves
+        ],
+    ]
+    if current_image_dir.exists():
+        path_moves.append((current_image_dir, target_image_dir))
+    _validate_stored_moves(path_moves)
+
+    _move_stored_path(current_note_path, target_note_path)
+    for source_file, current_source_path, target_source_path, source_filename in source_moves:
+        _move_stored_path(current_source_path, target_source_path)
+        source_file.filename = source_filename
+        source_file.file_path = str(target_source_path)
+    if current_image_dir.exists():
+        _move_stored_path(current_image_dir, target_image_dir)
+
+    note.folder_id = target_folder.id
+    note.folder = target_folder
+    note.filename = note_filename
+    note.note_path = str(target_note_path)
 
 
 @router.post("/from-text", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
@@ -881,6 +967,12 @@ def update_note(
 ) -> NoteRead:
     note = _read_note_or_404(session, note_id)
     _ensure_can_change_note(note, user)
+
+    if payload.folder_id is not None:
+        folder = session.get(Folder, payload.folder_id)
+        if folder is None or folder.archived_at is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        _move_note_to_folder(note, folder)
 
     next_title = payload.title or note.title
     note_path = note_file_path(note)
