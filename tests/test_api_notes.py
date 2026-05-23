@@ -505,7 +505,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["job"]["note_id"] == note["id"]
     assert note["note_api_url"].endswith(f"/api/notes/{note['id']}")
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
-    assert "waiting for the parsing pipeline" in note["text"]
+    assert "Your file has been added to the queue" in note["text"]
     note_filename = f"receipt-{note['id'][:8]}"
     assert note["note_url"].endswith(f"/markdown/uploads/{note_filename}.md")
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
