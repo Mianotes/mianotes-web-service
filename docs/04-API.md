@@ -4,7 +4,7 @@ This document describes the current Mianotes web service API.
 
 All endpoints return JSON unless the endpoint explicitly returns a stored file.
 Protected endpoints accept the browser session cookie created by the auth
-flow, the service-wide API token configured with `MIANOTES_API_TOKEN`, or a
+flow, the service-wide API key configured with `MIANOTES_API_KEY`, or a
 scoped per-user API token sent as a bearer token.
 
 ```text
@@ -860,6 +860,38 @@ Session cookie or bearer token with `tokens:write` or `admin`.
 | `401` | Not authenticated. |
 | `403` | Token lacks `tokens:write`, or non-admin user tries to revoke another user's token. |
 | `404` | Token does not exist. |
+
+## Create service API key
+
+Creates the service-wide API key used by local agents and MCP clients. This is
+the same key concept as `MIANOTES_API_KEY`; Mianotes stores the raw key in the
+service storage configuration and stores only a derived public hash in the
+active `mia.db`.
+
+The raw key is returned only once.
+
+### Endpoint
+
+`POST /api/settings/api-key`
+
+### Authentication
+
+Admin session or bearer token with `admin`.
+
+### Response
+
+```json
+{
+  "token": "mia_generated_service_key"
+}
+```
+
+### Error responses
+
+| Status | Reason |
+|---:|---|
+| `401` | Not authenticated. |
+| `403` | Admin access required. |
 
 ## Create user
 

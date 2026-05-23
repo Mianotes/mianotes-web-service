@@ -14,19 +14,25 @@ from mianotes_web_service.db import session as db_session
 from mianotes_web_service.db.init import create_database
 from mianotes_web_service.db.models import MiaJob
 from mianotes_web_service.domain.schemas import (
+    ServiceApiKeyRead,
     StorageLocationCreate,
     StorageLocationRead,
     StorageSettingsRead,
     StorageSwitchRead,
     StorageSwitchRequest,
 )
-from mianotes_web_service.services.auth import SESSION_COOKIE_NAME
+from mianotes_web_service.services.auth import (
+    SESSION_COOKIE_NAME,
+    generate_api_token,
+    sync_instance_api_token_public_key,
+)
 from mianotes_web_service.services.job_runner import InProcessJobRunner
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     activate_storage_location,
     add_storage_location,
     read_storage_config,
+    set_api_token,
     write_storage_config,
 )
 
@@ -104,6 +110,16 @@ def _queued_or_running_jobs(session: Session) -> int:
 @router.get("/storage", response_model=StorageSettingsRead)
 def storage_settings(_: AdminUser) -> StorageSettingsRead:
     return _storage_response(_read_storage_config())
+
+
+@router.post("/api-key", response_model=ServiceApiKeyRead, status_code=status.HTTP_201_CREATED)
+def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRead:
+    raw_token = generate_api_token()
+    config = _read_storage_config()
+    write_storage_config(get_settings().storage_config_path, set_api_token(config, raw_token))
+    get_settings().api_token = raw_token
+    sync_instance_api_token_public_key(session, raw_token)
+    return ServiceApiKeyRead(token=raw_token)
 
 
 @router.post("/storage/locations", response_model=StorageSettingsRead)

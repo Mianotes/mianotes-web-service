@@ -13,7 +13,11 @@ from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from mianotes_web_service.services.mia import MiaUnavailable, markitdown_openai_image_options
+from mianotes_web_service.services.mia import (
+    MiaUnavailable,
+    markitdown_llm_options,
+    markitdown_openai_image_options,
+)
 
 
 class ParserError(RuntimeError):
@@ -50,6 +54,7 @@ IMAGE_NEEDS_CLOUD_MESSAGE = (
     "improve Mia's image reading capabilities."
 )
 IMAGE_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this image."
+DOCUMENT_UNREADABLE_MESSAGE = "Sorry, Mia was unable to extract any text from this file."
 TESSERACT_CANDIDATES = (
     "/opt/homebrew/bin/tesseract",
     "/usr/local/bin/tesseract",
@@ -264,11 +269,30 @@ class MarkItDownParser:
         if _is_image(path):
             return self._parse_image(path)
 
+        text = _convert_with_markitdown(path)
+        if text.strip():
+            return ParsedDocument(
+                text=text,
+                parser=self.name,
+                source_path=path,
+            )
+
         return ParsedDocument(
-            text=_convert_with_markitdown(path),
-            parser=self.name,
+            text=self._parse_document_with_ocr(path),
+            parser="markitdown+ocr",
             source_path=path,
         )
+
+    def _parse_document_with_ocr(self, path: Path) -> str:
+        try:
+            text = _convert_with_markitdown(
+                path,
+                enable_plugins=True,
+                **markitdown_llm_options(),
+            )
+        except MiaUnavailable:
+            return DOCUMENT_UNREADABLE_MESSAGE
+        return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
 
     def _parse_image(self, path: Path) -> ParsedDocument:
         _convert_with_markitdown(path)

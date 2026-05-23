@@ -117,7 +117,7 @@ browser master password or cookie session. Use `POST /api/tokens` from a
 browser session to create a token, then send it as `Authorization: Bearer
 mia_<token>` from agent clients.
 
-For MCP clients, set `MIANOTES_API_URL` and `MIANOTES_API_TOKEN`, then run
+For MCP clients, set `MIANOTES_API_URL` and `MIANOTES_API_KEY`, then run
 `python -m mianotes_web_service.mcp_server` or the installed `mianotes-mcp`
 console script.
 

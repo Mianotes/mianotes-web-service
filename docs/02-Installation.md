@@ -75,12 +75,12 @@ Do not add database or storage variables unless you want to change the default f
 
 ### Agent and API client variables
 
-Add one private API token to the web service `.env`. This token belongs to the
+Add one private API key to the web service `.env`. This key belongs to the
 running Mianotes service, not to a single database. Mianotes stores only a
 derived public hash in each `mia.db` it opens.
 
 ```env
-MIANOTES_API_TOKEN=<create-a-long-random-secret>
+MIANOTES_API_KEY=<create-a-long-random-secret>
 ```
 
 Agents, scripts, and MCP clients send that same value as a bearer token:
@@ -89,13 +89,15 @@ Agents, scripts, and MCP clients send that same value as a bearer token:
 set -a
 . ./.env
 set +a
-curl -H "Authorization: Bearer ${MIANOTES_API_TOKEN}" \
+curl -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
   "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/search?q=settings"
 ```
 
 You can still create scoped per-user API tokens later when you want narrower
-credentials for a specific automation, but `MIANOTES_API_TOKEN` is the default
+credentials for a specific automation, but `MIANOTES_API_KEY` is the default
 service-wide token for local agents.
+
+`MIANOTES_API_TOKEN` is still accepted as a backwards-compatible alias.
 
 ## Step 3: Start the server
 

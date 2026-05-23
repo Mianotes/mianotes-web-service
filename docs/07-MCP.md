@@ -26,16 +26,18 @@ MIANOTES_API_URL=${MIANOTES_API_URL:-http://127.0.0.1:8200} \
 mianotes-mcp
 ```
 
-The MCP process needs `MIANOTES_API_TOKEN` in its environment. The simplest way
+The MCP process needs `MIANOTES_API_KEY` in its environment. The simplest way
 is to source the same `.env` file used by the web service. Do not copy the token
 into extra files unless you have to.
 
 ## Authentication
 
-By default, MCP clients use the service-wide `MIANOTES_API_TOKEN`. The raw token
+By default, MCP clients use the service-wide `MIANOTES_API_KEY`. The raw key
 stays in `.env`; each `mia.db` stores only a derived public hash. The token acts
 as the first admin user in the selected database, after that database has been
 set up.
+
+`MIANOTES_API_TOKEN` is still accepted as a backwards-compatible alias.
 
 Scoped per-user API tokens are still available for narrower automations. Use
 scoped tokens when an agent should only read notes or work in a limited role.

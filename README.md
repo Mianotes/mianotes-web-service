@@ -16,7 +16,7 @@ The service is designed for small groups: developers, researchers, students, and
 - Stores note text as Markdown on the filesystem.
 - Keeps users, folders, notes, tags, comments, jobs, sessions, and API tokens indexed in SQLite.
 - Converts uploaded files and URLs through a MarkItDown-based parser layer.
-- Supports browser sessions, one service-wide API token for local agents, and scoped per-user tokens for narrower automations.
+- Supports browser sessions, one service-wide API key for local agents, and scoped per-user tokens for narrower automations.
 - Exposes JSON REST APIs for the web app and external automation.
 - Provides a stdio MCP server so compatible AI agents can use Mianotes as a local knowledge tool.
 - Supports local LLMs, or OpenAI, for Mia prompts sent through comments.

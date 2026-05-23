@@ -1,5 +1,6 @@
+import zipfile
 from collections.abc import Generator
-from datetime import UTC, datetime, timedelta
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -75,7 +76,7 @@ def test_publish_themes_are_listed(client: TestClient):
 
     assert response.status_code == 200
     theme_ids = {theme["id"] for theme in response.json()}
-    assert {"mianotes", "minimal"}.issubset(theme_ids)
+    assert theme_ids == {"mialight", "miadark"}
 
 
 def test_publish_draft_returns_editable_blocks(client: TestClient):
@@ -92,7 +93,7 @@ def test_publish_draft_returns_editable_blocks(client: TestClient):
 
     assert response.status_code == 200
     draft = response.json()
-    assert draft["theme"] == "mianotes"
+    assert draft["theme"] == "mialight"
     assert draft["folder_id"] == folder["id"]
     assert draft["tag_id"] is None
     assert draft["site_configuration"]["brand"] == "mianotes"
@@ -100,6 +101,7 @@ def test_publish_draft_returns_editable_blocks(client: TestClient):
         {"title": "GitHub", "url": "https://github.com/Mianotes"},
         {"title": "Contact", "url": "mailto:mianotes@proton.me"},
     ]
+    assert draft["site_configuration"]["showPreviousVersions"] is True
     assert draft["site_configuration"]["footerHtml"] == "Copyright © Your Name Here."
     assert draft["navigation"] == [
         {
@@ -122,12 +124,27 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
         client,
         folder["id"],
         "Clients",
-        "# Clients\n\nMCP clients connect agents to local tools.",
+        (
+            "# Clients\n\n"
+            "MCP clients connect agents to local tools.\n\n"
+            "## Configuration\n\n"
+            "| Field | Type | Description |\n"
+            "|---|---|---|\n"
+            "| `id` | string | Unique client ID. |\n"
+            "| `archived_at` | string \\| null | ISO 8601 archive timestamp. |\n\n"
+            "```json\n"
+            "{\"method\": \"tools/list\"}\n"
+            "```\n\n"
+            "> [!TIP] Understanding the configuration\n"
+            "> Use `MIANOTES_API_KEY` to connect agents.\n\n"
+            "> [!WARNING] Security consideration\n"
+            "> Keep API keys private.\n"
+        ),
     )
     note_path = f"clients-{note['id'][:8]}.html"
     payload = {
         "folder_id": folder["id"],
-        "theme": "mianotes",
+        "theme": "mialight",
         "site_configuration": {
             "brand": "Mia Docs",
             "version": "0.1.1",
@@ -142,7 +159,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
 
     assert response.status_code == 201
     published = response.json()
-    assert published["theme"] == "mianotes"
+    assert published["theme"] == "mialight"
     assert published["version"] == "0.1.1"
     assert published["folder_id"] == folder["id"]
     assert published["tag_id"] is None
@@ -151,6 +168,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert published["markdown_path"] == ""
     assert published["url_path"] == "html/0.1.1/index.html"
     assert published["site_url"].endswith("/html/0.1.1/index.html")
+    assert published["download_url"].endswith(f"/api/publish/{published['id']}/download")
 
     html_root = tmp_path / "data" / "html" / "0.1.1"
     assert (html_root / "index.html").is_file()
@@ -158,7 +176,22 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert (html_root / "site.js").is_file()
     assert (html_root / "search.js").is_file()
     assert (tmp_path / "data" / "html" / "navigation.js").is_file()
-    assert (html_root / note_path).read_text(encoding="utf-8").find("styles.css") > -1
+    note_html = (html_root / note_path).read_text(encoding="utf-8")
+    assert note_html.find("styles.css") > -1
+    assert '<meta name="generator" content="Mianotes - https://github.com/Mianotes">' in note_html
+    assert note_html.count("<h1>Clients</h1>") == 1
+    assert '<table class="doc-table">' in note_html
+    assert "<th>Field</th>" in note_html
+    assert "<code>id</code>" in note_html
+    assert "<code>archived_at</code>" in note_html
+    assert "<td>string | null</td>" in note_html
+    assert "<td>null</td>" not in note_html
+    assert "| Field | Type | Description |" not in note_html
+    assert '<div class="code-card">' in note_html
+    assert '<span class="tok-key">&quot;method&quot;</span>' in note_html
+    assert 'class="admonition admonition-tip"' in note_html
+    assert 'class="admonition admonition-warning"' in note_html
+    assert '<aside class="page-toc" data-page-toc></aside>' in note_html
     assert (tmp_path / "data" / "markdown" / "about-mcp").is_dir()
 
     listed_note = client.get(f"/api/notes/{note['id']}").json()
@@ -171,7 +204,10 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert note_file.status_code == 200
     assert "Mia Docs" in note_file.text
     assert "MCP clients" in note_file.text
-    assert "https://github.com/Mianotes" in (html_root / "site.js").read_text(encoding="utf-8")
+    site_js = (html_root / "site.js").read_text(encoding="utf-8")
+    assert "https://github.com/Mianotes" in site_js
+    assert site_js.find("${versionLinks}") < site_js.find("${externalLinks}")
+    assert "renderPageToc();" in site_js
 
     public_client = TestClient(client.app)
     public_root = public_client.get("/html")
@@ -183,21 +219,32 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     public_markdown = public_client.get(f"/markdown/about-mcp/clients-{note['id'][:8]}.md")
     assert public_markdown.status_code == 200
     assert "MCP clients" in public_markdown.text
-    assert (
-        public_client.get(
-            f"/markdown/about-mcp/sources/{note['id'][:8]}/original.txt"
-        ).status_code
-        == 404
+    public_source_file = public_client.get(
+        f"/markdown/about-mcp/sources/{note['id'][:8]}/original.txt"
     )
+    assert public_source_file.status_code == 200
+    assert "# Clients" in public_source_file.text
     assert public_client.get("/markdown").status_code == 404
+
+    archive_response = client.get(published["download_url"])
+    assert archive_response.status_code == 200
+    assert archive_response.headers["content-type"].startswith("application/zip")
+    with zipfile.ZipFile(BytesIO(archive_response.content)) as archive:
+        names = set(archive.namelist())
+    assert "0.1.1-static-site/index.html" in names
+    assert "0.1.1-static-site/navigation.js" in names
+    assert f"0.1.1-static-site/0.1.1/{note_path}" in names
 
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
     assert next_draft["site_configuration"]["brand"] == "Mia Docs"
+    assert next_draft["site_configuration"]["showPreviousVersions"] is True
     assert next_draft["navigation"] == payload["navigation"]
     assert next_draft["updated_notes"] == []
 
 
-def test_publish_draft_reuses_saved_navigation_and_stages_later_updates(client: TestClient):
+def test_publish_draft_regenerates_navigation_and_stages_new_navigation_items(
+    client: TestClient,
+):
     _join(client)
     folder = client.post("/api/folders", json={"name": "Publish staging"}).json()
     first_note = _create_note(
@@ -218,19 +265,11 @@ def test_publish_draft_reuses_saved_navigation_and_stages_later_updates(client: 
             ],
         }
     ]
-    published_at = datetime.now(UTC) - timedelta(hours=1)
-
-    with client.app.state.testing_session() as session:
-        stored = session.get(Note, first_note["id"])
-        assert stored is not None
-        stored.updated_at = published_at
-        session.commit()
-
     publish_response = client.post(
         "/api/publish",
         json={
             "folder_id": folder["id"],
-            "theme": "mianotes",
+            "theme": "mialight",
             "site_configuration": {
                 "brand": "mianotes",
                 "version": "0.1.0",
@@ -253,7 +292,21 @@ def test_publish_draft_reuses_saved_navigation_and_stages_later_updates(client: 
 
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
 
-    assert next_draft["navigation"] == saved_navigation
+    assert next_draft["navigation"] == [
+        {
+            "title": "Publish staging",
+            "items": [
+                {
+                    "title": "Architecture",
+                    "path": first_path,
+                },
+                {
+                    "title": "Settings page",
+                    "path": second_path,
+                },
+            ],
+        }
+    ]
     assert next_draft["updated_notes"] == [
         {
             "title": "Settings page",
@@ -297,7 +350,7 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
     publish_response = client.post(
         "/api/publish",
         json={
-            "theme": "mianotes",
+            "theme": "mialight",
             "site_configuration": {
                 "brand": "mianotes",
                 "version": "0.1.0",
@@ -314,7 +367,7 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
         "/api/publish",
         json={
             "folder_id": mianotes_folder["id"],
-            "theme": "mianotes",
+            "theme": "mialight",
             "site_configuration": {
                 "brand": "mianotes",
                 "version": "0.1.0",
@@ -339,12 +392,23 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
 
     draft = client.get("/api/publish/draft").json()
 
-    assert draft["navigation"] == saved_navigation
+    assert draft["navigation"][0] == {
+        "title": "Improvements",
+        "items": [
+            {
+                "title": "Improvements",
+                "path": improvements_path,
+            }
+        ],
+    }
+    mianotes_group = draft["navigation"][1]
+    assert mianotes_group["title"] == "Mianotes"
     assert {
         "title": "How to use Mianotes",
         "path": mianotes_path,
-    } in draft["updated_notes"]
-    assert all(note["path"].startswith("mianotes/") for note in draft["updated_notes"])
+    } in mianotes_group["items"]
+    assert len(mianotes_group["items"]) == 2
+    assert draft["updated_notes"] == mianotes_group["items"]
 
 
 def test_publish_draft_includes_published_status_notes(client: TestClient):

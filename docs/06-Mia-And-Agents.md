@@ -44,12 +44,12 @@ AI agents use Mianotes programmatically. They can:
 - Prompt Mia from comments.
 
 Agents should use API tokens and MCP tools, not browser cookies. The default
-setup uses the service-wide `MIANOTES_API_TOKEN` from the web service `.env`.
+setup uses the service-wide `MIANOTES_API_KEY` from the web service `.env`.
 That private token works across database switches because each `mia.db` stores
 only the token's derived public hash.
 
 The stdio MCP server is started with `MIANOTES_API_URL` and
-`MIANOTES_API_TOKEN`, then calls the same REST API as any other agent client. If
+`MIANOTES_API_KEY`, then calls the same REST API as any other agent client. If
 the MCP process is started outside the web service shell, source the same `.env`
 first so you do not duplicate the token in multiple places.
 

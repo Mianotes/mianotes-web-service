@@ -1,8 +1,15 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, status
+import re
+import zipfile
+from io import BytesIO
+
+from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 
 from mianotes_web_service.api.dependencies import NotesReadUser, NotesWriteUser, SessionDep
+from mianotes_web_service.core.config import get_settings
+from mianotes_web_service.db.models import PublishedSite
 from mianotes_web_service.domain.schemas import (
     PublishDraftRead,
     PublishRead,
@@ -36,7 +43,7 @@ def read_publish_themes(user: NotesReadUser) -> list[PublishThemeRead]:
 def read_publish_draft(
     session: SessionDep,
     user: NotesReadUser,
-    theme: str = "mianotes",
+    theme: str = "mialight",
     folder_id: str | None = None,
     tag_id: str | None = None,
 ) -> PublishDraftRead:
@@ -62,6 +69,7 @@ def publish_site_endpoint(
 ) -> PublishRead:
     published_site = publish_site(session, user, payload)
     site_url = str(request.url_for("get_folder_file", file_path=published_site.url_path))
+    download_url = str(request.url_for("download_published_site", site_id=published_site.id))
     return PublishRead(
         id=published_site.id,
         theme=published_site.theme,
@@ -73,5 +81,45 @@ def publish_site_endpoint(
         markdown_path=published_site.markdown_path,
         url_path=published_site.url_path,
         site_url=site_url,
+        download_url=download_url,
         created_at=published_site.created_at,
     )
+
+
+@router.get("/{site_id}/download", name="download_published_site")
+def download_published_site(
+    site_id: str,
+    session: SessionDep,
+    user: NotesReadUser,
+) -> StreamingResponse:
+    _ = user
+    site = session.get(PublishedSite, site_id)
+    if site is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Published site not found")
+
+    html_root = (get_settings().data_dir / "html").resolve()
+    site_dir = (get_settings().data_dir / site.html_path).resolve()
+    if html_root not in site_dir.parents or not site_dir.is_dir():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Published site files not found")
+
+    archive = BytesIO()
+    archive_root = f"{_archive_name(site)}-static-site"
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in (html_root / "index.html", html_root / "navigation.js"):
+            if file_path.is_file():
+                zip_file.write(file_path, f"{archive_root}/{file_path.name}")
+        for file_path in sorted(path for path in site_dir.rglob("*") if path.is_file()):
+            zip_file.write(file_path, f"{archive_root}/{file_path.relative_to(html_root).as_posix()}")
+    archive.seek(0)
+
+    filename = f"{archive_root}.zip"
+    return StreamingResponse(
+        archive,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _archive_name(site: PublishedSite) -> str:
+    value = re.sub(r"[^A-Za-z0-9._-]+", "-", site.version.strip()).strip(".-_")
+    return value or "mianotes"

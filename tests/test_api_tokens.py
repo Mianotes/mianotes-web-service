@@ -1,3 +1,4 @@
+import json
 from collections.abc import Generator
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from mianotes_web_service.services.auth import (
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
     get_settings.cache_clear()
     monkeypatch.setenv("MIANOTES_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(tmp_path / "storage.json"))
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -82,6 +84,42 @@ def test_service_api_token_authenticates_as_database_admin(
     stored_public_key = _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY)
     assert stored_public_key == hash_api_token(raw_token)
     assert stored_public_key != raw_token
+
+
+def test_service_api_key_env_alias_authenticates_as_database_admin(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+):
+    _join_admin(client)
+    raw_token = "service-private-key"
+    monkeypatch.setenv("MIANOTES_API_KEY", raw_token)
+    get_settings.cache_clear()
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
+    stored_public_key = _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY)
+    assert stored_public_key == hash_api_token(raw_token)
+    assert stored_public_key != raw_token
+
+
+def test_admin_can_create_service_api_key_from_settings(client: TestClient):
+    _join_admin(client)
+
+    created = client.post("/api/settings/api-key", json={})
+
+    assert created.status_code == 201
+    raw_token = created.json()["token"]
+    assert raw_token.startswith("mia_")
+    assert _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY) == hash_api_token(raw_token)
+
+    storage_config = json.loads(get_settings().storage_config_path.read_text(encoding="utf-8"))
+    assert storage_config["apiKey"] == raw_token
+    assert "apiToken" not in storage_config
+
+    agent_client = TestClient(client.app)
+    response = agent_client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
 
 
 def test_service_api_token_requires_initialized_database(

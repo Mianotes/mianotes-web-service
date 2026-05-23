@@ -58,6 +58,10 @@ function iconCopy() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
 }
 
+function iconToc() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13"></path><path d="M8 12h13"></path><path d="M8 18h13"></path><path d="M3 6h.01"></path><path d="M3 12h.01"></path><path d="M3 18h.01"></path></svg>`;
+}
+
 function htmlEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -66,6 +70,53 @@ function htmlEscape(value) {
     '"': "&quot;",
     "'": "&#039;"
   }[char]));
+}
+
+function slugForHeading(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/<[^>]*>/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "section";
+}
+
+function renderPageToc() {
+  const toc = document.querySelector("[data-page-toc]");
+  const article = document.querySelector(".article");
+  if (!toc || !article) return;
+
+  const used = new Map();
+  const headings = Array.from(article.querySelectorAll("h2, h3"))
+    .filter((heading) => heading.textContent?.trim())
+    .map((heading) => {
+      const base = slugForHeading(heading.textContent);
+      const count = used.get(base) || 0;
+      used.set(base, count + 1);
+      const id = count ? `${base}-${count + 1}` : base;
+      heading.id = heading.id || id;
+      return {
+        id: heading.id,
+        title: heading.textContent.trim(),
+        level: heading.tagName.toLowerCase()
+      };
+    });
+
+  if (!headings.length) {
+    toc.hidden = true;
+    return;
+  }
+
+  toc.hidden = false;
+  toc.innerHTML = `
+    <div class="toc-inner">
+      <h2>${iconToc()}<span>On this page</span></h2>
+      <nav aria-label="On this page">
+        ${headings.map((heading) => `
+          <a class="toc-link ${heading.level === "h3" ? "nested" : ""}" href="#${htmlEscape(heading.id)}">${htmlEscape(heading.title)}</a>
+        `).join("")}
+      </nav>
+    </div>
+  `;
 }
 
 function renderHeader() {
@@ -78,10 +129,12 @@ function renderHeader() {
   const externalLinks = configuredLinks.map((item) => `
     <a href="${htmlEscape(item.url)}" target="_blank" rel="noreferrer">${htmlEscape(item.title)}</a>
   `).join("");
-  const versionLinks = (SITE_NAVIGATION?.navigation || []).map((item) => {
+  const versionLinks = SITE_CONFIGURATION?.showPreviousVersions !== false
+    ? (SITE_NAVIGATION?.navigation || []).slice(0, 3).map((item) => {
     const active = currentVersion() === item.key;
     return `<a class="${active ? "active" : ""}" href="${versionHrefFor(item)}">${htmlEscape(item.label)}</a>`;
-  }).join("");
+  }).join("")
+    : "";
   const brand = htmlEscape(SITE_CONFIGURATION?.brand || "mianotes");
 
   header.innerHTML = `
@@ -99,8 +152,8 @@ function renderHeader() {
       </div>
     </div>
     <nav class="primary-nav" aria-label="Primary">
-      ${externalLinks}
       ${versionLinks}
+      ${externalLinks}
     </nav>
   `;
 }
@@ -281,6 +334,7 @@ function bindCopyButtons() {
 
 renderHeader();
 renderSidebar();
+renderPageToc();
 renderArticleFooter();
 bindSearch();
 bindCopyButtons();

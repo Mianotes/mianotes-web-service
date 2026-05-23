@@ -137,9 +137,9 @@ def _api_url() -> str:
 
 
 def _api_token() -> str:
-    token = os.environ.get("MIANOTES_API_TOKEN")
+    token = os.environ.get("MIANOTES_API_KEY") or os.environ.get("MIANOTES_API_TOKEN")
     if not token:
-        raise RuntimeError("MIANOTES_API_TOKEN is required")
+        raise RuntimeError("MIANOTES_API_KEY is required")
     return token
 
 

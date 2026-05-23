@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     port: int = 8200
     data_dir: Path = Field(default=Path("data"))
     database_url: str | None = None
+    api_key: str | None = None
     api_token: str | None = None
     storage_config_path: Path = Field(default=Path("storage.json"))
     llm_provider: str = "openai"
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def set_default_database_url(self) -> Settings:
+        if not self.api_token:
+            self.api_token = self.api_key
         if not self.database_url:
             if os.environ.get("MIANOTES_DATA_DIR") and not os.environ.get(
                 "MIANOTES_STORAGE_CONFIG_PATH"
@@ -46,6 +49,8 @@ class Settings(BaseSettings):
                 )
                 self.data_dir = storage_config.active_folder_path
                 self.database_url = f"sqlite:///{self.data_dir / storage_config.database_file}"
+                if not self.api_token:
+                    self.api_token = storage_config.api_token
         return self
 
     @property

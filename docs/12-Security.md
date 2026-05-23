@@ -3,7 +3,7 @@
 Mianotes supports three ways to access protected APIs:
 
 - Browser users sign in through the dashboard and use a cookie-based session created by the login flow.
-- Local agents can use the service-wide `MIANOTES_API_TOKEN` from `.env`, sent as a bearer token.
+- Local agents can use the service-wide `MIANOTES_API_KEY` from `.env`, sent as a bearer token.
 - Narrower automations can use scoped per-user API tokens created through the API or dashboard.
 
 ```http
@@ -30,7 +30,7 @@ For example, if an agent can read a private key, credentials file, or `.env` fil
 - Do not give untrusted agents filesystem access to sensitive files.
 - Run agents with the least filesystem access they need.
 - Give agents project-specific working directories instead of access to a whole home directory.
-- Use `MIANOTES_API_TOKEN` for trusted local agents, or scoped per-user API tokens when an automation needs narrower access.
+- Use `MIANOTES_API_KEY` for trusted local agents, or scoped per-user API tokens when an automation needs narrower access.
 - Revoke an agent token when the agent no longer needs access.
 - Avoid giving hosted or third-party agents direct access to local folders unless you trust the agent and its operator.
 - Review activity logs after allowing a new agent or automation to use Mianotes.

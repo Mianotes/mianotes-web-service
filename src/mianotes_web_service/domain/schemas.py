@@ -288,6 +288,10 @@ class StorageSwitchRead(BaseModel):
     session_ended: bool = True
 
 
+class ServiceApiKeyRead(BaseModel):
+    token: str
+
+
 class ApiTokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     user_id: str | None = None
@@ -359,7 +363,7 @@ class PublishDraftRead(BaseModel):
 class PublishRequest(BaseModel):
     folder_id: str | None = None
     tag_id: str | None = None
-    theme: str = Field(default="mianotes", min_length=1, max_length=80)
+    theme: str = Field(default="mialight", min_length=1, max_length=80)
     site_configuration: dict[str, object]
     navigation: list[dict[str, object]]
     updated_notes: list[dict[str, object]]
@@ -376,4 +380,5 @@ class PublishRead(BaseModel):
     markdown_path: str
     url_path: str
     site_url: str
+    download_url: str
     created_at: datetime

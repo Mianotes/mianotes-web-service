@@ -7,6 +7,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services import parsing
 from mianotes_web_service.services.parsing import (
     DEFAULT_BROWSER_USER_AGENT,
+    DOCUMENT_UNREADABLE_MESSAGE,
     IMAGE_NEEDS_CLOUD_MESSAGE,
     IMAGE_UNREADABLE_MESSAGE,
     MarkItDownParser,
@@ -51,6 +52,116 @@ def test_markitdown_parser_converts_file(tmp_path: Path, monkeypatch: pytest.Mon
     assert parsed.source_path == source
     assert "Hello from MarkItDown" in parsed.text
     assert "source=note.md" in parsed.text
+
+
+def test_document_parser_retries_blank_document_with_ocr_plugin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+    created_with = []
+
+    class FakeMarkItDown:
+        def __init__(self, **kwargs):
+            created_with.append(kwargs)
+
+        def convert(self, path: str):
+            if created_with[-1].get("enable_plugins"):
+                return SimpleNamespace(text_content="Scanned PDF text")
+            return SimpleNamespace(text_content="")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "gpt-4o",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "Scanned PDF text"
+    assert parsed.parser == "markitdown+ocr"
+    assert created_with == [
+        {},
+        {
+            "enable_plugins": True,
+            "llm_client": created_with[1]["llm_client"],
+            "llm_model": "gpt-4o",
+        },
+    ]
+
+
+def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(text_content="")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("OpenAI is not configured")),
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == DOCUMENT_UNREADABLE_MESSAGE
+    assert parsed.parser == "markitdown+ocr"
+
+
+def test_document_parser_adds_feedback_when_ocr_returns_no_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(text_content="")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: {
+            "llm_client": object(),
+            "llm_model": "gpt-4o",
+        },
+    )
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == DOCUMENT_UNREADABLE_MESSAGE
+    assert parsed.parser == "markitdown+ocr"
 
 
 def test_image_parser_uses_configured_llm_options(

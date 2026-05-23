@@ -22,6 +22,7 @@ from mianotes_web_service.services.storage import markdown_note_body, short_id, 
 PUBLISHABLE_NOTE_STATUSES = ("ready", "published")
 
 THEMES_DIR = Path(__file__).resolve().parents[1] / "publishing" / "themes"
+GENERATOR_META_TAG = '<meta name="generator" content="Mianotes - https://github.com/Mianotes">'
 DEFAULT_SITE_CONFIGURATION: dict[str, object] = {
     "brand": "mianotes",
     "version": "0.1.0",
@@ -29,6 +30,7 @@ DEFAULT_SITE_CONFIGURATION: dict[str, object] = {
         {"title": "GitHub", "url": "https://github.com/Mianotes"},
         {"title": "Contact", "url": "mailto:mianotes@proton.me"},
     ],
+    "showPreviousVersions": True,
     "footerHtml": "Copyright © Your Name Here.",
 }
 
@@ -71,7 +73,8 @@ def list_publish_themes() -> list[PublishTheme]:
                 directory=directory,
             )
         )
-    return themes
+    theme_order = {"mialight": 0, "miadark": 1}
+    return sorted(themes, key=lambda theme: (theme_order.get(theme.id, 99), theme.name.lower()))
 
 
 def read_publish_theme(theme_id: str) -> PublishTheme:
@@ -84,7 +87,7 @@ def read_publish_theme(theme_id: str) -> PublishTheme:
 def build_publish_draft(
     session: Session,
     *,
-    theme_id: str = "mianotes",
+    theme_id: str = "mialight",
     folder_id: str | None = None,
     tag_id: str | None = None,
 ) -> PublishDraft:
@@ -93,24 +96,23 @@ def build_publish_draft(
     tag = _read_tag(session, tag_id) if tag_id else None
     notes = _read_publishable_notes(session, folder_id=folder_id, tag_id=tag_id)
     latest_publish = _read_latest_publish(session, folder_id=folder_id, tag_id=tag_id)
-    since = latest_publish.created_at if latest_publish else None
+    has_previous_publish = latest_publish is not None
     include_folder = folder_id is None
     site_configuration = (
         _load_json_object(latest_publish.site_configuration, DEFAULT_SITE_CONFIGURATION)
         if latest_publish
         else _default_site_configuration(theme)
     )
-    navigation = (
-        _load_json_list(latest_publish.navigation, [])
+    navigation = _navigation_for_notes(notes, include_folder=include_folder)
+    previous_navigation_paths = (
+        _navigation_paths(_load_json_list(latest_publish.navigation, []))
         if latest_publish
-        else _navigation_for_notes(notes, include_folder=include_folder)
+        else set()
     )
-    navigation_paths = _navigation_paths(navigation)
-    updated_notes = [] if since is None else _updated_notes(
+    updated_notes = [] if not has_previous_publish else _updated_notes(
         notes,
-        since=since,
         include_folder=include_folder,
-        navigation_paths=navigation_paths,
+        previous_navigation_paths=previous_navigation_paths,
     )
     return PublishDraft(
         theme=theme.id,
@@ -263,16 +265,13 @@ def _navigation_for_notes(notes: list[Note], *, include_folder: bool) -> list[di
 def _updated_notes(
     notes: list[Note],
     *,
-    since: datetime | None,
     include_folder: bool,
-    navigation_paths: set[str],
+    previous_navigation_paths: set[str],
 ) -> list[dict[str, object]]:
     updated_notes: list[dict[str, object]] = []
     for note in notes:
         path = _published_note_path(note, include_folder=include_folder)
-        is_missing_from_navigation = path not in navigation_paths
-        is_updated_since_publish = since is not None and _as_utc(note.updated_at) > _as_utc(since)
-        if not is_missing_from_navigation and not is_updated_since_publish:
+        if path in previous_navigation_paths:
             continue
         updated_notes.append(
             {
@@ -299,12 +298,6 @@ def _navigation_paths(navigation: list[dict[str, object]]) -> set[str]:
 
     collect(navigation)
     return paths
-
-
-def _as_utc(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value.astimezone(UTC)
 
 
 def _published_note_path(note: Note, *, include_folder: bool) -> str:
@@ -360,7 +353,10 @@ def _write_note_pages(
                     "in the filesystem."
                 ),
             )
-        body = markdown_note_body(source_path.read_text(encoding="utf-8"))
+        body = _without_duplicate_title_heading(
+            markdown_note_body(source_path.read_text(encoding="utf-8")),
+            note.title,
+        )
         relative_path = Path(_published_note_path(note, include_folder=include_folder))
         page_path = version_dir / relative_path
         page_path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,6 +420,7 @@ def _render_published_page(
             f'      <footer class="site-footer">{footer_html}</footer>\n'
             "    </article>\n"
             "  </section>\n"
+            '  <aside class="page-toc" data-page-toc></aside>\n'
             "</main>\n"
         ),
     )
@@ -450,6 +447,7 @@ def _write_version_index(
             "  <head>\n"
             '    <meta charset="utf-8">\n'
             '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            f"    {GENERATOR_META_TAG}\n"
             f"{refresh}"
             f"    <title>{brand} documentation</title>\n"
             "  </head>\n"
@@ -469,6 +467,7 @@ def _write_root_index(*, html_root: Path, version_slug: str) -> None:
             "  <head>\n"
             '    <meta charset="utf-8">\n'
             '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            f"    {GENERATOR_META_TAG}\n"
             "    <title>mianotes documentation</title>\n"
             '    <script src="./navigation.js"></script>\n'
             "    <script>\n"
@@ -551,6 +550,7 @@ def _html_shell(
         "  <head>\n"
         '    <meta charset="utf-8">\n'
         '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"    {GENERATOR_META_TAG}\n"
         f"    <title>{escaped_title}</title>\n"
         f'    <link rel="stylesheet" href="{html.escape(stylesheet)}">\n'
         f'    <script src="{html.escape(navigation_script)}" defer></script>\n'
@@ -581,6 +581,8 @@ def _markdown_to_html(markdown: str) -> str:
     in_code = False
     code_lines: list[str] = []
     code_language = ""
+    lines = markdown.splitlines()
+    index = 0
 
     def flush_paragraph() -> None:
         if paragraph:
@@ -592,14 +594,12 @@ def _markdown_to_html(markdown: str) -> str:
             blocks.append(f"<ul>{''.join(list_items)}</ul>")
             list_items.clear()
 
-    for line in markdown.splitlines():
+    while index < len(lines):
+        line = lines[index]
         stripped = line.strip()
         if stripped.startswith("```"):
             if in_code:
-                blocks.append(
-                    f'<pre><code class="language-{html.escape(code_language)}">'
-                    f"{html.escape(chr(10).join(code_lines))}</code></pre>"
-                )
+                blocks.append(_code_block_to_html(chr(10).join(code_lines), code_language))
                 in_code = False
                 code_lines.clear()
                 code_language = ""
@@ -608,13 +608,36 @@ def _markdown_to_html(markdown: str) -> str:
                 flush_list()
                 in_code = True
                 code_language = stripped.removeprefix("```").strip()
+            index += 1
             continue
         if in_code:
             code_lines.append(line)
+            index += 1
             continue
         if not stripped:
             flush_paragraph()
             flush_list()
+            index += 1
+            continue
+        if _is_table_start(lines, index):
+            flush_paragraph()
+            flush_list()
+            table_lines = [line]
+            index += 2
+            while index < len(lines) and _is_table_row(lines[index]):
+                table_lines.append(lines[index])
+                index += 1
+            blocks.append(_table_to_html(table_lines))
+            continue
+        if _is_admonition_start(stripped):
+            flush_paragraph()
+            flush_list()
+            admonition_lines = [line]
+            index += 1
+            while index < len(lines) and lines[index].strip().startswith(">"):
+                admonition_lines.append(lines[index])
+                index += 1
+            blocks.append(_admonition_to_html(admonition_lines))
             continue
         heading = re.match(r"^(#{1,4})\s+(.+)$", stripped)
         if heading:
@@ -622,26 +645,190 @@ def _markdown_to_html(markdown: str) -> str:
             flush_list()
             level = len(heading.group(1))
             blocks.append(f"<h{level}>{_inline_markdown(heading.group(2))}</h{level}>")
+            index += 1
             continue
         bullet = re.match(r"^[-*]\s+(.+)$", stripped)
         if bullet:
             flush_paragraph()
             list_items.append(f"<li>{_inline_markdown(bullet.group(1))}</li>")
+            index += 1
             continue
         paragraph.append(stripped)
+        index += 1
 
     flush_paragraph()
     flush_list()
     if in_code:
-        blocks.append(f"<pre><code>{html.escape(chr(10).join(code_lines))}</code></pre>")
+        blocks.append(_code_block_to_html(chr(10).join(code_lines), code_language))
     return "\n".join(blocks)
+
+
+def _without_duplicate_title_heading(markdown: str, title: str) -> str:
+    lines = markdown.splitlines()
+    first_content_index = next(
+        (index for index, line in enumerate(lines) if line.strip()),
+        None,
+    )
+    if first_content_index is None:
+        return markdown.strip()
+
+    match = re.match(r"^#{1,6}\s+(.+?)\s*#*\s*$", lines[first_content_index].strip())
+    if not match:
+        return markdown.strip()
+    if _normalised_heading_text(match.group(1)) != _normalised_heading_text(title):
+        return markdown.strip()
+    return "\n".join(lines[first_content_index + 1 :]).strip()
+
+
+def _normalised_heading_text(value: str) -> str:
+    text = re.sub(r"`([^`]+)`", r"\1", value)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"[*_~]+", "", text)
+    return re.sub(r"\s+", " ", text).strip().casefold()
+
+
+def _is_table_start(lines: list[str], index: int) -> bool:
+    return (
+        index + 1 < len(lines)
+        and _is_table_row(lines[index])
+        and _is_table_separator(lines[index + 1])
+    )
+
+
+def _is_table_row(line: str) -> bool:
+    stripped = line.strip()
+    return "|" in stripped and stripped.startswith("|") and stripped.endswith("|")
+
+
+def _is_table_separator(line: str) -> bool:
+    stripped = line.strip()
+    if not _is_table_row(stripped):
+        return False
+    cells = _table_cells(stripped)
+    return bool(cells) and all(re.fullmatch(r":?-{3,}:?", cell.strip()) for cell in cells)
+
+
+def _table_cells(line: str) -> list[str]:
+    stripped = line.strip()
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|"):
+        stripped = stripped[:-1]
+
+    cells: list[str] = []
+    cell: list[str] = []
+    index = 0
+    while index < len(stripped):
+        char = stripped[index]
+        if char == "\\" and index + 1 < len(stripped) and stripped[index + 1] == "|":
+            cell.append("|")
+            index += 2
+            continue
+        if char == "|":
+            cells.append("".join(cell).strip())
+            cell.clear()
+            index += 1
+            continue
+        cell.append(char)
+        index += 1
+    cells.append("".join(cell).strip())
+    return cells
+
+
+def _table_to_html(lines: list[str]) -> str:
+    header_cells = _table_cells(lines[0])
+    body_rows = [_table_cells(line) for line in lines[1:]]
+    column_count = max(len(header_cells), *(len(row) for row in body_rows), 1)
+
+    def padded(cells: list[str]) -> list[str]:
+        return cells + [""] * (column_count - len(cells))
+
+    header_html = "".join(
+        f"<th>{_inline_markdown(cell)}</th>" for cell in padded(header_cells)
+    )
+    body_html = "".join(
+        "<tr>"
+        + "".join(f"<td>{_inline_markdown(cell)}</td>" for cell in padded(row))
+        + "</tr>"
+        for row in body_rows
+    )
+    columns_html = "".join("<col>" for _ in range(column_count))
+    return (
+        '<table class="doc-table">'
+        f"<colgroup>{columns_html}</colgroup>"
+        f"<thead><tr>{header_html}</tr></thead>"
+        f"<tbody>{body_html}</tbody>"
+        "</table>"
+    )
+
+
+def _code_block_to_html(code: str, language: str = "") -> str:
+    language_class = f' class="language-{html.escape(language)}"' if language else ""
+    return (
+        '<div class="code-card">'
+        f"<pre><code{language_class}>{_highlight_code(code)}</code></pre>"
+        "</div>"
+    )
+
+
+def _highlight_code(code: str) -> str:
+    escaped = html.escape(code)
+    escaped = re.sub(
+        r"(&quot;[^&]*&quot;)(\s*:)",
+        r'<span class="tok-key">\1</span>\2',
+        escaped,
+    )
+    escaped = re.sub(
+        r"(:\s*)(&quot;[^&]*&quot;)",
+        r'\1<span class="tok-string">\2</span>',
+        escaped,
+    )
+    return escaped
+
+
+def _is_admonition_start(stripped: str) -> bool:
+    return bool(re.match(r"^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]", stripped, re.I))
+
+
+def _admonition_to_html(lines: list[str]) -> str:
+    first = lines[0].strip()
+    match = re.match(
+        r"^>\s*\[!(?P<kind>NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(?P<title>.*)$",
+        first,
+        re.I,
+    )
+    kind = (match.group("kind") if match else "note").lower()
+    title = (match.group("title") if match else "").strip() or _admonition_default_title(kind)
+    body_lines = [_strip_blockquote_marker(line) for line in lines[1:]]
+    body = _markdown_to_html("\n".join(body_lines).strip()) if body_lines else ""
+    return (
+        f'<aside class="admonition admonition-{html.escape(kind)}">'
+        f'<div class="admonition-title"><span class="admonition-icon" aria-hidden="true"></span>'
+        f"<strong>{_inline_markdown(title)}</strong></div>"
+        f'<div class="admonition-body">{body}</div>'
+        "</aside>"
+    )
+
+
+def _strip_blockquote_marker(line: str) -> str:
+    return re.sub(r"^>\s?", "", line)
+
+
+def _admonition_default_title(kind: str) -> str:
+    return {
+        "note": "Note",
+        "tip": "Tip",
+        "important": "Important",
+        "warning": "Warning",
+        "caution": "Caution",
+    }.get(kind, "Note")
 
 
 def _inline_markdown(text: str) -> str:
     escaped = html.escape(text)
     escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
     escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
-    escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', escaped)
+    escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a class="inline-link" href="\2">\1</a>', escaped)
     return escaped
 
 
@@ -658,7 +845,9 @@ def _load_json_object(value: str, fallback: dict[str, object]) -> dict[str, obje
         return json.loads(json.dumps(fallback))
     if not isinstance(loaded, dict):
         return json.loads(json.dumps(fallback))
-    return loaded
+    merged = json.loads(json.dumps(fallback))
+    merged.update(loaded)
+    return merged
 
 
 def _load_json_list(value: str, fallback: list[dict[str, object]]) -> list[dict[str, object]]:
