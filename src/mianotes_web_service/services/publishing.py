@@ -105,10 +105,12 @@ def build_publish_draft(
         if latest_publish
         else _navigation_for_notes(notes, include_folder=include_folder)
     )
+    navigation_paths = _navigation_paths(navigation)
     updated_notes = [] if since is None else _updated_notes(
         notes,
         since=since,
         include_folder=include_folder,
+        navigation_paths=navigation_paths,
     )
     return PublishDraft(
         theme=theme.id,
@@ -263,19 +265,40 @@ def _updated_notes(
     *,
     since: datetime | None,
     include_folder: bool,
+    navigation_paths: set[str],
 ) -> list[dict[str, object]]:
     updated_notes: list[dict[str, object]] = []
     for note in notes:
-        cutoff = note.published_at or since
-        if cutoff is not None and _as_utc(note.updated_at) <= _as_utc(cutoff):
+        path = _published_note_path(note, include_folder=include_folder)
+        is_missing_from_navigation = path not in navigation_paths
+        is_updated_since_publish = since is not None and _as_utc(note.updated_at) > _as_utc(since)
+        if not is_missing_from_navigation and not is_updated_since_publish:
             continue
         updated_notes.append(
             {
                 "title": note.title,
-                "path": _published_note_path(note, include_folder=include_folder),
+                "path": path,
             }
         )
     return updated_notes
+
+
+def _navigation_paths(navigation: list[dict[str, object]]) -> set[str]:
+    paths: set[str] = set()
+
+    def collect(items: Iterable[object]) -> None:
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            path = item.get("path")
+            if isinstance(path, str) and path:
+                paths.add(path)
+            children = item.get("items")
+            if isinstance(children, list):
+                collect(children)
+
+    collect(navigation)
+    return paths
 
 
 def _as_utc(value: datetime) -> datetime:

@@ -244,6 +244,91 @@ def test_publish_draft_reuses_saved_navigation_and_stages_later_updates(client: 
     ]
 
 
+def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: TestClient):
+    _join(client)
+    improvements_folder = client.post("/api/folders", json={"name": "Improvements"}).json()
+    mianotes_folder = next(
+        folder for folder in client.get("/api/folders").json() if folder["name"] == "Mianotes"
+    )
+    improvements_note = _create_note(
+        client,
+        improvements_folder["id"],
+        "Improvements",
+        "Improvement notes.",
+    )
+    mianotes_note = _create_note(
+        client,
+        mianotes_folder["id"],
+        "How to use Mianotes",
+        "Mianotes notes.",
+    )
+    improvements_path = f"improvements/improvements-{improvements_note['id'][:8]}.html"
+    mianotes_path = f"mianotes/how-to-use-mianotes-{mianotes_note['id'][:8]}.html"
+    saved_navigation = [
+        {
+            "title": "Improvements",
+            "items": [
+                {
+                    "title": "Improvements",
+                    "path": improvements_path,
+                }
+            ],
+        }
+    ]
+
+    publish_response = client.post(
+        "/api/publish",
+        json={
+            "theme": "mianotes",
+            "site_configuration": {
+                "brand": "mianotes",
+                "version": "0.1.0",
+                "headerLinks": [],
+                "footerHtml": "Copyright © Test.",
+            },
+            "navigation": saved_navigation,
+            "updated_notes": [],
+        },
+    )
+    assert publish_response.status_code == 201
+
+    folder_publish_response = client.post(
+        "/api/publish",
+        json={
+            "folder_id": mianotes_folder["id"],
+            "theme": "mianotes",
+            "site_configuration": {
+                "brand": "mianotes",
+                "version": "0.1.0",
+                "headerLinks": [],
+                "footerHtml": "Copyright © Test.",
+            },
+            "navigation": [
+                {
+                    "title": "Mianotes",
+                    "items": [
+                        {
+                            "title": "How to use Mianotes",
+                            "path": f"how-to-use-mianotes-{mianotes_note['id'][:8]}.html",
+                        }
+                    ],
+                }
+            ],
+            "updated_notes": [],
+        },
+    )
+    assert folder_publish_response.status_code == 201
+
+    draft = client.get("/api/publish/draft").json()
+
+    assert draft["navigation"] == saved_navigation
+    assert {
+        "title": "How to use Mianotes",
+        "path": mianotes_path,
+    } in draft["updated_notes"]
+    assert all(note["path"].startswith("mianotes/") for note in draft["updated_notes"])
+
+
 def test_publish_draft_includes_published_status_notes(client: TestClient):
     _join(client)
     folder = client.post("/api/folders", json={"name": "Published Docs"}).json()
