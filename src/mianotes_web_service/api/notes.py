@@ -643,7 +643,10 @@ def create_note_from_file(
         title=note_title,
         status="pending_parse",
         source_type=_source_type_from_filename(file.filename),
-        summary="Your file has been added to the queue. Mia will read it and turn it into a note as soon as possible.",
+        summary=(
+            "Your file has been added to the queue. Mia will read it and turn it into "
+            "a note as soon as possible."
+        ),
         filename=paths.note_path.name,
         note_path=str(paths.note_path),
     )

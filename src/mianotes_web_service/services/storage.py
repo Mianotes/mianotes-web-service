@@ -209,7 +209,8 @@ def render_pending_upload_note(title: str, original_filename: str) -> str:
         "## Source\n\n"
         f"{original_filename}\n\n"
         "## Note\n\n"
-        "Your file has been added to the queue. Mia will read it and turn it into a note as soon as possible.\n"
+        "Your file has been added to the queue. Mia will read it and turn it into a "
+        "note as soon as possible.\n"
     )
 
 
