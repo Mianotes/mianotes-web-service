@@ -821,7 +821,7 @@ def test_parse_youtube_url_uses_markitdown_directly(monkeypatch: pytest.MonkeyPa
     class FakeMarkItDown:
         def convert(self, value: str):
             seen.append(value)
-            return SimpleNamespace(text_content="# Video\n\nTranscript text.")
+            return SimpleNamespace(text_content="# Video\n\n### Transcript\n\nTranscript text.")
 
     monkeypatch.setattr(
         parsing.importlib,
@@ -836,6 +836,27 @@ def test_parse_youtube_url_uses_markitdown_directly(monkeypatch: pytest.MonkeyPa
     assert parsed.source_path == Path(url)
     assert seen == [url]
     assert "Transcript text" in parsed.text
+
+
+def test_parse_youtube_url_rejects_footer_fallback(monkeypatch: pytest.MonkeyPatch):
+    class FakeMarkItDown:
+        def convert(self, _value: str):
+            return SimpleNamespace(
+                text_content=(
+                    "[About](https://www.youtube.com/about/)"
+                    "[Press](https://www.youtube.com/about/press/)\n\n"
+                    "© 2026 Google LLC"
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    with pytest.raises(ParserError, match="Could not extract a YouTube transcript"):
+        parse_youtube_url("https://www.youtube.com/watch?v=abc123")
 
 
 def test_parse_html_document_uses_trafilatura_cleaned_content(

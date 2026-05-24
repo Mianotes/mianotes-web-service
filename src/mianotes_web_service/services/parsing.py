@@ -764,6 +764,11 @@ def parse_youtube_url(url: str) -> ParsedDocument:
     text = normalise_parsed_markdown(_convert_url_with_markitdown(url))
     if not text.strip():
         raise ParserError("YouTube transcript conversion returned no text.")
+    if "### Transcript" not in text:
+        raise ParserError(
+            "Could not extract a YouTube transcript. YouTube may be rate-limiting "
+            "transcript requests, or this video may not have captions available."
+        )
     return ParsedDocument(
         text=text,
         parser="markitdown+youtube",
