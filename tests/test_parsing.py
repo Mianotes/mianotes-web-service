@@ -14,9 +14,11 @@ from mianotes_web_service.services.parsing import (
     ParserError,
     ParserUnavailable,
     fetch_url_to_html,
+    is_youtube_url,
     parse_document,
     parse_html_document,
     parse_url,
+    parse_youtube_url,
 )
 
 
@@ -798,6 +800,42 @@ def test_parse_url_fetches_html_then_converts_local_file(
     assert parsed.source_path == tmp_path / "page.html"
     assert "Converted URL" in parsed.text
     assert "source=page.html" in parsed.text
+
+
+def test_is_youtube_url_accepts_common_video_urls():
+    assert is_youtube_url("https://www.youtube.com/watch?v=abc123")
+    assert is_youtube_url("https://youtu.be/abc123")
+    assert is_youtube_url("https://youtube.com/shorts/abc123")
+    assert is_youtube_url("https://music.youtube.com/watch?v=abc123")
+
+
+def test_is_youtube_url_rejects_non_video_or_non_youtube_urls():
+    assert not is_youtube_url("https://www.youtube.com/feed/subscriptions")
+    assert not is_youtube_url("https://example.com/watch?v=abc123")
+    assert not is_youtube_url("file:///tmp/watch?v=abc123")
+
+
+def test_parse_youtube_url_uses_markitdown_directly(monkeypatch: pytest.MonkeyPatch):
+    seen: list[str] = []
+
+    class FakeMarkItDown:
+        def convert(self, value: str):
+            seen.append(value)
+            return SimpleNamespace(text_content="# Video\n\nTranscript text.")
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    url = "https://www.youtube.com/watch?v=abc123"
+    parsed = parse_youtube_url(url)
+
+    assert parsed.parser == "markitdown+youtube"
+    assert parsed.source_path == Path(url)
+    assert seen == [url]
+    assert "Transcript text" in parsed.text
 
 
 def test_parse_html_document_uses_trafilatura_cleaned_content(

@@ -13,8 +13,10 @@ from mianotes_web_service.services.jobs import (
 )
 from mianotes_web_service.services.parsing import (
     fetch_url_to_html,
+    is_youtube_url,
     parse_document,
     parse_html_document,
+    parse_youtube_url,
     parser_job_logging,
     parser_text_updates,
 )
@@ -179,8 +181,11 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
     note.status = "parsing"
     session.flush()
 
-    html_path = fetch_url_to_html(url, source_file_path(source_file))
-    parsed = parse_html_document(html_path, url=url)
+    if is_youtube_url(url):
+        parsed = parse_youtube_url(url)
+    else:
+        html_path = fetch_url_to_html(url, source_file_path(source_file))
+        parsed = parse_html_document(html_path, url=url)
     note_file_path(note).write_text(
         render_markdown_note(title=note.title, text=parsed.text),
         encoding="utf-8",

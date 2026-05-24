@@ -15,6 +15,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Protocol
 from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 from mianotes_web_service.services.mia import (
@@ -49,6 +50,13 @@ class DocumentParser(Protocol):
 DEFAULT_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 )
+YOUTUBE_HOSTS = {
+    "m.youtube.com",
+    "music.youtube.com",
+    "www.youtube.com",
+    "youtube.com",
+    "youtu.be",
+}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 AUDIO_EXTENSIONS = {".aac", ".aiff", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".webm"}
 AUDIO_CHUNK_SECONDS = 300
@@ -245,6 +253,23 @@ def _convert_with_markitdown(path: Path, **options: object) -> str:
     converter = _markitdown_class()(**options)
     try:
         result = converter.convert(str(path))
+    except Exception as exc:
+        _log_parser_command(command, str(exc), status="failed")
+        raise ParserError(str(exc)) from exc
+    _log_parser_command(
+        command,
+        f"converted {len(result.text_content)} characters",
+        status="succeeded",
+    )
+    return result.text_content
+
+
+def _convert_url_with_markitdown(url: str) -> str:
+    command = f"MarkItDown.convert({url})"
+    _log_parser_command(command, "started", status="running")
+    converter = _markitdown_class()()
+    try:
+        result = converter.convert(url)
     except Exception as exc:
         _log_parser_command(command, str(exc), status="failed")
         raise ParserError(str(exc)) from exc
@@ -713,6 +738,37 @@ def fetch_url_to_html(
         status="succeeded",
     )
     return output_path
+
+
+def is_youtube_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+
+    host = (parsed.hostname or "").lower()
+    if host not in YOUTUBE_HOSTS:
+        return False
+    if host == "youtu.be":
+        return bool(parsed.path.strip("/"))
+    if parsed.path == "/watch":
+        return bool(parse_qs(parsed.query).get("v", [""])[0])
+    return parsed.path.startswith(("/shorts/", "/embed/", "/live/"))
+
+
+def parse_youtube_url(url: str) -> ParsedDocument:
+    if not is_youtube_url(url):
+        raise ParserError("URL is not a supported YouTube video URL.")
+    text = normalise_parsed_markdown(_convert_url_with_markitdown(url))
+    if not text.strip():
+        raise ParserError("YouTube transcript conversion returned no text.")
+    return ParsedDocument(
+        text=text,
+        parser="markitdown+youtube",
+        source_path=Path(url),
+    )
 
 
 def parse_url(
