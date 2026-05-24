@@ -8,7 +8,7 @@ from .app import create_app
 from .core.config import get_settings
 from .db.init import create_database
 
-app = create_app()
+app = create_app(init_db=True)
 
 
 def main() -> None:

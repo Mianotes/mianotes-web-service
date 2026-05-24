@@ -4,11 +4,15 @@ from fastapi import FastAPI
 
 from . import __version__
 from .api.routes import api_router
+from .db.init import create_database
 from .db.session import SessionLocal
 from .services.job_runner import InProcessJobRunner
 
 
-def create_app() -> FastAPI:
+def create_app(*, init_db: bool = False) -> FastAPI:
+    if init_db:
+        create_database()
+
     app = FastAPI(
         title="Mianotes Web Service",
         version=__version__,
