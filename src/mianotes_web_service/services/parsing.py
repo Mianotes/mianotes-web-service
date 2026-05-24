@@ -48,6 +48,7 @@ DEFAULT_BROWSER_USER_AGENT = (
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 IMAGE_DESCRIPTION_HEADING = "# Description:"
 OCR_MIN_CHARACTERS = 20
+FENCED_CODE_BLOCK_PATTERN = re.compile(r"(```.*?```|~~~.*?~~~)", re.DOTALL)
 MARKITDOWN_OCR_BLOCK_PATTERN = re.compile(
     r"\*?\[Image OCR\]\s*"
     r"```(?:markdown|md|text)?\s*\n"
@@ -56,6 +57,11 @@ MARKITDOWN_OCR_BLOCK_PATTERN = re.compile(
     r"\[End OCR\]\*?",
     re.IGNORECASE | re.DOTALL,
 )
+MARKITDOWN_OCR_MARKER_LINE_PATTERN = re.compile(
+    r"^\*?\[(?:Image OCR|End OCR)\]\*?\s*\n?",
+    re.IGNORECASE | re.MULTILINE,
+)
+RAW_BR_TAG_PATTERN = re.compile(r"<br\s*/?>", re.IGNORECASE)
 IMAGE_NEEDS_CLOUD_MESSAGE = (
     "Mia couldn’t read the text in this image.\n\n"
     "To help Mia read images, screenshots, and scanned documents, connect Mia to "
@@ -136,10 +142,23 @@ def _normalise_document_ocr_markdown(text: str) -> str:
         return f"\n\n{_strip_outer_markdown_fence(match.group('body'))}\n\n"
 
     cleaned, replacements = MARKITDOWN_OCR_BLOCK_PATTERN.subn(replace_block, text)
-    if replacements == 0:
+    cleaned, marker_replacements = MARKITDOWN_OCR_MARKER_LINE_PATTERN.subn("", cleaned)
+    if replacements == 0 and marker_replacements == 0:
         return text
 
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
+def _normalise_markdown_break_tags(text: str) -> str:
+    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            parts[index] = RAW_BR_TAG_PATTERN.sub("<br />", part)
+    return "".join(parts)
+
+
+def _normalise_parsed_markdown(text: str) -> str:
+    return _normalise_markdown_break_tags(_normalise_document_ocr_markdown(text))
 
 
 def _convert_with_markitdown(path: Path, **options: object) -> str:
@@ -296,7 +315,7 @@ class MarkItDownParser:
         if _is_image(path):
             return self._parse_image(path)
 
-        text = _normalise_document_ocr_markdown(_convert_with_markitdown(path))
+        text = _normalise_parsed_markdown(_convert_with_markitdown(path))
         if text.strip():
             return ParsedDocument(
                 text=text,
@@ -319,7 +338,7 @@ class MarkItDownParser:
             )
         except MiaUnavailable:
             return DOCUMENT_UNREADABLE_MESSAGE
-        text = _normalise_document_ocr_markdown(text)
+        text = _normalise_parsed_markdown(text)
         return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
 
     def _parse_image(self, path: Path) -> ParsedDocument:

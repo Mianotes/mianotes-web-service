@@ -148,6 +148,45 @@ def test_document_parser_unwraps_markitdown_ocr_blocks(
     assert "```" not in parsed.text
 
 
+def test_document_parser_removes_unfenced_ocr_markers_and_self_closes_breaks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "## Page 1\n\n"
+                    "*[Image OCR]\n"
+                    "| Product Manager | Project Manager |\n"
+                    "| --- | --- |\n"
+                    "| Strategy<br>Vision | Delivery<br>Timeline |\n"
+                    "[End OCR]*\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "## Page 1\n\n"
+        "| Product Manager | Project Manager |\n"
+        "| --- | --- |\n"
+        "| Strategy<br />Vision | Delivery<br />Timeline |"
+    )
+
+
 def test_document_parser_preserves_regular_markdown_code_blocks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -164,7 +203,7 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
                 text_content=(
                     "# Code example\n\n"
                     "```python\n"
-                    "print('hello')\n"
+                    "print('<br>')\n"
                     "```\n"
                 )
             )
@@ -177,7 +216,7 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
 
     parsed = parse_document(source)
 
-    assert parsed.text == "# Code example\n\n```python\nprint('hello')\n```\n"
+    assert parsed.text == "# Code example\n\n```python\nprint('<br>')\n```\n"
 
 
 def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
