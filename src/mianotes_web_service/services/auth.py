@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
 
 MASTER_PASSWORD_KEY = "master_password_hash"
+ADMIN_KEY_HASH_KEY = "admin_key_hash"
 INSTANCE_API_TOKEN_PUBLIC_KEY = "instance_api_token_public_key"
 SESSION_COOKIE_NAME = "mianotes_session"
 SESSION_DAYS = 90
@@ -80,6 +81,40 @@ def verify_master_password(session: Session, password: str) -> bool:
     if stored_hash is None:
         return False
     return verify_password(password, stored_hash)
+
+
+def generate_admin_key() -> str:
+    return base64.b64encode(secrets.token_bytes(24)).decode("ascii")
+
+
+def get_admin_key_hash(session: Session) -> str | None:
+    setting = session.get(AppSetting, ADMIN_KEY_HASH_KEY)
+    return setting.value if setting is not None else None
+
+
+def is_admin_key_enabled(session: Session) -> bool:
+    return get_admin_key_hash(session) is not None
+
+
+def set_admin_key(session: Session, admin_key: str) -> None:
+    setting = session.get(AppSetting, ADMIN_KEY_HASH_KEY)
+    if setting is None:
+        session.add(AppSetting(key=ADMIN_KEY_HASH_KEY, value=hash_password(admin_key)))
+        return
+    setting.value = hash_password(admin_key)
+
+
+def create_admin_key(session: Session) -> str:
+    admin_key = generate_admin_key()
+    set_admin_key(session, admin_key)
+    return admin_key
+
+
+def verify_admin_key(session: Session, admin_key: str | None) -> bool:
+    stored_hash = get_admin_key_hash(session)
+    if stored_hash is None or admin_key is None:
+        return False
+    return verify_password(admin_key, stored_hash)
 
 
 def create_session_token(session: Session, user: User) -> SessionToken:
