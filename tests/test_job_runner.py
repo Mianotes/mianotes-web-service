@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from mianotes_web_service.db.models import Base, Folder, Note, SourceFile, User
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.job_runner import InProcessJobRunner
-from mianotes_web_service.services.jobs import create_job, decode_job_payload
+from mianotes_web_service.services.jobs import create_job, decode_job_log, decode_job_payload
 from mianotes_web_service.services.parsing import ParsedDocument
 
 
@@ -102,3 +102,44 @@ def test_job_runner_parses_file_and_updates_note(
         assert "Parsed Markdown" in Path(note.note_path).read_text(encoding="utf-8")
         assert job.status == "succeeded"
         assert decode_job_payload(job.result_json)["parser"] == "markitdown"
+        assert decode_job_log(job.log_json) == []
+
+
+def test_job_runner_keeps_logs_for_failed_jobs(
+    tmp_path: Path,
+    monkeypatch,
+):
+    testing_session = _session_factory()
+    source_path = tmp_path / "data" / "folder" / "sources" / "note1234" / "original.txt"
+    note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
+
+    def fake_parse_document(path: Path) -> ParsedDocument:
+        raise RuntimeError("parser exploded")
+
+    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_file",
+            note_id=note_id,
+            input_payload={"source_file_id": source_file_id},
+        )
+        session.commit()
+        job_id = job.id
+
+    InProcessJobRunner(testing_session).run(job_id)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        assert note.status == "failed"
+        assert job.status == "failed"
+        assert job.error == "parser exploded"
+        log = decode_job_log(job.log_json)
+        assert log[0]["command"] == "start parse_file"
+        assert log[-1]["command"] == "finish parse_file"
+        assert log[-1]["response"] == "parser exploded"

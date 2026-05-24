@@ -321,14 +321,23 @@ class ApiTokenCreated(ApiTokenRead):
 JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
+class MiaJobLogEntry(BaseModel):
+    timestamp: datetime
+    status: str
+    command: str
+    response: str | None = None
+
+
 class MiaJobRead(BaseModel):
     id: str
     user: UserRead
     note_id: str | None = None
+    note_title: str | None = None
     job_type: str
     status: JobStatus
     input: dict[str, object]
     result: dict[str, object]
+    log: list[MiaJobLogEntry] = Field(default_factory=list)
     error: str | None = None
     created_at: datetime
     updated_at: datetime

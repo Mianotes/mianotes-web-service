@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mianotes_web_service.db.models import MiaJob, Note, SourceFile
 from mianotes_web_service.services.jobs import (
+    append_job_log,
     decode_job_payload,
     mark_job_failed,
     mark_job_running,
@@ -14,6 +15,7 @@ from mianotes_web_service.services.parsing import (
     fetch_url_to_html,
     parse_document,
     parse_html_document,
+    parser_job_logging,
 )
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import render_markdown_note, summarize_text
@@ -38,15 +40,31 @@ class InProcessJobRunner:
         if job is None or job.status != "queued":
             return
         mark_job_running(job)
+        append_job_log(job, command=f"start {job.job_type}", response="job is running")
         session.commit()
 
         try:
-            result = _run_job(session, job)
+            with parser_job_logging(
+                lambda command, response, status: _persist_job_log(
+                    session,
+                    job_id,
+                    command,
+                    response,
+                    status,
+                )
+            ):
+                result = _run_job(session, job)
         except Exception as exc:  # pragma: no cover - defensive boundary
             session.rollback()
             failed_job = session.get(MiaJob, job_id)
             if failed_job is not None:
                 _mark_note_failed(failed_job)
+                append_job_log(
+                    failed_job,
+                    command=f"finish {failed_job.job_type}",
+                    response=str(exc),
+                    status="failed",
+                )
                 mark_job_failed(failed_job, str(exc))
                 session.commit()
             return
@@ -133,3 +151,17 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
 def _mark_note_failed(job: MiaJob) -> None:
     if job.note is not None and job.job_type in {"parse_file", "parse_url"}:
         job.note.status = "failed"
+
+
+def _persist_job_log(
+    session: Session,
+    job_id: str,
+    command: str,
+    response: str | None,
+    status: str,
+) -> None:
+    job = session.get(MiaJob, job_id)
+    if job is None:
+        return
+    append_job_log(job, command=command, response=response, status=status)
+    session.commit()

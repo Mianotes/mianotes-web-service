@@ -59,7 +59,7 @@ from mianotes_web_service.domain.schemas import (
     NoteUpdate,
     TagsUpdate,
 )
-from mianotes_web_service.services.jobs import create_job, decode_job_payload
+from mianotes_web_service.services.jobs import create_job, decode_job_log, decode_job_payload
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
 from mianotes_web_service.services.parsing import normalise_parsed_markdown
 from mianotes_web_service.services.paths import (
@@ -422,10 +422,12 @@ def _mia_job_response(job) -> MiaJobRead:
         id=job.id,
         user=job.user,
         note_id=job.note_id,
+        note_title=job.note.title if job.note is not None else None,
         job_type=job.job_type,
         status=job.status,
         input=decode_job_payload(job.input_json),
         result=decode_job_payload(job.result_json),
+        log=decode_job_log(job.log_json),
         error=job.error,
         created_at=job.created_at,
         updated_at=job.updated_at,

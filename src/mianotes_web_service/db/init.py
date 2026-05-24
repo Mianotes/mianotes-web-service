@@ -166,6 +166,12 @@ def _upgrade_sqlite_schema(target_engine: Engine) -> None:
                         "TEXT NOT NULL DEFAULT '[]'"
                     )
                 )
+        if "mia_jobs" in table_names:
+            columns = _sqlite_columns(connection, "mia_jobs")
+            if "log_json" not in columns:
+                connection.execute(
+                    text("ALTER TABLE mia_jobs ADD COLUMN log_json TEXT NOT NULL DEFAULT '[]'")
+                )
         table_names = _sqlite_table_names(connection)
         if "note_stars" in table_names and "notes" in table_names:
             connection.execute(

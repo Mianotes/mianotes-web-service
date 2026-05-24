@@ -9,7 +9,7 @@ from sqlalchemy.orm import joinedload
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.db.models import MiaJob, User
 from mianotes_web_service.domain.schemas import MiaJobRead
-from mianotes_web_service.services.jobs import decode_job_payload
+from mianotes_web_service.services.jobs import decode_job_log, decode_job_payload
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -25,10 +25,12 @@ def _job_response(job: MiaJob) -> MiaJobRead:
         id=job.id,
         user=job.user,
         note_id=job.note_id,
+        note_title=job.note.title if job.note is not None else None,
         job_type=job.job_type,
         status=job.status,
         input=decode_job_payload(job.input_json),
         result=decode_job_payload(job.result_json),
+        log=decode_job_log(job.log_json),
         error=job.error,
         created_at=job.created_at,
         updated_at=job.updated_at,
@@ -46,7 +48,7 @@ def list_jobs(
 ) -> list[MiaJobRead]:
     statement = (
         select(MiaJob)
-        .options(joinedload(MiaJob.user))
+        .options(joinedload(MiaJob.user), joinedload(MiaJob.note))
         .order_by(MiaJob.created_at.desc())
     )
     if not user.is_admin:
@@ -61,7 +63,9 @@ def list_jobs(
 @router.get("/{job_id}", response_model=MiaJobRead)
 def get_job(job_id: str, session: SessionDep, user: NotesReadUser) -> MiaJobRead:
     job = session.scalars(
-        select(MiaJob).where(MiaJob.id == job_id).options(joinedload(MiaJob.user))
+        select(MiaJob)
+        .where(MiaJob.id == job_id)
+        .options(joinedload(MiaJob.user), joinedload(MiaJob.note))
     ).one_or_none()
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")

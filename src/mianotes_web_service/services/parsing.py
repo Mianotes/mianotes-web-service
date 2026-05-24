@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import importlib
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
 import textwrap
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from pathlib import Path
@@ -86,6 +90,43 @@ TESSERACT_CANDIDATES = (
     "/usr/local/bin/tesseract",
     "/usr/bin/tesseract",
 )
+ParserLogCallback = Callable[[str, str | None, str], None]
+_PARSER_LOGGER: ContextVar[ParserLogCallback | None] = ContextVar(
+    "mianotes_parser_logger",
+    default=None,
+)
+
+
+@contextmanager
+def parser_job_logging(callback: ParserLogCallback) -> Iterator[None]:
+    token = _PARSER_LOGGER.set(callback)
+    try:
+        yield
+    finally:
+        _PARSER_LOGGER.reset(token)
+
+
+def _log_parser_command(
+    command: str,
+    response: str | None = None,
+    *,
+    status: str = "info",
+) -> None:
+    callback = _PARSER_LOGGER.get()
+    if callback is None:
+        return
+    callback(command, response, status)
+
+
+def _subprocess_response(completed: subprocess.CompletedProcess[str]) -> str:
+    parts = [f"exit {completed.returncode}"]
+    stdout = (getattr(completed, "stdout", "") or "").strip()
+    stderr = (getattr(completed, "stderr", "") or "").strip()
+    if stdout:
+        parts.append(f"stdout:\n{stdout}")
+    if stderr:
+        parts.append(f"stderr:\n{stderr}")
+    return "\n\n".join(parts)
 
 
 def _markitdown_class():
@@ -170,17 +211,28 @@ def normalise_parsed_markdown(text: str) -> str:
 
 
 def _convert_with_markitdown(path: Path, **options: object) -> str:
+    command = f"MarkItDown.convert({path.name})"
+    if options:
+        command = f"{command} with plugins/options"
+    _log_parser_command(command, "started", status="running")
     converter = _markitdown_class()(**options)
     try:
         result = converter.convert(str(path))
     except Exception as exc:
+        _log_parser_command(command, str(exc), status="failed")
         raise ParserError(str(exc)) from exc
+    _log_parser_command(
+        command,
+        f"converted {len(result.text_content)} characters",
+        status="succeeded",
+    )
     return result.text_content
 
 
 def _tesseract_executable() -> str | None:
     candidates: list[str] = []
     path_candidate = shutil.which("tesseract")
+    _log_parser_command("shutil.which('tesseract')", path_candidate or "not found")
     if path_candidate:
         candidates.append(path_candidate)
     candidates.extend(TESSERACT_CANDIDATES)
@@ -190,6 +242,7 @@ def _tesseract_executable() -> str | None:
         if candidate in seen or not Path(candidate).is_file():
             continue
         seen.add(candidate)
+        command = shlex.join([candidate, "--version"])
         try:
             completed = subprocess.run(
                 [candidate, "--version"],
@@ -199,37 +252,60 @@ def _tesseract_executable() -> str | None:
                 timeout=10,
             )
         except (OSError, subprocess.SubprocessError, TimeoutError):
+            _log_parser_command(command, "could not run version check", status="failed")
             continue
+        _log_parser_command(
+            command,
+            _subprocess_response(completed),
+            status="succeeded" if completed.returncode == 0 else "failed",
+        )
         if completed.returncode == 0:
             return candidate
+    _log_parser_command("find tesseract executable", "no working executable found", status="failed")
     return None
 
 
 def _run_tesseract(executable: str, path: Path, *, psm: str) -> str | None:
+    command_parts = [executable, str(path), "stdout", "--psm", psm]
+    command = shlex.join(command_parts)
     try:
         completed = subprocess.run(
-            [executable, str(path), "stdout", "--psm", psm],
+            command_parts,
             capture_output=True,
             check=False,
             text=True,
             timeout=60,
         )
     except (OSError, subprocess.SubprocessError, TimeoutError):
+        _log_parser_command(command, "command failed or timed out", status="failed")
         return None
 
     if completed.returncode != 0:
+        _log_parser_command(command, _subprocess_response(completed), status="failed")
         return None
 
     text = _normalise_ocr_text(re.sub(r"\n{3,}", "\n\n", completed.stdout))
     if len(text) < OCR_MIN_CHARACTERS:
+        _log_parser_command(
+            command,
+            f"{_subprocess_response(completed)}\n\nignored: only {len(text)} readable characters",
+            status="failed",
+        )
         return None
+    _log_parser_command(
+        command,
+        f"{_subprocess_response(completed)}\n\naccepted: {len(text)} readable characters",
+        status="succeeded",
+    )
     return text
 
 
 def _preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | None:
+    command = f"Pillow preprocess image {source_path.name}"
     try:
         from PIL import Image, ImageEnhance, ImageOps
     except ModuleNotFoundError:
+        _log_parser_command(command, "Pillow is not installed", status="failed")
         return None
 
     try:
@@ -241,7 +317,9 @@ def _preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | No
                 image = image.resize((image.width * 2, image.height * 2))
             image.save(output_path)
     except OSError:
+        _log_parser_command(command, "could not preprocess image", status="failed")
         return None
+    _log_parser_command(command, f"wrote {output_path.name}", status="succeeded")
     return output_path
 
 
@@ -419,13 +497,20 @@ def fetch_url_to_html(
     timeout: int = 30,
 ) -> Path:
     request = Request(url, headers={"User-Agent": user_agent})
+    command = f"GET {url}"
     try:
         with urlopen(request, timeout=timeout) as response:
             content = response.read()
     except (HTTPError, URLError, TimeoutError) as exc:
+        _log_parser_command(command, str(exc), status="failed")
         raise ParserError(f"Could not fetch URL: {exc}") from exc
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(content)
+    _log_parser_command(
+        command,
+        f"saved {len(content)} bytes to {output_path.name}",
+        status="succeeded",
+    )
     return output_path
 
 
