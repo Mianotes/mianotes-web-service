@@ -142,6 +142,55 @@ def test_user_can_update_own_profile_but_not_others(client: TestClient):
     assert admin_update.json()["role"] == "Designer"
 
 
+def test_admin_can_manage_user_admin_role(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+    member = client.post(
+        "/api/users",
+        json={"email": "member@example.com", "name": "Member"},
+    ).json()
+
+    promoted = client.patch(f"/api/users/{member['id']}/admin", json={"is_admin": True})
+    assert promoted.status_code == 200
+    assert promoted.json()["is_admin"] is True
+
+    demoted = client.patch(f"/api/users/{member['id']}/admin", json={"is_admin": False})
+    assert demoted.status_code == 200
+    assert demoted.json()["is_admin"] is False
+
+    client.post("/api/auth/logout")
+    client.post("/api/auth/login", json={"user_id": member["id"], "password": "instance-password"})
+    forbidden = client.patch(f"/api/users/{admin['id']}/admin", json={"is_admin": False})
+    assert forbidden.status_code == 403
+
+
+def test_workspace_keeps_at_least_one_admin(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+
+    demoted = client.patch(f"/api/users/{admin['id']}/admin", json={"is_admin": False})
+    assert demoted.status_code == 400
+    assert demoted.json()["detail"] == "This workspace needs at least one admin."
+
+    deleted = client.delete(f"/api/users/{admin['id']}")
+    assert deleted.status_code == 400
+    assert deleted.json()["detail"] == "This workspace needs at least one admin."
+
+
 def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",

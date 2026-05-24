@@ -22,6 +22,10 @@ class UserUpdate(BaseModel):
     role: str | None = Field(default=None, max_length=120)
 
 
+class UserAdminUpdate(BaseModel):
+    is_admin: bool
+
+
 class UserRead(BaseModel):
     id: str
     email: EmailStr

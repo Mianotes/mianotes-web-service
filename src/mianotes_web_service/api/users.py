@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from PIL import Image, ImageOps, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, UsersR
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import User
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import UserCreate, UserRead, UserUpdate
+from mianotes_web_service.domain.schemas import UserAdminUpdate, UserCreate, UserRead, UserUpdate
 from mianotes_web_service.services.storage import make_username
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -36,6 +36,23 @@ def _ensure_can_update_profile(current_user: User, target_user: User) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only admins can update other user profiles",
+        )
+
+
+def _admin_count(session: Session) -> int:
+    statement = select(func.count()).select_from(User).where(User.is_admin.is_(True))
+    return int(session.scalar(statement) or 0)
+
+
+def _ensure_can_remove_admin(session: Session, current_user: User, target_user: User) -> None:
+    if not target_user.is_admin:
+        return
+    if current_user.id == target_user.id and _admin_count(session) > 1:
+        return
+    if _admin_count(session) <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This workspace needs at least one admin.",
         )
 
 
@@ -136,6 +153,26 @@ def update_user(user_id: str, payload: UserUpdate, session: SessionDep, user: Cu
     return target_user
 
 
+@router.patch("/{user_id}/admin", response_model=UserRead)
+def update_user_admin(
+    user_id: str,
+    payload: UserAdminUpdate,
+    session: SessionDep,
+    user: AdminUser,
+) -> User:
+    target_user = _read_user_or_404(session, user_id)
+    if target_user.is_admin == payload.is_admin:
+        return target_user
+
+    if not payload.is_admin:
+        _ensure_can_remove_admin(session, user, target_user)
+
+    target_user.is_admin = payload.is_admin
+    session.commit()
+    session.refresh(target_user)
+    return target_user
+
+
 @router.post("/{user_id}/photo", response_model=UserRead)
 def upload_user_photo(
     user_id: str,
@@ -154,5 +191,6 @@ def upload_user_photo(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: str, session: SessionDep, user: AdminUser) -> None:
     user = _read_user_or_404(session, user_id)
+    _ensure_can_remove_admin(session, user, user)
     session.delete(user)
     session.commit()
