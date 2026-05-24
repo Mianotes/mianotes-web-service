@@ -165,7 +165,7 @@ def _normalise_html_void_tags(text: str) -> str:
     return "".join(parts)
 
 
-def _normalise_parsed_markdown(text: str) -> str:
+def normalise_parsed_markdown(text: str) -> str:
     return _normalise_html_void_tags(_normalise_document_ocr_markdown(text))
 
 
@@ -323,7 +323,7 @@ class MarkItDownParser:
         if _is_image(path):
             return self._parse_image(path)
 
-        text = _normalise_parsed_markdown(_convert_with_markitdown(path))
+        text = normalise_parsed_markdown(_convert_with_markitdown(path))
         if text.strip():
             return ParsedDocument(
                 text=text,
@@ -346,7 +346,7 @@ class MarkItDownParser:
             )
         except MiaUnavailable:
             return DOCUMENT_UNREADABLE_MESSAGE
-        text = _normalise_parsed_markdown(text)
+        text = normalise_parsed_markdown(text)
         return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
 
     def _parse_image(self, path: Path) -> ParsedDocument:

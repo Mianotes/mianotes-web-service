@@ -61,6 +61,7 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.jobs import create_job, decode_job_payload
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
+from mianotes_web_service.services.parsing import normalise_parsed_markdown
 from mianotes_web_service.services.paths import (
     folder_directory,
     note_file_path,
@@ -219,6 +220,10 @@ def _note_response(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=MISSING_NOTE_FILE_DETAIL,
         ) from exc
+    normalized_text = normalise_parsed_markdown(text)
+    if normalized_text != text:
+        note_path.write_text(normalized_text, encoding="utf-8")
+        text = normalized_text
     source_files = [
         {
             "id": source_file.id,

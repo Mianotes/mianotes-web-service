@@ -139,6 +139,60 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/mia.db").status_code == 404
 
 
+def test_get_note_normalizes_legacy_parser_markdown(client: TestClient, tmp_path: Path):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "legacy-parser@example.com",
+            "name": "Legacy Parser User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    folder = client.post("/api/folders", json={"name": "Research"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "user_id": user["id"],
+            "folder_id": folder["id"],
+            "title": "Legacy OCR",
+            "text": "Temporary text.",
+        },
+    ).json()
+    note_filename = f"legacy-ocr-{note['id'][:8]}.md"
+    note_path = tmp_path / "data" / "markdown" / "research" / note_filename
+    note_path.write_text(
+        "# Legacy OCR\n\n"
+        "Created: 2026-05-24T00:00:00Z\n\n"
+        "## Note\n\n"
+        "*[Image OCR]\n"
+        "| Left | Right |\n"
+        "| --- | --- |\n"
+        "| One<br>Two | <img src=\"diagram.png\"> |\n"
+        "[End OCR]*\n"
+        "```html\n"
+        "<br>\n"
+        "```\n",
+        encoding="utf-8",
+    )
+
+    response = client.get(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["text"] == (
+        "# Legacy OCR\n\n"
+        "Created: 2026-05-24T00:00:00Z\n\n"
+        "## Note\n\n"
+        "| Left | Right |\n"
+        "| --- | --- |\n"
+        "| One<br />Two | <img src=\"diagram.png\" /> |\n"
+        "```html\n"
+        "<br>\n"
+        "```"
+    )
+    assert note_path.read_text(encoding="utf-8") == response.json()["text"]
+
+
 def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path: Path):
     client.post(
         "/api/auth/join",
