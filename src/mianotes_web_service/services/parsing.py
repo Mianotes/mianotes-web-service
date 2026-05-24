@@ -6,6 +6,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 from collections.abc import Callable, Iterator
@@ -297,6 +298,10 @@ def _youtube_downloader_executable() -> str | None:
         _log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
         if path_candidate:
             return path_candidate
+
+        venv_candidate = Path(sys.executable).with_name(candidate)
+        if venv_candidate.exists():
+            return str(venv_candidate)
     return None
 
 

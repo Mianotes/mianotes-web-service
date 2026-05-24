@@ -933,6 +933,21 @@ def test_parse_youtube_url_falls_back_to_ytdlp_audio(monkeypatch: pytest.MonkeyP
     assert "-f" in commands[1]
 
 
+def test_youtube_downloader_executable_finds_venv_script(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    python_path = tmp_path / "bin" / "python"
+    downloader_path = tmp_path / "bin" / "yt-dlp"
+    downloader_path.parent.mkdir()
+    python_path.write_text("", encoding="utf-8")
+    downloader_path.write_text("", encoding="utf-8")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(parsing.sys, "executable", str(python_path))
+
+    assert parsing._youtube_downloader_executable() == str(downloader_path)
+
+
 def test_parse_html_document_uses_trafilatura_cleaned_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
