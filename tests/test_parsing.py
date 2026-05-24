@@ -11,6 +11,7 @@ from mianotes_web_service.services.parsing import (
     IMAGE_NEEDS_CLOUD_MESSAGE,
     IMAGE_UNREADABLE_MESSAGE,
     MarkItDownParser,
+    ParserError,
     ParserUnavailable,
     fetch_url_to_html,
     parse_document,
@@ -609,6 +610,78 @@ def test_missing_markitdown_reports_unavailable(tmp_path: Path, monkeypatch: pyt
 
     with pytest.raises(ParserUnavailable, match="markitdown is not installed"):
         MarkItDownParser().parse(source)
+
+
+def test_audio_parser_retries_with_low_quality_mp3(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake audio")
+    commands = []
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            if path.endswith("recording.m4a"):
+                raise RuntimeError("recognition connection failed")
+            return SimpleNamespace(text_content="Transcribed fallback audio")
+
+    def fake_run(args, **_kwargs):
+        commands.append(args)
+        Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+ffmpeg-mp3"
+    assert parsed.text == "Transcribed fallback audio"
+    assert parsed.source_path == source
+    assert commands[0][:8] == [
+        "/opt/homebrew/bin/ffmpeg",
+        "-y",
+        "-i",
+        str(source),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+    ]
+    assert commands[0][-1].endswith("low-quality.mp3")
+
+
+def test_audio_parser_reports_original_and_fallback_failures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake audio")
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            raise RuntimeError(f"could not transcribe {Path(path).name}")
+
+    def fake_run(args, **_kwargs):
+        Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    with pytest.raises(ParserError, match="low-quality.mp3"):
+        parse_document(source)
 
 
 def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

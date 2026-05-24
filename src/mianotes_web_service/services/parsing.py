@@ -50,6 +50,7 @@ DEFAULT_BROWSER_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 )
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+AUDIO_EXTENSIONS = {".aac", ".aiff", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".webm"}
 IMAGE_DESCRIPTION_HEADING = "# Description:"
 OCR_MIN_CHARACTERS = 20
 FENCED_CODE_BLOCK_PATTERN = re.compile(r"(```.*?```|~~~.*?~~~)", re.DOTALL)
@@ -148,6 +149,10 @@ def _is_image(path: Path) -> bool:
     return path.suffix.lower() in IMAGE_EXTENSIONS
 
 
+def _is_audio(path: Path) -> bool:
+    return path.suffix.lower() in AUDIO_EXTENSIONS
+
+
 def _normalise_image_markdown(text: str) -> str | None:
     if IMAGE_DESCRIPTION_HEADING not in text:
         return None
@@ -227,6 +232,59 @@ def _convert_with_markitdown(path: Path, **options: object) -> str:
         status="succeeded",
     )
     return result.text_content
+
+
+def _ffmpeg_executable() -> str | None:
+    path_candidate = shutil.which("ffmpeg")
+    _log_parser_command("shutil.which('ffmpeg')", path_candidate or "not found")
+    if path_candidate:
+        return path_candidate
+    return None
+
+
+def _transcode_audio_to_low_quality_mp3(source_path: Path, output_path: Path) -> Path | None:
+    executable = _ffmpeg_executable()
+    if executable is None:
+        return None
+
+    command_parts = [
+        executable,
+        "-y",
+        "-i",
+        str(source_path),
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-b:a",
+        "32k",
+        str(output_path),
+    ]
+    command = shlex.join(command_parts)
+    _log_parser_command(command, "started", status="running")
+    try:
+        completed = subprocess.run(
+            command_parts,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError):
+        _log_parser_command(command, "command failed or timed out", status="failed")
+        return None
+
+    if completed.returncode != 0 or not output_path.is_file():
+        _log_parser_command(command, _subprocess_response(completed), status="failed")
+        return None
+
+    _log_parser_command(
+        command,
+        f"{_subprocess_response(completed)}\n\nwrote {output_path.name}",
+        status="succeeded",
+    )
+    return output_path
 
 
 def _tesseract_executable() -> str | None:
@@ -400,6 +458,8 @@ class MarkItDownParser:
             raise ParserError("Source file not found")
         if _is_image(path):
             return self._parse_image(path)
+        if _is_audio(path):
+            return self._parse_audio(path)
 
         text = normalise_parsed_markdown(_convert_with_markitdown(path))
         if text.strip():
@@ -426,6 +486,42 @@ class MarkItDownParser:
             return DOCUMENT_UNREADABLE_MESSAGE
         text = normalise_parsed_markdown(text)
         return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
+
+    def _parse_audio(self, path: Path) -> ParsedDocument:
+        try:
+            text = normalise_parsed_markdown(_convert_with_markitdown(path))
+        except ParserError:
+            text = self._parse_low_quality_audio(path)
+            return ParsedDocument(
+                text=text,
+                parser="markitdown+ffmpeg-mp3",
+                source_path=path,
+            )
+
+        if text.strip():
+            return ParsedDocument(
+                text=text,
+                parser=self.name,
+                source_path=path,
+            )
+
+        text = self._parse_low_quality_audio(path)
+        return ParsedDocument(
+            text=text,
+            parser="markitdown+ffmpeg-mp3",
+            source_path=path,
+        )
+
+    def _parse_low_quality_audio(self, path: Path) -> str:
+        with tempfile.TemporaryDirectory(prefix="mianotes-audio-") as temp_dir:
+            mp3_path = Path(temp_dir) / "low-quality.mp3"
+            converted_path = _transcode_audio_to_low_quality_mp3(path, mp3_path)
+            if converted_path is None:
+                raise ParserError("Could not convert audio to a low quality MP3 fallback.")
+            text = normalise_parsed_markdown(_convert_with_markitdown(converted_path))
+            if text.strip():
+                return text
+        raise ParserError("Audio conversion produced no transcript.")
 
     def _parse_image(self, path: Path) -> ParsedDocument:
         _convert_with_markitdown(path)
