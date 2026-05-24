@@ -137,6 +137,11 @@ def test_job_runner_keeps_logs_for_failed_jobs(
         assert note is not None
         assert job is not None
         assert note.status == "failed"
+        text = Path(note.note_path).read_text(encoding="utf-8")
+        assert "Mia couldn’t process this file." in text
+        assert "Your file has been added to the queue" not in text
+        assert "Jobs screen" in text
+        assert "parser exploded" not in text
         assert job.status == "failed"
         assert job.error == "parser exploded"
         log = decode_job_log(job.log_json)
