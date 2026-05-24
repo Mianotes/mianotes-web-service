@@ -134,7 +134,7 @@ def create_storage_location(payload: StorageLocationCreate, _: AdminUser) -> Sto
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    new_location = next_config.locations[-1]
+    new_location = next_config.locations[0]
     new_engine = db_session.create_database_engine(
         _database_url(new_location.folder_path, next_config.database_file)
     )

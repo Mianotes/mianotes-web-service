@@ -176,7 +176,7 @@ def add_storage_location(
     return StorageConfig(
         active_location=config.active_location,
         database_file=config.database_file,
-        locations=[*config.locations, location],
+        locations=[location, *config.locations],
         api_token=config.api_token,
     )
 
