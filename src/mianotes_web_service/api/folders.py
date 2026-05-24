@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     FolderCreate,
     FolderRead,
+    FolderReorder,
     FolderRestore,
     FolderUpdate,
 )
@@ -73,6 +74,24 @@ def _replace_path_prefix(value: str, old_roots: tuple[Path, ...], new_root: Path
     return value
 
 
+def _folder_order_statement():
+    return select(Folder).order_by(
+        Folder.is_pinned.desc(),
+        Folder.sort_order.asc(),
+        Folder.created_at.desc(),
+    )
+
+
+def _next_folder_sort_order(session: Session, user_id: str) -> int:
+    current = session.scalar(
+        select(func.max(Folder.sort_order)).where(
+            Folder.user_id == user_id,
+            Folder.archived_at.is_(None),
+        )
+    )
+    return (current or 0) + 10
+
+
 @router.post("", response_model=FolderRead, status_code=status.HTTP_201_CREATED)
 def create_folder(payload: FolderCreate, session: SessionDep, user: FoldersWriteUser) -> Folder:
     slug = slugify(payload.name)
@@ -82,6 +101,7 @@ def create_folder(payload: FolderCreate, session: SessionDep, user: FoldersWrite
         slug=slug,
         path=slug,
         is_pinned=payload.is_pinned,
+        sort_order=_next_folder_sort_order(session, user.id),
     )
     session.add(folder)
     try:
@@ -103,12 +123,51 @@ def list_folders(
     user_id: Annotated[str | None, Query()] = None,
     include_archived: Annotated[bool, Query()] = False,
 ) -> list[Folder]:
-    statement = select(Folder).order_by(Folder.is_pinned.desc(), Folder.created_at.desc())
+    statement = _folder_order_statement()
     if user_id is not None:
         statement = statement.where(Folder.user_id == user_id)
     if not include_archived:
         statement = statement.where(Folder.archived_at.is_(None))
     return list(session.scalars(statement))
+
+
+@router.patch("/order", response_model=list[FolderRead])
+def reorder_folders(
+    payload: FolderReorder,
+    session: SessionDep,
+    user: FoldersWriteUser,
+) -> list[Folder]:
+    folder_ids = payload.folder_ids
+    if len(set(folder_ids)) != len(folder_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Folder order cannot contain duplicate folders",
+        )
+
+    folders = list(session.scalars(select(Folder).where(Folder.id.in_(folder_ids))))
+    folders_by_id = {folder.id: folder for folder in folders}
+    if len(folders_by_id) != len(folder_ids):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+
+    for folder in folders_by_id.values():
+        if folder.archived_at is not None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        if not user.is_admin and folder.user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the folder owner or an admin can sort this folder",
+            )
+        if folder.is_pinned:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Pinned folders must be unpinned before sorting",
+            )
+
+    for index, folder_id in enumerate(folder_ids, start=1):
+        folders_by_id[folder_id].sort_order = index * 10
+
+    session.commit()
+    return list(session.scalars(_folder_order_statement().where(Folder.archived_at.is_(None))))
 
 
 @router.get("/{folder_id}", response_model=FolderRead)

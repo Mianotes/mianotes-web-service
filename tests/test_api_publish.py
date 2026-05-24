@@ -370,6 +370,11 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
     mianotes_folder = next(
         folder for folder in client.get("/api/folders").json() if folder["name"] == "Mianotes"
     )
+    reorder_response = client.patch(
+        "/api/folders/order",
+        json={"folder_ids": [improvements_folder["id"], mianotes_folder["id"]]},
+    )
+    assert reorder_response.status_code == 200
     improvements_note = _create_note(
         client,
         improvements_folder["id"],

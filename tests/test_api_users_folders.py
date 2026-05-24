@@ -211,6 +211,7 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert folder["slug"] == "product-research"
     assert folder["path"] == "product-research"
     assert folder["is_pinned"] is True
+    assert folder["sort_order"] == 10
     folder_dir = tmp_path / "data" / "markdown" / "product-research"
     folder_dir.mkdir(parents=True)
     (folder_dir / "note.md").write_text("note", encoding="utf-8")
@@ -228,7 +229,7 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     unpinned = client.post("/api/folders", json={"name": "Later Folder"}).json()
     ordered = client.get("/api/folders", params={"user_id": user["id"]}).json()
     assert ordered[0]["id"] == folder["id"]
-    assert ordered[1]["id"] == unpinned["id"]
+    assert unpinned["id"] in [item["id"] for item in ordered]
 
     updated = client.patch(
         f"/api/folders/{folder['id']}",
@@ -283,3 +284,61 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     restored_visible = client.get("/api/folders", params={"user_id": user["id"]})
     assert restored_visible.status_code == 200
     assert folder["id"] in [item["id"] for item in restored_visible.json()]
+
+
+def test_unpinned_folders_can_be_reordered(client: TestClient):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "ben@example.com",
+            "name": "Ben",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+    pinned = client.post("/api/folders", json={"name": "Pinned", "is_pinned": True}).json()
+    default_folder = next(
+        folder for folder in client.get("/api/folders", params={"user_id": user["id"]}).json()
+        if folder["name"] == "Mianotes"
+    )
+    first = client.post("/api/folders", json={"name": "First"}).json()
+    second = client.post("/api/folders", json={"name": "Second"}).json()
+    third = client.post("/api/folders", json={"name": "Third"}).json()
+
+    reordered = client.patch(
+        "/api/folders/order",
+        json={"folder_ids": [third["id"], first["id"], default_folder["id"], second["id"]]},
+    )
+
+    assert reordered.status_code == 200
+    ordered = client.get("/api/folders", params={"user_id": user["id"]}).json()
+    assert [folder["id"] for folder in ordered] == [
+        pinned["id"],
+        third["id"],
+        first["id"],
+        default_folder["id"],
+        second["id"],
+    ]
+    assert [folder["sort_order"] for folder in ordered[1:]] == [10, 20, 30, 40]
+
+
+def test_pinned_folders_must_be_unpinned_before_reordering(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "ben@example.com",
+            "name": "Ben",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    pinned = client.post("/api/folders", json={"name": "Pinned", "is_pinned": True}).json()
+    folder = client.post("/api/folders", json={"name": "Regular"}).json()
+
+    response = client.patch(
+        "/api/folders/order",
+        json={"folder_ids": [folder["id"], pinned["id"]]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Pinned folders must be unpinned before sorting"

@@ -217,7 +217,12 @@ def _read_publishable_notes(
         .join(Note.folder)
         .where(Note.status.in_(PUBLISHABLE_NOTE_STATUSES), Folder.archived_at.is_(None))
         .options(joinedload(Note.folder), joinedload(Note.user), joinedload(Note.tags))
-        .order_by(Folder.name.asc(), Note.title.asc())
+        .order_by(
+            Folder.is_pinned.desc(),
+            Folder.sort_order.asc(),
+            Folder.created_at.desc(),
+            Note.title.asc(),
+        )
     )
     if folder_id:
         statement = statement.where(Note.folder_id == folder_id)

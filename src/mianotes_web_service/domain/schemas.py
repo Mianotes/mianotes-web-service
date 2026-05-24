@@ -48,6 +48,10 @@ class FolderUpdate(BaseModel):
     is_pinned: bool | None = None
 
 
+class FolderReorder(BaseModel):
+    folder_ids: list[str] = Field(min_length=1)
+
+
 class FolderRestore(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     is_pinned: bool | None = None
@@ -60,6 +64,7 @@ class FolderRead(BaseModel):
     slug: str
     path: str
     is_pinned: bool
+    sort_order: int
     archived_at: datetime | None = None
     archived_by_user_id: str | None = None
     created_at: datetime

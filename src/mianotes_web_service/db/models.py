@@ -73,6 +73,7 @@ class Folder(Base, TimestampMixin):
     slug: Mapped[str] = mapped_column(String(220), nullable=False)
     path: Mapped[str] = mapped_column(Text, nullable=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_by_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
 
