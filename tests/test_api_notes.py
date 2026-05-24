@@ -361,6 +361,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
             "email": "other-star@example.com",
             "name": "Other Star User",
             "password": "house-password",
+            "password_confirmation": "house-password",
         },
     ).json()["user"]
     listed = client.get("/api/notes", params={"starred": True})
@@ -800,6 +801,7 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
             "email": "maria@example.com",
             "name": "Maria",
             "password": "house-password",
+            "password_confirmation": "house-password",
         },
     ).json()["user"]
     forbidden_update = client.patch(

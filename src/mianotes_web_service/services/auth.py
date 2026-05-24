@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
 
 MASTER_PASSWORD_KEY = "master_password_hash"
-ADMIN_KEY_HASH_KEY = "admin_key_hash"
+WORKSPACE_ACCESS_MODE_KEY = "workspace_access_mode"
+WORKSPACE_ACCESS_MODE_OPEN = "open"
+WORKSPACE_ACCESS_MODE_ADMIN_ONLY = "admin_only"
 INSTANCE_API_TOKEN_PUBLIC_KEY = "instance_api_token_public_key"
 SESSION_COOKIE_NAME = "mianotes_session"
 SESSION_DAYS = 90
@@ -83,38 +85,33 @@ def verify_master_password(session: Session, password: str) -> bool:
     return verify_password(password, stored_hash)
 
 
-def generate_admin_key() -> str:
-    return base64.b64encode(secrets.token_bytes(24)).decode("ascii")
+def set_user_password(user: User, password: str) -> None:
+    user.password_hash = hash_password(password)
 
 
-def get_admin_key_hash(session: Session) -> str | None:
-    setting = session.get(AppSetting, ADMIN_KEY_HASH_KEY)
-    return setting.value if setting is not None else None
-
-
-def is_admin_key_enabled(session: Session) -> bool:
-    return get_admin_key_hash(session) is not None
-
-
-def set_admin_key(session: Session, admin_key: str) -> None:
-    setting = session.get(AppSetting, ADMIN_KEY_HASH_KEY)
-    if setting is None:
-        session.add(AppSetting(key=ADMIN_KEY_HASH_KEY, value=hash_password(admin_key)))
-        return
-    setting.value = hash_password(admin_key)
-
-
-def create_admin_key(session: Session) -> str:
-    admin_key = generate_admin_key()
-    set_admin_key(session, admin_key)
-    return admin_key
-
-
-def verify_admin_key(session: Session, admin_key: str | None) -> bool:
-    stored_hash = get_admin_key_hash(session)
-    if stored_hash is None or admin_key is None:
+def verify_user_password(user: User, password: str) -> bool:
+    if not user.password_hash:
         return False
-    return verify_password(admin_key, stored_hash)
+    return verify_password(password, user.password_hash)
+
+
+def get_workspace_access_mode(session: Session) -> str:
+    setting = session.get(AppSetting, WORKSPACE_ACCESS_MODE_KEY)
+    if setting is None:
+        return WORKSPACE_ACCESS_MODE_OPEN
+    if setting.value not in {WORKSPACE_ACCESS_MODE_OPEN, WORKSPACE_ACCESS_MODE_ADMIN_ONLY}:
+        return WORKSPACE_ACCESS_MODE_OPEN
+    return setting.value
+
+
+def set_workspace_access_mode(session: Session, mode: str) -> None:
+    if mode not in {WORKSPACE_ACCESS_MODE_OPEN, WORKSPACE_ACCESS_MODE_ADMIN_ONLY}:
+        raise ValueError("Unsupported workspace access mode")
+    setting = session.get(AppSetting, WORKSPACE_ACCESS_MODE_KEY)
+    if setting is None:
+        session.add(AppSetting(key=WORKSPACE_ACCESS_MODE_KEY, value=mode))
+        return
+    setting.value = mode
 
 
 def create_session_token(session: Session, user: User) -> SessionToken:

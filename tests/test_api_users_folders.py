@@ -114,7 +114,12 @@ def test_user_can_update_own_profile_but_not_others(client: TestClient):
     client.post("/api/auth/logout")
     joined = client.post(
         "/api/auth/join",
-        json={"email": "member@example.com", "name": "Member", "password": "instance-password"},
+        json={
+            "email": "member@example.com",
+            "name": "Member",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
     )
     member = joined.json()["user"]
 

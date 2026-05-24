@@ -14,7 +14,6 @@ from mianotes_web_service.db import session as db_session
 from mianotes_web_service.db.init import create_database
 from mianotes_web_service.db.models import MiaJob
 from mianotes_web_service.domain.schemas import (
-    AdminKeyRead,
     ServiceApiKeyRead,
     StorageLocationCreate,
     StorageLocationRead,
@@ -24,7 +23,6 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.auth import (
     SESSION_COOKIE_NAME,
-    create_admin_key,
     generate_api_token,
     sync_instance_api_token_public_key,
 )
@@ -122,13 +120,6 @@ def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRe
     get_settings().api_token = raw_token
     sync_instance_api_token_public_key(session, raw_token)
     return ServiceApiKeyRead(token=raw_token)
-
-
-@router.post("/admin-key", response_model=AdminKeyRead, status_code=status.HTTP_201_CREATED)
-def regenerate_admin_key(session: SessionDep, _: AdminUser) -> AdminKeyRead:
-    admin_key = create_admin_key(session)
-    session.commit()
-    return AdminKeyRead(admin_key=admin_key)
 
 
 @router.post("/storage/locations", response_model=StorageSettingsRead)

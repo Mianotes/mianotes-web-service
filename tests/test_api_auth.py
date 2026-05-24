@@ -50,7 +50,7 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         "user_id": None,
         "is_first_user": True,
         "master_password_owner_name": None,
-        "admin_key_required": False,
+        "signup_disabled": False,
     }
 
     setup = client.post(
@@ -79,7 +79,7 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         "user_id": admin["id"],
         "is_first_user": None,
         "master_password_owner_name": "Admin",
-        "admin_key_required": False,
+        "signup_disabled": False,
     }
 
     unknown_check = client.post(
@@ -91,7 +91,7 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         "user_id": None,
         "is_first_user": None,
         "master_password_owner_name": "Admin",
-        "admin_key_required": False,
+        "signup_disabled": False,
     }
 
     joined = client.post(
@@ -99,13 +99,20 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
         json={
             "email": "maria@example.com",
             "name": "Maria",
-            "password": "house-password",
+            "password": "maria-password",
+            "password_confirmation": "maria-password",
         },
     )
     assert joined.status_code == 201
     maria = joined.json()["user"]
     assert maria["is_admin"] is False
 
+    maria_login = client.post(
+        "/api/auth/login",
+        json={"user_id": maria["id"], "password": "maria-password"},
+    )
+    assert maria_login.status_code == 200
+
     logged_in = client.post(
         "/api/auth/login",
         json={"user_id": admin["id"], "password": "house-password"},
@@ -114,7 +121,7 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     assert logged_in.json()["user"]["id"] == admin["id"]
 
 
-def test_shared_instance_requires_admin_key_for_admin_login(client: TestClient):
+def test_admin_only_workspace_blocks_new_accounts(client: TestClient):
     setup = client.post(
         "/api/auth/join",
         json={
@@ -122,52 +129,42 @@ def test_shared_instance_requires_admin_key_for_admin_login(client: TestClient):
             "name": "Admin",
             "password": "house-password",
             "password_confirmation": "house-password",
-            "shared_instance": True,
+            "workspace_access_mode": "admin_only",
         },
     )
     assert setup.status_code == 201
     admin = setup.json()["user"]
-    admin_key = setup.json()["admin_key"]
     assert admin["is_admin"] is True
-    assert isinstance(admin_key, str)
-    assert len(admin_key) >= 24
 
     client.post("/api/auth/logout")
-
-    known_check = client.post(
+    unknown_check = client.post(
         "/api/auth/check-email",
-        json={"email": "admin@example.com"},
+        json={"email": "maria@example.com"},
     )
-    assert known_check.status_code == 200
-    assert known_check.json()["admin_key_required"] is True
+    assert unknown_check.status_code == 200
+    assert unknown_check.json()["signup_disabled"] is True
 
-    missing_key = client.post(
-        "/api/auth/login",
-        json={"user_id": admin["id"], "password": "house-password"},
-    )
-    assert missing_key.status_code == 401
-    assert missing_key.json()["detail"] == "Admin key is required"
-
-    bad_key = client.post(
-        "/api/auth/login",
+    blocked = client.post(
+        "/api/auth/join",
         json={
-            "user_id": admin["id"],
-            "password": "house-password",
-            "admin_key": "wrong-admin-key",
+            "email": "maria@example.com",
+            "name": "Maria",
+            "password": "maria-password",
+            "password_confirmation": "maria-password",
         },
     )
-    assert bad_key.status_code == 401
-    assert bad_key.json()["detail"] == "Invalid admin key"
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == "This workspace is limited to the admin account"
 
     logged_in = client.post(
         "/api/auth/login",
-        json={"user_id": admin["id"], "password": "house-password", "admin_key": admin_key},
+        json={"user_id": admin["id"], "password": "house-password"},
     )
     assert logged_in.status_code == 200
     assert logged_in.json()["user"]["id"] == admin["id"]
 
 
-def test_admin_can_regenerate_admin_key(client: TestClient):
+def test_open_workspace_requires_new_users_to_choose_password(client: TestClient):
     setup = client.post(
         "/api/auth/join",
         json={
@@ -175,63 +172,43 @@ def test_admin_can_regenerate_admin_key(client: TestClient):
             "name": "Admin",
             "password": "house-password",
             "password_confirmation": "house-password",
-            "shared_instance": True,
+            "workspace_access_mode": "open",
         },
     )
-    old_key = setup.json()["admin_key"]
+    assert setup.status_code == 201
 
-    regenerated = client.post("/api/settings/admin-key", json={})
-    assert regenerated.status_code == 201
-    new_key = regenerated.json()["admin_key"]
-    assert new_key != old_key
-
-    client.post("/api/auth/logout")
-    old_key_login = client.post(
-        "/api/auth/login",
-        json={
-            "user_id": setup.json()["user"]["id"],
-            "password": "house-password",
-            "admin_key": old_key,
-        },
-    )
-    assert old_key_login.status_code == 401
-
-    new_key_login = client.post(
-        "/api/auth/login",
-        json={
-            "user_id": setup.json()["user"]["id"],
-            "password": "house-password",
-            "admin_key": new_key,
-        },
-    )
-    assert new_key_login.status_code == 200
-
-
-def test_admin_key_can_be_reset_from_host_machine(client: TestClient):
-    setup = client.post(
+    missing_confirmation = client.post(
         "/api/auth/join",
         json={
-            "email": "admin@example.com",
-            "name": "Admin",
-            "password": "house-password",
-            "password_confirmation": "house-password",
-            "shared_instance": True,
+            "email": "maria@example.com",
+            "name": "Maria",
+            "password": "maria-password",
         },
     )
-    old_key = setup.json()["admin_key"]
-    admin = setup.json()["user"]
+    assert missing_confirmation.status_code == 422
+    assert missing_confirmation.json()["detail"] == "Password confirmation is required"
+
+    joined = client.post(
+        "/api/auth/join",
+        json={
+            "email": "maria@example.com",
+            "name": "Maria",
+            "password": "maria-password",
+            "password_confirmation": "maria-password",
+        },
+    )
+    assert joined.status_code == 201
+    maria = joined.json()["user"]
     client.post("/api/auth/logout")
 
-    reset = client.post(
-        "/api/auth/admin-key/reset-local",
-        json={"user_id": admin["id"], "password": "house-password"},
+    old_master_login = client.post(
+        "/api/auth/login",
+        json={"user_id": maria["id"], "password": "house-password"},
     )
-    assert reset.status_code == 200
-    new_key = reset.json()["admin_key"]
-    assert new_key != old_key
+    assert old_master_login.status_code == 401
 
     logged_in = client.post(
         "/api/auth/login",
-        json={"user_id": admin["id"], "password": "house-password", "admin_key": new_key},
+        json={"user_id": maria["id"], "password": "maria-password"},
     )
     assert logged_in.status_code == 200

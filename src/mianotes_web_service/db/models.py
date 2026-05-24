@@ -38,6 +38,7 @@ class User(Base, TimestampMixin):
     phone: Mapped[str | None] = mapped_column(String(64))
     role: Mapped[str | None] = mapped_column(String(120))
     avatar_path: Mapped[str | None] = mapped_column(Text)
+    password_hash: Mapped[str | None] = mapped_column(Text)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     folders: Mapped[list[Folder]] = relationship(

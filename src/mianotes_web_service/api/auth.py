@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -9,8 +9,6 @@ from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
 from mianotes_web_service.domain.schemas import (
-    AdminKeyRead,
-    AdminKeyResetRequest,
     EmailCheck,
     EmailCheckResult,
     JoinRequest,
@@ -19,13 +17,16 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.auth import (
     SESSION_COOKIE_NAME,
-    create_admin_key,
+    WORKSPACE_ACCESS_MODE_ADMIN_ONLY,
+    WORKSPACE_ACCESS_MODE_OPEN,
     create_session_token,
     get_master_password_hash,
-    is_admin_key_enabled,
+    get_workspace_access_mode,
     set_master_password,
-    verify_admin_key,
+    set_user_password,
+    set_workspace_access_mode,
     verify_master_password,
+    verify_user_password,
 )
 from mianotes_web_service.services.storage import FilesystemStorage, make_username
 
@@ -102,12 +103,6 @@ def _master_password_owner_name(session: Session) -> str | None:
     return admin.name if admin is not None else None
 
 
-def _is_local_request(request: Request) -> bool:
-    if request.client is None:
-        return False
-    return request.client.host in {"127.0.0.1", "::1", "localhost", "testclient"}
-
-
 @router.post("/check-email", response_model=EmailCheckResult)
 def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
     if not _instance_initialized(session):
@@ -121,15 +116,18 @@ def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
         return EmailCheckResult(
             user_id=user.id,
             master_password_owner_name=master_password_owner_name,
-            admin_key_required=user.is_admin and is_admin_key_enabled(session),
         )
-    return EmailCheckResult(user_id=None, master_password_owner_name=master_password_owner_name)
+    signup_disabled = get_workspace_access_mode(session) == WORKSPACE_ACCESS_MODE_ADMIN_ONLY
+    return EmailCheckResult(
+        user_id=None,
+        master_password_owner_name=master_password_owner_name,
+        signup_disabled=signup_disabled,
+    )
 
 
 @router.post("/join", response_model=SessionRead, status_code=status.HTTP_201_CREATED)
 def join(payload: JoinRequest, response: Response, session: SessionDep) -> SessionRead:
     email = str(payload.email).lower()
-    admin_key: str | None = None
 
     if not _instance_initialized(session):
         if payload.password_confirmation is None:
@@ -154,15 +152,36 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
         else:
             user.name = payload.name
             user.is_admin = True
+        set_user_password(user, payload.password)
         set_master_password(session, payload.password)
-        admin_key = create_admin_key(session) if payload.shared_instance else None
+        access_mode = payload.workspace_access_mode or WORKSPACE_ACCESS_MODE_OPEN
+        try:
+            set_workspace_access_mode(session, access_mode)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
         session.flush()
         _create_onboarding_note(session, user)
     else:
-        if not verify_master_password(session, payload.password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
+        if get_workspace_access_mode(session) == WORKSPACE_ACCESS_MODE_ADMIN_ONLY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This workspace is limited to the admin account",
+            )
         if session.scalars(select(User).where(User.email == email)).one_or_none() is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
+        if payload.password_confirmation is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Password confirmation is required",
+            )
+        if payload.password != payload.password_confirmation:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Passwords do not match",
+            )
 
         user = User(
             email=email,
@@ -170,6 +189,7 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
             username=make_username(email, payload.name),
             is_admin=False,
         )
+        set_user_password(user, payload.password)
         session.add(user)
         try:
             session.flush()
@@ -184,7 +204,7 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
     session.commit()
     _set_session_cookie(response, token.id)
     session.refresh(user)
-    return SessionRead(user=user, admin_key=admin_key)
+    return SessionRead(user=user)
 
 
 @router.post("/login", response_model=SessionRead)
@@ -192,19 +212,14 @@ def login(payload: LoginRequest, response: Response, session: SessionDep) -> Ses
     user = session.get(User, payload.user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    if not verify_master_password(session, payload.password):
+    if user.password_hash:
+        valid_password = verify_user_password(user, payload.password)
+    else:
+        valid_password = verify_master_password(session, payload.password)
+        if valid_password:
+            set_user_password(user, payload.password)
+    if not valid_password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
-    if user.is_admin and is_admin_key_enabled(session):
-        if payload.admin_key is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Admin key is required",
-            )
-        if not verify_admin_key(session, payload.admin_key):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid admin key",
-            )
     token = create_session_token(session, user)
     session.commit()
     _set_session_cookie(response, token.id)
@@ -214,27 +229,6 @@ def login(payload: LoginRequest, response: Response, session: SessionDep) -> Ses
 @router.get("/session", response_model=SessionRead)
 def session_info(user: CurrentUser) -> SessionRead:
     return SessionRead(user=user)
-
-
-@router.post("/admin-key/reset-local", response_model=AdminKeyRead)
-def reset_admin_key_locally(
-    payload: AdminKeyResetRequest,
-    request: Request,
-    session: SessionDep,
-) -> AdminKeyRead:
-    if not _is_local_request(request):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin key reset is only available from the Mianotes host machine",
-        )
-    user = session.get(User, payload.user_id)
-    if user is None or not user.is_admin:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin user not found")
-    if not verify_master_password(session, payload.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password")
-    admin_key = create_admin_key(session)
-    session.commit()
-    return AdminKeyRead(admin_key=admin_key)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

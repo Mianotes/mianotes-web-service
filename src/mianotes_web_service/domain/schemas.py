@@ -233,7 +233,7 @@ class EmailCheckResult(BaseModel):
     user_id: str | None
     is_first_user: bool | None = None
     master_password_owner_name: str | None = None
-    admin_key_required: bool = False
+    signup_disabled: bool = False
 
 
 class JoinRequest(BaseModel):
@@ -241,28 +241,16 @@ class JoinRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     password: str = Field(min_length=1)
     password_confirmation: str | None = Field(default=None, min_length=1)
-    shared_instance: bool = False
+    workspace_access_mode: str | None = None
 
 
 class LoginRequest(BaseModel):
     user_id: str
     password: str = Field(min_length=1)
-    admin_key: str | None = Field(default=None, min_length=1)
-
-
-class AdminKeyResetRequest(BaseModel):
-    user_id: str
-    password: str = Field(min_length=1)
-
-
-class AdminKeyRead(BaseModel):
-    admin_key: str
-    filename: str = "mianotes-admin-key.txt"
 
 
 class SessionRead(BaseModel):
     user: UserRead
-    admin_key: str | None = None
 
     model_config = {"from_attributes": True}
 
