@@ -187,6 +187,43 @@ def test_document_parser_removes_unfenced_ocr_markers_and_self_closes_breaks(
     )
 
 
+def test_document_parser_self_closes_html_void_tags(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "html.md"
+    source.write_text("# HTML", encoding="utf-8")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "![Logo](logo.png)\n\n"
+                    '<img src="logo.png" alt="Logo">\n'
+                    "<hr>\n"
+                    '<input type="checkbox" checked>\n'
+                )
+            )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "![Logo](logo.png)\n\n"
+        '<img src="logo.png" alt="Logo" />\n'
+        "<hr />\n"
+        '<input type="checkbox" checked />\n'
+    )
+
+
 def test_document_parser_preserves_regular_markdown_code_blocks(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -204,6 +241,7 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
                     "# Code example\n\n"
                     "```python\n"
                     "print('<br>')\n"
+                    "print('<img src=\"logo.png\">')\n"
                     "```\n"
                 )
             )
@@ -216,7 +254,13 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
 
     parsed = parse_document(source)
 
-    assert parsed.text == "# Code example\n\n```python\nprint('<br>')\n```\n"
+    assert parsed.text == (
+        "# Code example\n\n"
+        "```python\n"
+        "print('<br>')\n"
+        "print('<img src=\"logo.png\">')\n"
+        "```\n"
+    )
 
 
 def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(

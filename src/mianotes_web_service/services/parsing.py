@@ -61,7 +61,11 @@ MARKITDOWN_OCR_MARKER_LINE_PATTERN = re.compile(
     r"^\*?\[(?:Image OCR|End OCR)\]\*?\s*\n?",
     re.IGNORECASE | re.MULTILINE,
 )
-RAW_BR_TAG_PATTERN = re.compile(r"<br\s*/?>", re.IGNORECASE)
+HTML_VOID_TAG_PATTERN = re.compile(
+    r"<(?P<tag>area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)"
+    r"(?P<attrs>\s[^<>]*?)?\s*/?>",
+    re.IGNORECASE,
+)
 IMAGE_NEEDS_CLOUD_MESSAGE = (
     "Mia couldn’t read the text in this image.\n\n"
     "To help Mia read images, screenshots, and scanned documents, connect Mia to "
@@ -149,16 +153,20 @@ def _normalise_document_ocr_markdown(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
 
 
-def _normalise_markdown_break_tags(text: str) -> str:
+def _normalise_html_void_tags(text: str) -> str:
+    def replace_tag(match: re.Match[str]) -> str:
+        attrs = (match.group("attrs") or "").rstrip()
+        return f"<{match.group('tag').lower()}{attrs} />"
+
     parts = FENCED_CODE_BLOCK_PATTERN.split(text)
     for index, part in enumerate(parts):
         if index % 2 == 0:
-            parts[index] = RAW_BR_TAG_PATTERN.sub("<br />", part)
+            parts[index] = HTML_VOID_TAG_PATTERN.sub(replace_tag, part)
     return "".join(parts)
 
 
 def _normalise_parsed_markdown(text: str) -> str:
-    return _normalise_markdown_break_tags(_normalise_document_ocr_markdown(text))
+    return _normalise_html_void_tags(_normalise_document_ocr_markdown(text))
 
 
 def _convert_with_markitdown(path: Path, **options: object) -> str:
