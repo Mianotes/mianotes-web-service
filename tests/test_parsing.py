@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -258,11 +259,7 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
     parsed = parse_document(source)
 
     assert parsed.text == (
-        "# Code example\n\n"
-        "```python\n"
-        "print('<br>')\n"
-        "print('<img src=\"logo.png\">')\n"
-        "```\n"
+        "# Code example\n\n```python\nprint('<br>')\nprint('<img src=\"logo.png\">')\n```\n"
     )
 
 
@@ -419,9 +416,7 @@ def test_image_parser_strips_ocr_code_block_indentation(
         return SimpleNamespace(
             returncode=0,
             stdout=(
-                "    # Mianotes\n\n"
-                "    ## Getting started\n\n"
-                "    Useful text from a screenshot.\n"
+                "    # Mianotes\n\n    ## Getting started\n\n    Useful text from a screenshot.\n"
             ),
         )
 
@@ -854,9 +849,88 @@ def test_parse_youtube_url_rejects_footer_fallback(monkeypatch: pytest.MonkeyPat
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
+    monkeypatch.setattr(parsing.shutil, "which", lambda _name: None)
 
     with pytest.raises(ParserError, match="Could not extract a YouTube transcript"):
         parse_youtube_url("https://www.youtube.com/watch?v=abc123")
+
+
+def test_parse_youtube_url_falls_back_to_ytdlp_captions(monkeypatch: pytest.MonkeyPatch):
+    commands: list[list[str]] = []
+
+    class FakeMarkItDown:
+        def convert(self, _value: str):
+            return SimpleNamespace(text_content="[About](https://www.youtube.com/about/)")
+
+    def fake_run(command_parts, **_kwargs):
+        commands.append(command_parts)
+        output_template = Path(command_parts[command_parts.index("-o") + 1])
+        caption_path = output_template.parent / "abc123.en.vtt"
+        caption_path.write_text(
+            "WEBVTT\n\n"
+            "00:00:00.000 --> 00:00:02.000\n"
+            "<c>Hello from captions</c>\n\n"
+            "00:00:02.000 --> 00:00:04.000\n"
+            "Second line\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command_parts, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(parsing.shutil, "which", lambda name: f"/usr/local/bin/{name}")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+
+    parsed = parse_youtube_url("https://www.youtube.com/watch?v=abc123")
+
+    assert parsed.parser == "yt-dlp+captions"
+    assert "Hello from captions" in parsed.text
+    assert "Second line" in parsed.text
+    assert commands[0][0].endswith("yt-dlp")
+    assert "--skip-download" in commands[0]
+
+
+def test_parse_youtube_url_falls_back_to_ytdlp_audio(monkeypatch: pytest.MonkeyPatch):
+    commands: list[list[str]] = []
+
+    class FakeMarkItDown:
+        def convert(self, _value: str):
+            return SimpleNamespace(text_content="[About](https://www.youtube.com/about/)")
+
+    def fake_run(command_parts, **_kwargs):
+        commands.append(command_parts)
+        if "--skip-download" in command_parts:
+            return subprocess.CompletedProcess(command_parts, 1, stdout="", stderr="no captions")
+        output_template = Path(command_parts[command_parts.index("-o") + 1])
+        audio_path = output_template.parent / "abc123.webm"
+        audio_path.write_text("audio", encoding="utf-8")
+        return subprocess.CompletedProcess(command_parts, 0, stdout="ok", stderr="")
+
+    def fake_parse_document(path: Path):
+        return parsing.ParsedDocument(
+            text="Transcript from downloaded audio",
+            parser="markitdown+ffmpeg-mp3",
+            source_path=path,
+        )
+
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(parsing.shutil, "which", lambda name: f"/usr/local/bin/{name}")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parsing, "parse_document", fake_parse_document)
+
+    parsed = parse_youtube_url("https://www.youtube.com/watch?v=abc123")
+
+    assert parsed.parser == "markitdown+ffmpeg-mp3+yt-dlp-audio"
+    assert parsed.text == "Transcript from downloaded audio"
+    assert "--skip-download" in commands[0]
+    assert "-f" in commands[1]
 
 
 def test_parse_html_document_uses_trafilatura_cleaned_content(

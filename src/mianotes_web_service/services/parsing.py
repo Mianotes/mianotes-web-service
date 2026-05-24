@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html as html_lib
 import importlib
 import re
 import shlex
@@ -100,6 +101,7 @@ TESSERACT_CANDIDATES = (
     "/usr/local/bin/tesseract",
     "/usr/bin/tesseract",
 )
+YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
 ParserLogCallback = Callable[[str, str | None, str], None]
 ParserTextCallback = Callable[[str], None]
 _PARSER_LOGGER: ContextVar[ParserLogCallback | None] = ContextVar(
@@ -287,6 +289,38 @@ def _ffmpeg_executable() -> str | None:
     if path_candidate:
         return path_candidate
     return None
+
+
+def _youtube_downloader_executable() -> str | None:
+    for candidate in YOUTUBE_DOWNLOADER_CANDIDATES:
+        path_candidate = shutil.which(candidate)
+        _log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
+        if path_candidate:
+            return path_candidate
+    return None
+
+
+def _run_youtube_downloader(command_parts: list[str], *, timeout: int = 600) -> bool:
+    command = shlex.join(command_parts)
+    _log_parser_command(command, "started", status="running")
+    try:
+        completed = subprocess.run(
+            command_parts,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError) as exc:
+        _log_parser_command(command, str(exc), status="failed")
+        return False
+
+    if completed.returncode != 0:
+        _log_parser_command(command, _subprocess_response(completed), status="failed")
+        return False
+
+    _log_parser_command(command, _subprocess_response(completed), status="succeeded")
+    return True
 
 
 def _transcode_audio_to_low_quality_mp3(source_path: Path, output_path: Path) -> Path | None:
@@ -758,21 +792,155 @@ def is_youtube_url(url: str) -> bool:
     return parsed.path.startswith(("/shorts/", "/embed/", "/live/"))
 
 
+def _caption_file_to_text(path: Path) -> str:
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    text_lines: list[str] = []
+    previous = ""
+    for line in lines:
+        clean = line.strip()
+        if not clean:
+            continue
+        if clean.upper() == "WEBVTT" or clean.startswith(("Kind:", "Language:")):
+            continue
+        if "-->" in clean:
+            continue
+        if clean.isdigit():
+            continue
+        clean = re.sub(r"<[^>]+>", "", clean)
+        clean = html_lib.unescape(clean).strip()
+        if not clean or clean == previous:
+            continue
+        text_lines.append(clean)
+        previous = clean
+    return "\n".join(text_lines).strip()
+
+
+def _parse_youtube_captions_with_downloader(url: str, work_dir: Path) -> ParsedDocument | None:
+    executable = _youtube_downloader_executable()
+    if executable is None:
+        return None
+
+    captions_dir = work_dir / "captions"
+    captions_dir.mkdir(parents=True, exist_ok=True)
+    output_template = captions_dir / "%(id)s.%(ext)s"
+    command_parts = [
+        executable,
+        "--no-playlist",
+        "--skip-download",
+        "--write-sub",
+        "--write-auto-sub",
+        "--sub-lang",
+        "en",
+        "--sub-format",
+        "vtt",
+        "-o",
+        str(output_template),
+        url,
+    ]
+    if not _run_youtube_downloader(command_parts, timeout=300):
+        return None
+
+    caption_paths = sorted([*captions_dir.glob("*.vtt"), *captions_dir.glob("*.srt")])
+    for caption_path in caption_paths:
+        text = _caption_file_to_text(caption_path)
+        if text:
+            return ParsedDocument(
+                text=f"## YouTube transcript\n\n{text}",
+                parser="yt-dlp+captions",
+                source_path=caption_path,
+            )
+    _log_parser_command("parse yt-dlp captions", "no readable captions found", status="failed")
+    return None
+
+
+def _download_youtube_audio(url: str, work_dir: Path) -> Path | None:
+    executable = _youtube_downloader_executable()
+    if executable is None:
+        return None
+
+    audio_dir = work_dir / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    output_template = audio_dir / "%(id)s.%(ext)s"
+    command_parts = [
+        executable,
+        "--no-playlist",
+        "--max-filesize",
+        "200m",
+        "-f",
+        "bestaudio/best",
+        "-o",
+        str(output_template),
+        url,
+    ]
+    if not _run_youtube_downloader(command_parts, timeout=900):
+        return None
+
+    audio_paths = sorted(
+        path
+        for path in audio_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
+    )
+    if not audio_paths:
+        _log_parser_command("find yt-dlp audio", "no supported audio file found", status="failed")
+        return None
+    return audio_paths[0]
+
+
+def _parse_youtube_audio_with_downloader(url: str, work_dir: Path) -> ParsedDocument | None:
+    audio_path = _download_youtube_audio(url, work_dir)
+    if audio_path is None:
+        return None
+    parsed = parse_document(audio_path)
+    if not parsed.text.strip():
+        return None
+    return ParsedDocument(
+        text=parsed.text,
+        parser=f"{parsed.parser}+yt-dlp-audio",
+        source_path=audio_path,
+    )
+
+
 def parse_youtube_url(url: str) -> ParsedDocument:
     if not is_youtube_url(url):
         raise ParserError("URL is not a supported YouTube video URL.")
-    text = normalise_parsed_markdown(_convert_url_with_markitdown(url))
-    if not text.strip():
-        raise ParserError("YouTube transcript conversion returned no text.")
-    if "### Transcript" not in text:
-        raise ParserError(
+    errors: list[str] = []
+    try:
+        text = normalise_parsed_markdown(_convert_url_with_markitdown(url))
+        if text.strip() and "### Transcript" in text:
+            return ParsedDocument(
+                text=text,
+                parser="markitdown+youtube",
+                source_path=Path(url),
+            )
+        errors.append("MarkItDown did not return a YouTube transcript.")
+    except ParserError as exc:
+        errors.append(str(exc))
+
+    with tempfile.TemporaryDirectory(prefix="mianotes-youtube-") as temp_dir:
+        work_dir = Path(temp_dir)
+        parsed = _parse_youtube_captions_with_downloader(url, work_dir)
+        if parsed is not None:
+            return ParsedDocument(
+                text=parsed.text,
+                parser=parsed.parser,
+                source_path=Path(url),
+            )
+        parsed = _parse_youtube_audio_with_downloader(url, work_dir)
+        if parsed is not None:
+            return ParsedDocument(
+                text=parsed.text,
+                parser=parsed.parser,
+                source_path=Path(url),
+            )
+
+    detail = " ".join(errors)
+    raise ParserError(
+        (
             "Could not extract a YouTube transcript. YouTube may be rate-limiting "
-            "transcript requests, or this video may not have captions available."
+            "transcript requests, this video may not have captions available, or yt-dlp "
+            "could not download a fallback."
         )
-    return ParsedDocument(
-        text=text,
-        parser="markitdown+youtube",
-        source_path=Path(url),
+        + (f" {detail}" if detail else "")
     )
 
 
