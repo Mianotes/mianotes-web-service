@@ -23,20 +23,14 @@ The service is designed for small groups: developers, researchers, students, and
 
 ## Documentation
 
-- [Introduction](docs/01-Introduction.md)
-- [Installation](docs/02-Installation.md)
-- [Workflow](docs/03-Workflow.md)
-- [APIs](docs/04-API.md)
-- [Customisation](docs/05-Customisation.md)
-- [Database](docs/13-Database.md)
-- [Mia and agents](docs/06-Mia-And-Agents.md)
-- [MCP](docs/07-MCP.md)
-- [Architecture](docs/08-Architecture.md)
-- [Development](docs/09-Development.md)
-- [Testing](docs/10-Testing.md)
-- [Prompting Mia](docs/11-Prompting-Mia.md)
-- [Security](docs/12-Security.md)
-- [API token](docs/14-API-token.md)
+This documentation is organised for three kinds of reader:
+
+1. **People deciding whether to try Mianotes.** Start with [What is Mianotes?](docs/01-about/01-overview.md), [Use cases](docs/01-about/02-use-cases.md), and [Installation](docs/02-getting-started/01-installation.md).
+2. **Humans using the web app.** Start with [Human workflow](docs/03-for-humans/01-human-workflow.md) and [Folders, notes, and tags](docs/03-for-humans/02-folders-notes-tags.md).
+3. **People publishing documentation.** Start with [Publishing static sites](docs/03-for-humans/04-publishing.md).
+4. **AI agents and developers.** Start with [Agent overview](docs/04-for-agents/01-agent-overview.md), [API tokens](docs/04-for-agents/02-api-tokens.md), [MCP server](docs/04-for-agents/03-mcp-server.md), and [API overview](docs/06-api-reference/01-api-overview.md).
+
+The full table of contents is in [TOC.md](docs/TOC.md).
 
 ## Technology
 
