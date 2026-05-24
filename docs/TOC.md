@@ -51,10 +51,10 @@
 - [Storage and database](07-system/02-storage-and-database.md)
 - [Security](07-system/03-security.md)
 
-## Join the project
+## Open source
 
-- [Development](08-join-the-project/01-development.md)
-- [Testing](08-join-the-project/02-testing.md)
-- [Theming and customisation](08-join-the-project/03-theming.md)
-- [Maintainer checklist](08-join-the-project/04-maintainer-checklist.md)
-- [Troubleshooting](08-join-the-project/05-troubleshooting.md)
+- [Development](08-open-source/01-development.md)
+- [Testing](08-open-source/02-testing.md)
+- [Theming and customisation](08-open-source/03-theming.md)
+- [Maintainer checklist](08-open-source/04-maintainer-checklist.md)
+- [Troubleshooting](08-open-source/05-troubleshooting.md)
