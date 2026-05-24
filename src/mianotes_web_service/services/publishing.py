@@ -104,9 +104,19 @@ def build_publish_draft(
         if latest_publish
         else default_site_configuration
     )
-    navigation = _navigation_for_notes(notes, include_folder=include_folder)
+    previous_navigation = _load_json_list(latest_publish.navigation, []) if latest_publish else []
+    navigation = (
+        _navigation_with_new_notes(
+            previous_navigation,
+            notes,
+            include_folder=include_folder,
+            since=latest_publish.created_at,
+        )
+        if latest_publish
+        else _navigation_for_notes(notes, include_folder=include_folder)
+    )
     previous_navigation_paths = (
-        _navigation_paths(_load_json_list(latest_publish.navigation, []))
+        _navigation_paths(previous_navigation)
         if latest_publish
         else set()
     )
@@ -114,6 +124,7 @@ def build_publish_draft(
         notes,
         include_folder=include_folder,
         previous_navigation_paths=previous_navigation_paths,
+        since=latest_publish.created_at,
     )
     return PublishDraft(
         theme=theme.id,
@@ -270,12 +281,71 @@ def _navigation_for_notes(notes: list[Note], *, include_folder: bool) -> list[di
     for note in notes:
         folder = note.folder
         groups.setdefault(folder.name, []).append(
-            {
-                "title": note.title,
-                "path": _published_note_path(note, include_folder=include_folder),
-            }
+            _navigation_item_for_note(note, include_folder=include_folder)
         )
     return [{"title": title, "items": items} for title, items in groups.items()]
+
+
+def _navigation_with_new_notes(
+    saved_navigation: list[dict[str, object]],
+    notes: list[Note],
+    *,
+    include_folder: bool,
+    since: datetime,
+) -> list[dict[str, object]]:
+    notes_by_path = {
+        _published_note_path(note, include_folder=include_folder): note
+        for note in notes
+    }
+    navigation: list[dict[str, object]] = []
+    groups_by_title: dict[str, dict[str, object]] = {}
+    placed_paths: set[str] = set()
+
+    for group in saved_navigation:
+        title = group.get("title")
+        items = group.get("items")
+        if not isinstance(title, str) or not isinstance(items, list):
+            continue
+        next_items: list[dict[str, object]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            path = item.get("path")
+            if not isinstance(path, str) or path in placed_paths:
+                continue
+            note = notes_by_path.get(path)
+            if note is None:
+                continue
+            next_items.append(_navigation_item_for_note(note, include_folder=include_folder))
+            placed_paths.add(path)
+        if next_items:
+            next_group: dict[str, object] = {"title": title, "items": next_items}
+            navigation.append(next_group)
+            groups_by_title[title] = next_group
+
+    for note in notes:
+        path = _published_note_path(note, include_folder=include_folder)
+        if path in placed_paths or not _note_changed_after(note, since):
+            continue
+        title = note.folder.name
+        group = groups_by_title.get(title)
+        if group is None:
+            group = {"title": title, "items": []}
+            groups_by_title[title] = group
+            navigation.append(group)
+        items = group["items"]
+        if isinstance(items, list):
+            items.append(_navigation_item_for_note(note, include_folder=include_folder))
+            placed_paths.add(path)
+
+    return navigation
+
+
+def _navigation_item_for_note(note: Note, *, include_folder: bool) -> dict[str, object]:
+    return {
+        "title": note.title,
+        "path": _published_note_path(note, include_folder=include_folder),
+    }
 
 
 def _updated_notes(
@@ -283,11 +353,12 @@ def _updated_notes(
     *,
     include_folder: bool,
     previous_navigation_paths: set[str],
+    since: datetime,
 ) -> list[dict[str, object]]:
     updated_notes: list[dict[str, object]] = []
     for note in notes:
         path = _published_note_path(note, include_folder=include_folder)
-        if path in previous_navigation_paths:
+        if path in previous_navigation_paths or not _note_changed_after(note, since):
             continue
         updated_notes.append(
             {
@@ -296,6 +367,17 @@ def _updated_notes(
             }
         )
     return updated_notes
+
+
+def _note_changed_after(note: Note, since: datetime) -> bool:
+    changed_at = note.updated_at or note.created_at
+    return _as_utc(changed_at) > _as_utc(since)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _navigation_paths(navigation: list[dict[str, object]]) -> set[str]:

@@ -425,7 +425,6 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
         "Mianotes notes.",
     )
     improvements_path = f"improvements/improvements-{improvements_note['id'][:8]}.html"
-    mianotes_path = f"mianotes/how-to-use-mianotes-{mianotes_note['id'][:8]}.html"
     saved_navigation = [
         {
             "title": "Improvements",
@@ -453,6 +452,14 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
         },
     )
     assert publish_response.status_code == 201
+
+    new_mianotes_note = _create_note(
+        client,
+        mianotes_folder["id"],
+        "New Mianotes note",
+        "Fresh Mianotes notes.",
+    )
+    new_mianotes_path = f"mianotes/new-mianotes-note-{new_mianotes_note['id'][:8]}.html"
 
     folder_publish_response = client.post(
         "/api/publish",
@@ -494,11 +501,12 @@ def test_all_folders_draft_stages_notes_missing_from_saved_navigation(client: Te
     }
     mianotes_group = draft["navigation"][1]
     assert mianotes_group["title"] == "Mianotes"
-    assert {
-        "title": "How to use Mianotes",
-        "path": mianotes_path,
-    } in mianotes_group["items"]
-    assert len(mianotes_group["items"]) == 2
+    assert mianotes_group["items"] == [
+        {
+            "title": "New Mianotes note",
+            "path": new_mianotes_path,
+        }
+    ]
     assert draft["updated_notes"] == mianotes_group["items"]
 
 
