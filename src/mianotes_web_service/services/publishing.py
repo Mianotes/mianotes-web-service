@@ -131,6 +131,16 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     folder = _read_folder(session, payload.folder_id) if payload.folder_id else None
     tag = _read_tag(session, payload.tag_id) if payload.tag_id else None
     notes = _read_publishable_notes(session, folder_id=payload.folder_id, tag_id=payload.tag_id)
+    include_folder = payload.folder_id is None
+    notes_by_path = {
+        _published_note_path(note, include_folder=include_folder): note
+        for note in notes
+    }
+    notes = [
+        notes_by_path[path]
+        for path in _navigation_paths_in_order(payload.navigation)
+        if path in notes_by_path
+    ]
     version = str(payload.site_configuration.get("version") or theme.version)
     version_slug = _version_slug(version)
     data_dir = get_settings().data_dir
@@ -144,7 +154,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
         notes,
         version_dir=version_dir,
         config=payload.site_configuration,
-        include_folder=payload.folder_id is None,
+        include_folder=include_folder,
     )
     _write_theme_assets(
         theme,
@@ -289,15 +299,21 @@ def _updated_notes(
 
 
 def _navigation_paths(navigation: list[dict[str, object]]) -> set[str]:
-    paths: set[str] = set()
+    return set(_navigation_paths_in_order(navigation))
+
+
+def _navigation_paths_in_order(navigation: list[dict[str, object]]) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
 
     def collect(items: Iterable[object]) -> None:
         for item in items:
             if not isinstance(item, dict):
                 continue
             path = item.get("path")
-            if isinstance(path, str) and path:
-                paths.add(path)
+            if isinstance(path, str) and path and path not in seen:
+                paths.append(path)
+                seen.add(path)
             children = item.get("items")
             if isinstance(children, list):
                 collect(children)

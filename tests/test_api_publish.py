@@ -291,6 +291,43 @@ def test_publish_site_replaces_same_version_html(client: TestClient, tmp_path: P
     assert "Second published body." in served_html.text
 
 
+def test_publish_site_uses_navigation_as_published_note_set(client: TestClient, tmp_path: Path):
+    _join(client)
+    removed_folder = client.post("/api/folders", json={"name": "Removed"}).json()
+    kept_folder = client.post("/api/folders", json={"name": "Kept"}).json()
+    removed_note = _create_note(client, removed_folder["id"], "Removed note", "Removed body.")
+    kept_note = _create_note(client, kept_folder["id"], "Kept note", "Kept body.")
+    removed_path = f"removed/removed-note-{removed_note['id'][:8]}.html"
+    kept_path = f"kept/kept-note-{kept_note['id'][:8]}.html"
+    payload = {
+        "folder_id": None,
+        "theme": "mialight",
+        "site_configuration": {
+            "brand": "Mia Docs",
+            "version": "0.2.0",
+            "headerLinks": [],
+        },
+        "navigation": [{"title": "Kept", "items": [{"title": "Kept note", "path": kept_path}]}],
+        "updated_notes": [{"title": "Kept note", "path": kept_path}],
+    }
+
+    response = client.post("/api/publish", json=payload)
+
+    assert response.status_code == 201
+    assert response.json()["note_count"] == 1
+    html_root = tmp_path / "data" / "html" / "0.2.0"
+    index_html = (html_root / "index.html").read_text(encoding="utf-8")
+    assert f"url=./{kept_path}" in index_html
+    assert removed_path not in index_html
+    assert (html_root / kept_path).is_file()
+    assert not (html_root / removed_path).exists()
+    search_js = (html_root / "search.js").read_text(encoding="utf-8")
+    assert "Kept body." in search_js
+    assert "Removed body." not in search_js
+    assert client.get(f"/api/notes/{kept_note['id']}").json()["is_published"] is True
+    assert client.get(f"/api/notes/{removed_note['id']}").json()["is_published"] is False
+
+
 def test_publish_draft_regenerates_navigation_and_stages_new_navigation_items(
     client: TestClient,
 ):
