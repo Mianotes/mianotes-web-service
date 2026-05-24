@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -96,6 +97,89 @@ def test_jobs_can_be_read_by_owner(app_client: tuple[TestClient, sessionmaker[Se
     fetched = client.get(f"/api/jobs/{job_id}")
     assert fetched.status_code == 200
     assert fetched.json()["job_type"] == "parse_file"
+
+
+def test_jobs_list_keeps_active_failed_and_recent_succeeded_jobs(
+    app_client: tuple[TestClient, sessionmaker[Session]],
+):
+    client, testing_session = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    now = datetime.now(UTC)
+
+    with testing_session() as session:
+        user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+        queued = create_job(session, user, job_type="parse_file")
+        running = create_job(session, user, job_type="parse_file")
+        running.status = "running"
+        failed = create_job(session, user, job_type="parse_file")
+        failed.status = "failed"
+        failed.finished_at = now - timedelta(days=14)
+        recent_succeeded = create_job(session, user, job_type="parse_file")
+        recent_succeeded.status = "succeeded"
+        recent_succeeded.finished_at = now - timedelta(hours=23, minutes=30)
+        old_succeeded = create_job(session, user, job_type="parse_file")
+        old_succeeded.status = "succeeded"
+        old_succeeded.finished_at = now - timedelta(days=2)
+        cancelled = create_job(session, user, job_type="parse_file")
+        cancelled.status = "cancelled"
+        cancelled.finished_at = now
+        session.commit()
+        visible_ids = {queued.id, running.id, failed.id, recent_succeeded.id}
+        hidden_ids = {old_succeeded.id, cancelled.id}
+
+    listed = client.get("/api/jobs")
+
+    assert listed.status_code == 200
+    listed_ids = {job["id"] for job in listed.json()}
+    assert visible_ids <= listed_ids
+    assert hidden_ids.isdisjoint(listed_ids)
+
+
+def test_jobs_status_filter_keeps_retention_window(
+    app_client: tuple[TestClient, sessionmaker[Session]],
+):
+    client, testing_session = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    now = datetime.now(UTC)
+
+    with testing_session() as session:
+        user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+        recent_succeeded = create_job(session, user, job_type="parse_file")
+        recent_succeeded.status = "succeeded"
+        recent_succeeded.finished_at = now - timedelta(hours=1)
+        old_succeeded = create_job(session, user, job_type="parse_file")
+        old_succeeded.status = "succeeded"
+        old_succeeded.finished_at = now - timedelta(days=2)
+        failed = create_job(session, user, job_type="parse_file")
+        failed.status = "failed"
+        session.commit()
+        recent_succeeded_id = recent_succeeded.id
+        old_succeeded_id = old_succeeded.id
+        failed_id = failed.id
+
+    listed = client.get("/api/jobs", params={"status": "succeeded"})
+
+    assert listed.status_code == 200
+    listed_ids = {job["id"] for job in listed.json()}
+    assert recent_succeeded_id in listed_ids
+    assert old_succeeded_id not in listed_ids
+    assert failed_id not in listed_ids
 
 
 def test_job_status_helpers(app_client: tuple[TestClient, sessionmaker[Session]]):

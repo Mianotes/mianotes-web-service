@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import joinedload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
@@ -12,6 +13,7 @@ from mianotes_web_service.domain.schemas import MiaJobRead
 from mianotes_web_service.services.jobs import decode_job_log, decode_job_payload
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+RECENT_SUCCEEDED_JOB_WINDOW = timedelta(hours=24)
 
 
 def _ensure_can_read_job(job: MiaJob, user: User) -> None:
@@ -46,9 +48,18 @@ def list_jobs(
     note_id: Annotated[str | None, Query()] = None,
     status_filter: Annotated[str | None, Query(alias="status")] = None,
 ) -> list[MiaJobRead]:
+    recent_succeeded_cutoff = datetime.now(UTC) - RECENT_SUCCEEDED_JOB_WINDOW
     statement = (
         select(MiaJob)
         .options(joinedload(MiaJob.user), joinedload(MiaJob.note))
+        .where(
+            or_(
+                MiaJob.status.in_(("queued", "running", "failed")),
+                (MiaJob.status == "succeeded")
+                & (MiaJob.finished_at.is_not(None))
+                & (MiaJob.finished_at >= recent_succeeded_cutoff),
+            )
+        )
         .order_by(MiaJob.created_at.desc())
     )
     if not user.is_admin:
