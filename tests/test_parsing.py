@@ -657,6 +657,66 @@ def test_audio_parser_retries_with_low_quality_mp3(
     assert commands[0][-1].endswith("low-quality.mp3")
 
 
+def test_audio_parser_splits_audio_when_low_quality_mp3_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake long audio")
+    commands = []
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            name = Path(path).name
+            if name in {"recording.m4a", "low-quality.mp3"}:
+                raise RuntimeError(f"could not transcribe {name}")
+            if name == "chunk-000.mp3":
+                return SimpleNamespace(text_content="First chunk transcript")
+            if name == "chunk-001.mp3":
+                return SimpleNamespace(text_content="Second chunk transcript")
+            return SimpleNamespace(text_content="")
+
+    def fake_run(args, **_kwargs):
+        commands.append(args)
+        if "segment" in args:
+            chunk_dir = Path(args[-1]).parent
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            (chunk_dir / "chunk-000.mp3").write_bytes(b"chunk one")
+            (chunk_dir / "chunk-001.mp3").write_bytes(b"chunk two")
+        else:
+            Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parsing.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+ffmpeg-mp3"
+    assert parsed.text == (
+        "## Audio transcript\n\n"
+        "### Part 1\n\n"
+        "First chunk transcript\n\n"
+        "### Part 2\n\n"
+        "Second chunk transcript"
+    )
+    assert len(commands) == 2
+    assert commands[1][-7:] == [
+        "-f",
+        "segment",
+        "-segment_time",
+        str(parsing.AUDIO_CHUNK_SECONDS),
+        "-reset_timestamps",
+        "1",
+        commands[1][-1],
+    ]
+
+
 def test_audio_parser_reports_original_and_fallback_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -669,7 +729,12 @@ def test_audio_parser_reports_original_and_fallback_failures(
             raise RuntimeError(f"could not transcribe {Path(path).name}")
 
     def fake_run(args, **_kwargs):
-        Path(args[-1]).write_bytes(b"low quality mp3")
+        if "segment" in args:
+            chunk_dir = Path(args[-1]).parent
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            (chunk_dir / "chunk-000.mp3").write_bytes(b"chunk one")
+        else:
+            Path(args[-1]).write_bytes(b"low quality mp3")
         return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
 
     monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
@@ -680,7 +745,7 @@ def test_audio_parser_reports_original_and_fallback_failures(
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
 
-    with pytest.raises(ParserError, match="low-quality.mp3"):
+    with pytest.raises(ParserError, match="chunk-000.mp3"):
         parse_document(source)
 
 
