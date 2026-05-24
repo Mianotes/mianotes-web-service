@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from . import __version__
 from .api.routes import api_router
+from .db.init import create_database
 from .db.session import SessionLocal
 from .services.job_runner import InProcessJobRunner, fail_interrupted_jobs
 
@@ -14,6 +15,7 @@ from .services.job_runner import InProcessJobRunner, fail_interrupted_jobs
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        create_database()
         with SessionLocal() as session:
             fail_interrupted_jobs(session)
         yield
