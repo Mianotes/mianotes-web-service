@@ -770,6 +770,33 @@ def test_ffmpeg_executable_skips_broken_path(monkeypatch: pytest.MonkeyPatch):
     assert commands == [["/broken/ffmpeg", "-version"], ["/working/ffmpeg", "-version"]]
 
 
+def test_audio_parser_prefers_verified_audio_tool_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    good_dir = tmp_path / "opt" / "bin"
+    bad_dir = tmp_path / "usr" / "local" / "bin"
+    good_dir.mkdir(parents=True)
+    bad_dir.mkdir(parents=True)
+    for directory in (good_dir, bad_dir):
+        for tool in ("ffmpeg", "flac"):
+            (directory / tool).write_text("", encoding="utf-8")
+
+    def fake_run(args, **_kwargs):
+        if str(args[0]).startswith(str(bad_dir)):
+            return SimpleNamespace(returncode=126, stdout="", stderr="Bad CPU type in executable")
+        return SimpleNamespace(returncode=0, stdout=f"{Path(args[0]).name} ok", stderr="")
+
+    monkeypatch.setattr(parsing, "AUDIO_TOOL_NAMES", ("ffmpeg", "flac"))
+    monkeypatch.setattr(parsing, "AUDIO_TOOL_DIR_CANDIDATES", (str(good_dir), str(bad_dir)))
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setenv("PATH", f"{bad_dir}:/usr/bin")
+
+    with parsing._prefer_working_audio_tools():
+        assert parsing.os.environ["PATH"].split(":")[0] == str(good_dir)
+
+    assert parsing.os.environ["PATH"] == f"{bad_dir}:/usr/bin"
+
+
 def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     requests = []
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html as html_lib
 import importlib
+import os
 import re
 import shlex
 import shutil
@@ -108,6 +109,8 @@ FFMPEG_CANDIDATES = (
     "/usr/local/bin/ffmpeg",
     "/usr/bin/ffmpeg",
 )
+AUDIO_TOOL_NAMES = ("ffmpeg", "ffprobe", "flac", "metaflac")
+AUDIO_TOOL_DIR_CANDIDATES = ("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin")
 YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
 ParserLogCallback = Callable[[str, str | None, str], None]
 ParserTextCallback = Callable[[str], None]
@@ -310,6 +313,33 @@ def _executable_version_works(path: str) -> bool:
         return True
     _log_parser_command(command, _subprocess_response(completed), status="failed")
     return False
+
+
+def _working_audio_tool_dir() -> str | None:
+    for candidate_dir in AUDIO_TOOL_DIR_CANDIDATES:
+        tool_paths = [Path(candidate_dir) / tool for tool in AUDIO_TOOL_NAMES]
+        if not all(path.exists() for path in tool_paths):
+            continue
+        if all(_executable_version_works(str(path)) for path in tool_paths):
+            return candidate_dir
+    return None
+
+
+@contextmanager
+def _prefer_working_audio_tools() -> Iterator[None]:
+    original_path = os.environ.get("PATH", "")
+    tool_dir = _working_audio_tool_dir()
+    if tool_dir is None:
+        yield
+        return
+
+    path_parts = [part for part in original_path.split(os.pathsep) if part and part != tool_dir]
+    os.environ["PATH"] = os.pathsep.join([tool_dir, *path_parts])
+    _log_parser_command("set audio tool PATH", os.environ["PATH"])
+    try:
+        yield
+    finally:
+        os.environ["PATH"] = original_path
 
 
 def _ffmpeg_executable() -> str | None:
@@ -670,29 +700,30 @@ class MarkItDownParser:
         return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
 
     def _parse_audio(self, path: Path) -> ParsedDocument:
-        try:
-            text = normalise_parsed_markdown(_convert_with_markitdown(path))
-        except ParserError:
+        with _prefer_working_audio_tools():
+            try:
+                text = normalise_parsed_markdown(_convert_with_markitdown(path))
+            except ParserError:
+                text = self._parse_low_quality_audio(path)
+                return ParsedDocument(
+                    text=text,
+                    parser="markitdown+ffmpeg-mp3",
+                    source_path=path,
+                )
+
+            if text.strip():
+                return ParsedDocument(
+                    text=text,
+                    parser=self.name,
+                    source_path=path,
+                )
+
             text = self._parse_low_quality_audio(path)
             return ParsedDocument(
                 text=text,
                 parser="markitdown+ffmpeg-mp3",
                 source_path=path,
             )
-
-        if text.strip():
-            return ParsedDocument(
-                text=text,
-                parser=self.name,
-                source_path=path,
-            )
-
-        text = self._parse_low_quality_audio(path)
-        return ParsedDocument(
-            text=text,
-            parser="markitdown+ffmpeg-mp3",
-            source_path=path,
-        )
 
     def _parse_low_quality_audio(self, path: Path) -> str:
         with tempfile.TemporaryDirectory(prefix="mianotes-audio-") as temp_dir:
