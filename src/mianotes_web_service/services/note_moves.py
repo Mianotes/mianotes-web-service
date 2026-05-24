@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
+from fastapi import HTTPException, status
+
+from mianotes_web_service.core.config import get_settings
+from mianotes_web_service.db.models import Folder, Note, SourceFile
+from mianotes_web_service.services.paths import (
+    folder_directory,
+    note_file_path,
+    note_image_directory,
+    source_file_path,
+)
+from mianotes_web_service.services.storage import FilesystemStorage
+
+
+def validate_stored_moves(moves: list[tuple[Path, Path]]) -> None:
+    for current_path, target_path in moves:
+        if current_path.resolve() == target_path.resolve():
+            continue
+        if not current_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Note file not found",
+            )
+        if target_path.exists():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A file already exists in the target folder",
+            )
+
+
+def move_stored_path(current_path: Path, target_path: Path) -> None:
+    if current_path.resolve() == target_path.resolve():
+        return
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(current_path), str(target_path))
+
+
+def move_note_to_folder(note: Note, target_folder: Folder) -> None:
+    if note.folder_id == target_folder.id:
+        return
+
+    current_folder = note.folder
+    current_folder_dir = folder_directory(current_folder) if current_folder else None
+    target_folder_dir = folder_directory(target_folder)
+    FilesystemStorage(get_settings().data_dir).prepare_folder_directory(target_folder_dir)
+
+    current_note_path = note_file_path(note)
+    note_filename = note.filename or current_note_path.name
+    target_note_path = target_folder_dir / note_filename
+    source_moves: list[tuple[SourceFile, Path, Path, str]] = []
+
+    for source_file in note.source_files:
+        current_source_path = source_file_path(source_file)
+        source_filename = source_file.filename
+        if not source_filename and current_folder_dir is not None:
+            try:
+                source_filename = current_source_path.relative_to(current_folder_dir).as_posix()
+            except ValueError:
+                source_filename = None
+        if not source_filename:
+            continue
+        source_moves.append(
+            (
+                source_file,
+                current_source_path,
+                target_folder_dir / source_filename,
+                source_filename,
+            )
+        )
+
+    current_image_dir = note_image_directory(note)
+    target_image_dir = target_folder_dir / "images" / note.id[:8]
+
+    path_moves = [
+        (current_note_path, target_note_path),
+        *[
+            (current_source_path, target_source_path)
+            for _, current_source_path, target_source_path, _ in source_moves
+        ],
+    ]
+    if current_image_dir.exists():
+        path_moves.append((current_image_dir, target_image_dir))
+    validate_stored_moves(path_moves)
+
+    move_stored_path(current_note_path, target_note_path)
+    for source_file, current_source_path, target_source_path, source_filename in source_moves:
+        move_stored_path(current_source_path, target_source_path)
+        source_file.filename = source_filename
+        source_file.file_path = str(target_source_path)
+    if current_image_dir.exists():
+        move_stored_path(current_image_dir, target_image_dir)
+
+    note.folder_id = target_folder.id
+    note.folder = target_folder
+    note.filename = note_filename
+    note.note_path = str(target_note_path)
