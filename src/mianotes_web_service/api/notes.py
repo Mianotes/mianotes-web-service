@@ -157,6 +157,7 @@ def _read_note_or_404(session: Session, note_id: str) -> Note:
             joinedload(Note.source_files),
             joinedload(Note.comments).joinedload(Comment.user),
             joinedload(Note.tags),
+            joinedload(Note.jobs),
         )
     )
     note = session.scalars(statement).unique().one_or_none()
@@ -205,6 +206,10 @@ def _starred_note_ids(session: Session, note_ids: list[str], user_id: str) -> se
     )
 
 
+def _latest_note_job(note: Note):
+    return max(note.jobs, key=lambda job: job.created_at, default=None)
+
+
 def _note_response(
     note: Note,
     request: Request,
@@ -224,6 +229,7 @@ def _note_response(
     if normalized_text != text:
         note_path.write_text(normalized_text, encoding="utf-8")
         text = normalized_text
+    latest_job = _latest_note_job(note)
     source_files = [
         {
             "id": source_file.id,
@@ -267,6 +273,8 @@ def _note_response(
         comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
         tags=note.tags,
         share_url=_share_url(request, note, share_token),
+        job_id=latest_job.id if latest_job is not None else None,
+        job_status=latest_job.status if latest_job is not None else None,
         actions={
             "self": {"method": "GET", "url": str(request.url_for("get_note", note_id=note.id))},
             "update": {"method": "PATCH", "url": str(request.url_for("get_note", note_id=note.id))},
@@ -317,6 +325,7 @@ def _note_list_response(note: Note, request: Request, *, is_starred: bool = Fals
             note.summary = summarize_markdown_note(note_file_path(note).read_text(encoding="utf-8"))
         except OSError:
             note.summary = ""
+    latest_job = _latest_note_job(note)
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
@@ -335,6 +344,8 @@ def _note_list_response(note: Note, request: Request, *, is_starred: bool = Fals
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
         tags=note.tags,
+        job_id=latest_job.id if latest_job is not None else None,
+        job_status=latest_job.status if latest_job is not None else None,
     )
 
 
@@ -449,7 +460,7 @@ def _note_ingestion_response(
         is_starred=_note_is_starred(session, note.id, user.id),
     )
     return NoteIngestionRead(
-        **note_read.model_dump(),
+        **note_read.model_dump(exclude={"job_id", "job_status"}),
         note_id=note.id,
         job_id=job.id,
         job_status=job.status,
@@ -832,6 +843,7 @@ def list_notes(
             joinedload(Note.folder),
             joinedload(Note.source_files),
             joinedload(Note.tags),
+            joinedload(Note.jobs),
         )
         .order_by(Note.created_at.desc())
     )

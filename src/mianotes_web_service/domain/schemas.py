@@ -166,6 +166,8 @@ class NoteRead(BaseModel):
     comments_url: str
     tags: list[TagRead]
     share_url: str | None = None
+    job_id: str | None = None
+    job_status: str | None = None
     actions: dict[str, ApiAction]
 
     model_config = {"from_attributes": True}
@@ -189,6 +191,8 @@ class NoteListItem(BaseModel):
     updated_at: datetime
     comments_count: int = 0
     tags: list[TagRead] = Field(default_factory=list)
+    job_id: str | None = None
+    job_status: str | None = None
 
     model_config = {"from_attributes": True}
 

@@ -16,6 +16,7 @@ from mianotes_web_service.services.parsing import (
     parse_document,
     parse_html_document,
     parser_job_logging,
+    parser_text_updates,
 )
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import render_markdown_note, summarize_text
@@ -30,6 +31,9 @@ FAILED_LINK_MESSAGE = (
     "The link has been saved, but Mia could not turn it into a note this time. "
     "You can check the Jobs screen for the technical details."
 )
+INTERRUPTED_JOB_MESSAGE = (
+    "The service stopped before this job finished. Please upload the file again."
+)
 
 
 class InProcessJobRunner:
@@ -43,7 +47,9 @@ class InProcessJobRunner:
         try:
             with self.session_factory() as session:
                 self._run_with_session(session, job_id)
-        except Exception:
+        except Exception as exc:
+            with self.session_factory() as session:
+                _mark_job_crashed(session, job_id, exc)
             return
 
     def _run_with_session(self, session: Session, job_id: str) -> None:
@@ -64,7 +70,10 @@ class InProcessJobRunner:
                     status,
                 )
             ):
-                result = _run_job(session, job)
+                with parser_text_updates(
+                    lambda text: _persist_note_text_update(session, job_id, text)
+                ):
+                    result = _run_job(session, job)
         except Exception as exc:  # pragma: no cover - defensive boundary
             session.rollback()
             failed_job = session.get(MiaJob, job_id)
@@ -81,6 +90,26 @@ class InProcessJobRunner:
             return
 
         mark_job_succeeded(job, result)
+        session.commit()
+
+
+def fail_interrupted_jobs(session: Session) -> None:
+    jobs = (
+        session.query(MiaJob)
+        .filter(MiaJob.status.in_(("queued", "running")))
+        .order_by(MiaJob.created_at.asc())
+        .all()
+    )
+    for job in jobs:
+        _mark_note_failed(job)
+        append_job_log(
+            job,
+            command=f"finish {job.job_type}",
+            response=INTERRUPTED_JOB_MESSAGE,
+            status="failed",
+        )
+        mark_job_failed(job, INTERRUPTED_JOB_MESSAGE)
+    if jobs:
         session.commit()
 
 
@@ -119,6 +148,13 @@ def _run_parse_file_job(session: Session, job: MiaJob) -> dict[str, object]:
     session.flush()
 
     parsed = parse_document(source_file_path(source_file))
+    append_job_log(
+        job,
+        command=f"finish {job.job_type} parsing",
+        response=f"parsed {len(parsed.text)} characters with {parsed.parser}",
+        status="succeeded",
+    )
+    session.commit()
     note_file_path(note).write_text(
         render_markdown_note(title=note.title, text=parsed.text),
         encoding="utf-8",
@@ -168,6 +204,37 @@ def _mark_note_failed(job: MiaJob) -> None:
             encoding="utf-8",
         )
         job.note.summary = summarize_text(message)
+
+
+def _persist_note_text_update(session: Session, job_id: str, text: str) -> None:
+    job = session.get(MiaJob, job_id)
+    if job is None or job.note is None or job.job_type not in {"parse_file", "parse_url"}:
+        return
+    job.note.status = "parsing"
+    note_file_path(job.note).write_text(
+        render_markdown_note(title=job.note.title, text=text),
+        encoding="utf-8",
+    )
+    job.note.summary = summarize_text(text)
+    session.commit()
+
+
+def _mark_job_crashed(session: Session, job_id: str, exc: Exception) -> None:
+    job = session.get(MiaJob, job_id)
+    if job is None or job.status not in {"queued", "running"}:
+        return
+    try:
+        _mark_note_failed(job)
+    except Exception:
+        pass
+    append_job_log(
+        job,
+        command=f"finish {job.job_type}",
+        response=f"Job runner crashed: {exc}",
+        status="failed",
+    )
+    mark_job_failed(job, str(exc))
+    session.commit()
 
 
 def _persist_job_log(

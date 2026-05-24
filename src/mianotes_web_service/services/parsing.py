@@ -93,8 +93,13 @@ TESSERACT_CANDIDATES = (
     "/usr/bin/tesseract",
 )
 ParserLogCallback = Callable[[str, str | None, str], None]
+ParserTextCallback = Callable[[str], None]
 _PARSER_LOGGER: ContextVar[ParserLogCallback | None] = ContextVar(
     "mianotes_parser_logger",
+    default=None,
+)
+_PARSER_TEXT_CALLBACK: ContextVar[ParserTextCallback | None] = ContextVar(
+    "mianotes_parser_text_callback",
     default=None,
 )
 
@@ -108,6 +113,15 @@ def parser_job_logging(callback: ParserLogCallback) -> Iterator[None]:
         _PARSER_LOGGER.reset(token)
 
 
+@contextmanager
+def parser_text_updates(callback: ParserTextCallback) -> Iterator[None]:
+    token = _PARSER_TEXT_CALLBACK.set(callback)
+    try:
+        yield
+    finally:
+        _PARSER_TEXT_CALLBACK.reset(token)
+
+
 def _log_parser_command(
     command: str,
     response: str | None = None,
@@ -118,6 +132,13 @@ def _log_parser_command(
     if callback is None:
         return
     callback(command, response, status)
+
+
+def _emit_parser_text_update(text: str) -> None:
+    callback = _PARSER_TEXT_CALLBACK.get()
+    if callback is None:
+        return
+    callback(text)
 
 
 def _subprocess_response(completed: subprocess.CompletedProcess[str]) -> str:
@@ -599,6 +620,9 @@ class MarkItDownParser:
                     ) from exc
                 if chunk_text.strip():
                     transcript_parts.append(f"### Part {index}\n\n{chunk_text}")
+                    _emit_parser_text_update(
+                        "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
+                    )
 
             if transcript_parts:
                 return "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
