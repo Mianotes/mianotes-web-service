@@ -111,6 +111,12 @@ FFMPEG_CANDIDATES = (
 )
 AUDIO_TOOL_NAMES = ("ffmpeg", "ffprobe", "flac", "metaflac")
 AUDIO_TOOL_DIR_CANDIDATES = ("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin")
+AUDIO_TOOL_VERSION_ARGS = {
+    "ffmpeg": "-version",
+    "ffprobe": "-version",
+    "flac": "--version",
+    "metaflac": "--version",
+}
 YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
 ParserLogCallback = Callable[[str, str | None, str], None]
 ParserTextCallback = Callable[[str], None]
@@ -293,8 +299,8 @@ def _convert_url_with_markitdown(url: str) -> str:
     return result.text_content
 
 
-def _executable_version_works(path: str) -> bool:
-    command_parts = [path, "-version"]
+def _executable_version_works(path: str, *, version_arg: str = "-version") -> bool:
+    command_parts = [path, version_arg]
     command = shlex.join(command_parts)
     try:
         completed = subprocess.run(
@@ -320,7 +326,13 @@ def _working_audio_tool_dir() -> str | None:
         tool_paths = [Path(candidate_dir) / tool for tool in AUDIO_TOOL_NAMES]
         if not all(path.exists() for path in tool_paths):
             continue
-        if all(_executable_version_works(str(path)) for path in tool_paths):
+        if all(
+            _executable_version_works(
+                str(path),
+                version_arg=AUDIO_TOOL_VERSION_ARGS.get(path.name, "-version"),
+            )
+            for path in tool_paths
+        ):
             return candidate_dir
     return None
 

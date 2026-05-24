@@ -624,7 +624,7 @@ def test_audio_parser_retries_with_low_quality_mp3(
             return SimpleNamespace(text_content="Transcribed fallback audio")
 
     def fake_run(args, **_kwargs):
-        if args[-1] == "-version":
+        if args[-1] in {"-version", "--version"}:
             return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         commands.append(args)
         Path(args[-1]).write_bytes(b"low quality mp3")
@@ -676,7 +676,7 @@ def test_audio_parser_splits_audio_when_low_quality_mp3_fails(
             return SimpleNamespace(text_content="")
 
     def fake_run(args, **_kwargs):
-        if args[-1] == "-version":
+        if args[-1] in {"-version", "--version"}:
             return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         commands.append(args)
         if "segment" in args:
@@ -730,7 +730,7 @@ def test_audio_parser_reports_original_and_fallback_failures(
             raise RuntimeError(f"could not transcribe {Path(path).name}")
 
     def fake_run(args, **_kwargs):
-        if args[-1] == "-version":
+        if args[-1] in {"-version", "--version"}:
             return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         if "segment" in args:
             chunk_dir = Path(args[-1]).parent
@@ -787,6 +787,11 @@ def test_audio_parser_prefers_verified_audio_tool_directory(
         return SimpleNamespace(returncode=0, stdout=f"{Path(args[0]).name} ok", stderr="")
 
     monkeypatch.setattr(parsing, "AUDIO_TOOL_NAMES", ("ffmpeg", "flac"))
+    monkeypatch.setattr(
+        parsing,
+        "AUDIO_TOOL_VERSION_ARGS",
+        {"ffmpeg": "-version", "flac": "--version"},
+    )
     monkeypatch.setattr(parsing, "AUDIO_TOOL_DIR_CANDIDATES", (str(good_dir), str(bad_dir)))
     monkeypatch.setattr(parsing.subprocess, "run", fake_run)
     monkeypatch.setenv("PATH", f"{bad_dir}:/usr/bin")
