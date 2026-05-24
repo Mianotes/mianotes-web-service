@@ -57,3 +57,4 @@
 - [Testing](08-join-the-project/02-testing.md)
 - [Theming and customisation](08-join-the-project/03-theming.md)
 - [Maintainer checklist](08-join-the-project/04-maintainer-checklist.md)
+- [Troubleshooting](08-join-the-project/05-troubleshooting.md)
