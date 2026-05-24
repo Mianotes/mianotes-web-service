@@ -624,6 +624,8 @@ def test_audio_parser_retries_with_low_quality_mp3(
             return SimpleNamespace(text_content="Transcribed fallback audio")
 
     def fake_run(args, **_kwargs):
+        if args[-1] == "-version":
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         commands.append(args)
         Path(args[-1]).write_bytes(b"low quality mp3")
         return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
@@ -674,6 +676,8 @@ def test_audio_parser_splits_audio_when_low_quality_mp3_fails(
             return SimpleNamespace(text_content="")
 
     def fake_run(args, **_kwargs):
+        if args[-1] == "-version":
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         commands.append(args)
         if "segment" in args:
             chunk_dir = Path(args[-1]).parent
@@ -726,6 +730,8 @@ def test_audio_parser_reports_original_and_fallback_failures(
             raise RuntimeError(f"could not transcribe {Path(path).name}")
 
     def fake_run(args, **_kwargs):
+        if args[-1] == "-version":
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
         if "segment" in args:
             chunk_dir = Path(args[-1]).parent
             chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -744,6 +750,24 @@ def test_audio_parser_reports_original_and_fallback_failures(
 
     with pytest.raises(ParserError, match="chunk-000.mp3"):
         parse_document(source)
+
+
+def test_ffmpeg_executable_skips_broken_path(monkeypatch: pytest.MonkeyPatch):
+    commands: list[list[str]] = []
+
+    def fake_run(args, **_kwargs):
+        commands.append(args)
+        if args[0] == "/broken/ffmpeg":
+            return SimpleNamespace(returncode=126, stdout="", stderr="Bad CPU type in executable")
+        return SimpleNamespace(returncode=0, stdout="ffmpeg version 8.1", stderr="")
+
+    monkeypatch.setattr(parsing, "FFMPEG_CANDIDATES", ("ffmpeg", "/working/ffmpeg"))
+    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/broken/ffmpeg")
+    monkeypatch.setattr(parsing.Path, "exists", lambda path: str(path) == "/working/ffmpeg")
+    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+
+    assert parsing._ffmpeg_executable() == "/working/ffmpeg"
+    assert commands == [["/broken/ffmpeg", "-version"], ["/working/ffmpeg", "-version"]]
 
 
 def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

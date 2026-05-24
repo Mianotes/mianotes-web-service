@@ -102,6 +102,12 @@ TESSERACT_CANDIDATES = (
     "/usr/local/bin/tesseract",
     "/usr/bin/tesseract",
 )
+FFMPEG_CANDIDATES = (
+    "ffmpeg",
+    "/opt/homebrew/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/usr/bin/ffmpeg",
+)
 YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
 ParserLogCallback = Callable[[str, str | None, str], None]
 ParserTextCallback = Callable[[str], None]
@@ -284,11 +290,42 @@ def _convert_url_with_markitdown(url: str) -> str:
     return result.text_content
 
 
+def _executable_version_works(path: str) -> bool:
+    command_parts = [path, "-version"]
+    command = shlex.join(command_parts)
+    try:
+        completed = subprocess.run(
+            command_parts,
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError, TimeoutError) as exc:
+        _log_parser_command(command, str(exc), status="failed")
+        return False
+    if completed.returncode == 0:
+        first_line = (completed.stdout or "").splitlines()[0:1]
+        _log_parser_command(command, first_line[0] if first_line else "ok")
+        return True
+    _log_parser_command(command, _subprocess_response(completed), status="failed")
+    return False
+
+
 def _ffmpeg_executable() -> str | None:
-    path_candidate = shutil.which("ffmpeg")
-    _log_parser_command("shutil.which('ffmpeg')", path_candidate or "not found")
-    if path_candidate:
-        return path_candidate
+    seen: set[str] = set()
+    for candidate in FFMPEG_CANDIDATES:
+        if "/" in candidate:
+            path_candidate = candidate if Path(candidate).exists() else None
+            _log_parser_command(f"check executable {candidate}", path_candidate or "not found")
+        else:
+            path_candidate = shutil.which(candidate)
+            _log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
+        if not path_candidate or path_candidate in seen:
+            continue
+        seen.add(path_candidate)
+        if _executable_version_works(path_candidate):
+            return path_candidate
     return None
 
 
