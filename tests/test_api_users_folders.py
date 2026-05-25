@@ -171,6 +171,50 @@ def test_admin_can_manage_user_admin_role(client: TestClient):
     assert forbidden.status_code == 403
 
 
+def test_admin_can_update_user_password(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+    member = client.post(
+        "/api/users",
+        json={"email": "member@example.com", "name": "Member"},
+    ).json()
+
+    mismatch = client.patch(
+        f"/api/users/{member['id']}/password",
+        json={"password": "new-password", "password_confirmation": "different"},
+    )
+    assert mismatch.status_code == 400
+    assert mismatch.json()["detail"] == "Passwords do not match"
+
+    updated = client.patch(
+        f"/api/users/{member['id']}/password",
+        json={"password": "new-password", "password_confirmation": "new-password"},
+    )
+    assert updated.status_code == 200
+    assert updated.json()["id"] == member["id"]
+
+    client.post("/api/auth/logout")
+    logged_in = client.post(
+        "/api/auth/login",
+        json={"user_id": member["id"], "password": "new-password"},
+    )
+    assert logged_in.status_code == 200
+    assert logged_in.json()["user"]["id"] == member["id"]
+
+    forbidden = client.patch(
+        f"/api/users/{admin['id']}/password",
+        json={"password": "another-password", "password_confirmation": "another-password"},
+    )
+    assert forbidden.status_code == 403
+
+
 def test_workspace_keeps_at_least_one_admin(client: TestClient):
     admin = client.post(
         "/api/auth/join",

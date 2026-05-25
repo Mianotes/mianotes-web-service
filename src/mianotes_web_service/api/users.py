@@ -15,7 +15,14 @@ from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, UsersR
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import User
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.domain.schemas import UserAdminUpdate, UserCreate, UserRead, UserUpdate
+from mianotes_web_service.domain.schemas import (
+    UserAdminUpdate,
+    UserCreate,
+    UserPasswordUpdate,
+    UserRead,
+    UserUpdate,
+)
+from mianotes_web_service.services.auth import set_user_password
 from mianotes_web_service.services.storage import make_username
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -168,6 +175,26 @@ def update_user_admin(
         _ensure_can_remove_admin(session, user, target_user)
 
     target_user.is_admin = payload.is_admin
+    session.commit()
+    session.refresh(target_user)
+    return target_user
+
+
+@router.patch("/{user_id}/password", response_model=UserRead)
+def update_user_password(
+    user_id: str,
+    payload: UserPasswordUpdate,
+    session: SessionDep,
+    user: AdminUser,
+) -> User:
+    target_user = _read_user_or_404(session, user_id)
+    if payload.password != payload.password_confirmation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match",
+        )
+
+    set_user_password(target_user, payload.password)
     session.commit()
     session.refresh(target_user)
     return target_user

@@ -26,6 +26,11 @@ class UserAdminUpdate(BaseModel):
     is_admin: bool
 
 
+class UserPasswordUpdate(BaseModel):
+    password: str = Field(min_length=1)
+    password_confirmation: str = Field(min_length=1)
+
+
 class UserRead(BaseModel):
     id: str
     email: EmailStr
