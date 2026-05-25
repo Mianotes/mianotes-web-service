@@ -12,9 +12,47 @@ Prefer Mianotes MCP tools when available. If MCP tools are not available, use th
 ## Connection
 
 - Default API URL: `http://127.0.0.1:8200`
-- Override with `MIANOTES_API_URL`
-- Authenticate with `MIANOTES_API_TOKEN`
-- Never write tokens, API keys, passwords, or private credentials into notes, docs, commits, logs, or examples that will be saved.
+- Override with `MIANOTES_API_URL`.
+- Authenticate with `MIANOTES_API_KEY`; fall back to `MIANOTES_API_TOKEN` only for older installs.
+- Before REST API calls, load the service `.env` if the variables are not already set. Check the current directory first, then common repo locations such as `code/mianotes-web-service/.env` or `mianotes-web-service/.env`.
+- Never print, save, quote, log, or commit `MIANOTES_API_KEY`, `MIANOTES_API_TOKEN`, passwords, cookies, or other private credentials.
+
+REST environment setup:
+
+```bash
+if [ -f .env ]; then
+  set -a
+  . ./.env
+  set +a
+elif [ -f code/mianotes-web-service/.env ]; then
+  set -a
+  . code/mianotes-web-service/.env
+  set +a
+elif [ -f mianotes-web-service/.env ]; then
+  set -a
+  . mianotes-web-service/.env
+  set +a
+fi
+
+MIANOTES_API_URL="${MIANOTES_API_URL:-http://127.0.0.1:8200}"
+MIANOTES_AUTH_TOKEN="${MIANOTES_API_KEY:-${MIANOTES_API_TOKEN:-}}"
+```
+
+REST call rules:
+
+1. Always use `MIANOTES_API_KEY` or `MIANOTES_API_TOKEN` from the environment; never ask the user to paste it unless no `.env` exists and no token variable is set.
+2. Never echo or display the token. It is okay to run `test -n "${MIANOTES_AUTH_TOKEN}"` but not `echo "${MIANOTES_AUTH_TOKEN}"`.
+3. If no token is set, say the Mianotes API key is missing and ask the user to add `MIANOTES_API_KEY` to the service `.env`.
+4. Check the API with `GET /api/health` before starting or restarting services.
+5. If the API is not listening, do not spend a long time rediscovering the app. Say Mia is not reachable at `MIANOTES_API_URL` and ask whether to start the service.
+
+REST curl pattern:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
+  "${MIANOTES_API_URL}/api/search?q=settings&limit=10"
+```
 
 ## Available MCP Tools
 
@@ -118,8 +156,8 @@ Example:
 
 ```bash
 curl -sS \
-  -H "Authorization: Bearer ${MIANOTES_API_TOKEN}" \
-  "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/context?folder=Mianotes&title=Settings%20Page&limit=5"
+  -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
+  "${MIANOTES_API_URL}/api/context?folder=Mianotes&title=Settings%20Page&limit=5"
 ```
 
 ## Saving Notes
@@ -137,6 +175,14 @@ For MCP, use `create_note`.
 For REST, fetch folders with `GET /api/folders`, then create with:
 
 `POST /api/notes/from-text`
+
+REST save flow:
+
+1. Load the REST environment as described in Connection.
+2. Fetch folders with `GET /api/folders`.
+3. Match the target folder by case-insensitive `name` or `slug`.
+4. Create the note with `POST /api/notes/from-text` and the matched `folder_id`.
+5. If the target folder does not exist, ask before creating it unless the user explicitly asked to create it.
 
 When saving "your last answer", save the assistant's previous answer, not the user's request.
 
