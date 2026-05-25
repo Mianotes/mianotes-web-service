@@ -14,7 +14,7 @@ Prefer Mianotes MCP tools when available. If MCP tools are not available, use th
 - Default API URL: `http://127.0.0.1:8200`
 - Override with `MIANOTES_API_URL`.
 - Authenticate with `MIANOTES_API_KEY`; fall back to `MIANOTES_API_TOKEN` only for older installs.
-- Before REST API calls, load the service `.env` if the variables are not already set. Check the current directory first, then common repo locations such as `code/mianotes-web-service/.env` or `mianotes-web-service/.env`.
+- Before REST API calls, load the service `.env` if the variables are not already set and the current working directory is the Mianotes web service project root. Do not search unrelated personal folders or print the `.env` contents.
 - Never print, save, quote, log, or commit `MIANOTES_API_KEY`, `MIANOTES_API_TOKEN`, passwords, cookies, or other private credentials.
 
 REST environment setup:
@@ -23,14 +23,6 @@ REST environment setup:
 if [ -f .env ]; then
   set -a
   . ./.env
-  set +a
-elif [ -f code/mianotes-web-service/.env ]; then
-  set -a
-  . code/mianotes-web-service/.env
-  set +a
-elif [ -f mianotes-web-service/.env ]; then
-  set -a
-  . mianotes-web-service/.env
   set +a
 fi
 
