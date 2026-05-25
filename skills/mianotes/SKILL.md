@@ -93,7 +93,7 @@ Do not invent search results or imply Mia knows something that was not returned.
 
 ## Context Shorthand
 
-When the user writes `Mia(Folder > Title)`, treat it as an explicit request to retrieve context from that folder and note title before continuing.
+When the user writes `Mia(Folder > Title)` or `Mia(Folder:Title)`, treat it as an explicit request to retrieve context from that folder and note title before continuing.
 
 Examples:
 
@@ -101,10 +101,11 @@ Examples:
 - "Read the docs here Mia(Mianotes > Settings Page)"
 - "Use this before answering Mia(Work > Deployment Notes)"
 - "Add this to the plan Mia(Mianotes > Settings Page)"
+- "For context here: Mia(About:Core concepts)"
 
 Expected behavior:
 
-1. Parse the folder name before `>` and the title after `>`.
+1. Parse the folder name before `>` or `:` and the title after `>` or `:`.
 2. Query Mia for matching context.
 3. Use the returned note text as context for the user's request.
 4. Do not claim context exists unless Mia returns it.
