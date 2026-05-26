@@ -52,11 +52,9 @@ The repository includes `storage.example.json` as a template only. It is safe to
 
 The real `storage.json` is created and updated by each installation. It is ignored by Git because it can contain local filesystem paths that only make sense on that computer or server.
 
-If an admin creates a service API key from the Settings screen or
-`POST /api/settings/api-key`, the real `storage.json` also contains an `apiKey`
-field with the raw service key. This is what lets a UI-generated key survive a
-service restart. The active database stores only the derived public verifier
-used to check presented bearer tokens.
+`storage.json` must not contain raw API keys or other secrets. Service API keys
+are shown once, copied into the environment that needs them, and verified
+through a public hash stored in the active `.mianotes/mia.db`.
 
 Do not commit the real `storage.json`.
 

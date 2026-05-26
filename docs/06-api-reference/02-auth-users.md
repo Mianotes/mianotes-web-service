@@ -159,7 +159,9 @@ POST /api/settings/api-key
 
 Authentication: admin session or bearer token with `admin`.
 
-Creates the service-wide key used by local agents and MCP clients.
+Creates the service-wide key used by local agents and MCP clients. The service
+writes the raw key to its environment file and stores only a public verifier in
+the active database.
 
 Response:
 

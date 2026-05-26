@@ -68,9 +68,7 @@ def _has_authenticated_file_access(request: Request, session: Session) -> bool:
     settings = get_settings()
     if settings.api_token:
         sync_instance_api_token_public_key(session, settings.api_token)
-        return verify_instance_api_token(session, raw_api_token)
-
-    return False
+    return verify_instance_api_token(session, raw_api_token)
 
 
 def _published_markdown_response(file_path: str, session: Session) -> FileResponse:

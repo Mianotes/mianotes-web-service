@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -26,13 +27,13 @@ from mianotes_web_service.services.auth import (
     generate_api_token,
     sync_instance_api_token_public_key,
 )
+from mianotes_web_service.services.env_file import service_env_file_path, upsert_env_value
 from mianotes_web_service.services.job_runner import InProcessJobRunner
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     activate_storage_location,
     add_storage_location,
     read_storage_config,
-    set_api_token,
     storage_database_path,
     write_storage_config,
 )
@@ -116,9 +117,17 @@ def storage_settings(_: AdminUser) -> StorageSettingsRead:
 @router.post("/api-key", response_model=ServiceApiKeyRead, status_code=status.HTTP_201_CREATED)
 def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRead:
     raw_token = generate_api_token()
-    config = _read_storage_config()
-    write_storage_config(get_settings().storage_config_path, set_api_token(config, raw_token))
+    try:
+        upsert_env_value(service_env_file_path(), "MIANOTES_API_KEY", raw_token)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not write the API key to the Mianotes environment file.",
+        ) from exc
+
+    os.environ["MIANOTES_API_KEY"] = raw_token
     get_settings().api_token = raw_token
+    write_storage_config(get_settings().storage_config_path, _read_storage_config())
     sync_instance_api_token_public_key(session, raw_token)
     return ServiceApiKeyRead(token=raw_token)
 

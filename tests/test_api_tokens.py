@@ -1,4 +1,5 @@
 import json
+import os
 from collections.abc import Generator
 from pathlib import Path
 
@@ -23,6 +24,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
     get_settings.cache_clear()
     monkeypatch.setenv("MIANOTES_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(tmp_path / "storage.json"))
+    monkeypatch.setenv("MIANOTES_ENV_FILE", str(tmp_path / "mianotes.env"))
+    monkeypatch.setenv("MIANOTES_API_KEY", "")
+    monkeypatch.setenv("MIANOTES_API_TOKEN", "")
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -104,6 +108,10 @@ def test_service_api_key_env_alias_authenticates_as_database_admin(
 
 def test_admin_can_create_service_api_key_from_settings(client: TestClient):
     _join_admin(client)
+    storage_path = get_settings().storage_config_path
+    storage_config = json.loads(storage_path.read_text(encoding="utf-8"))
+    storage_config["apiKey"] = "mia_old_raw_secret"
+    storage_path.write_text(json.dumps(storage_config), encoding="utf-8")
 
     created = client.post("/api/settings/api-key", json={})
 
@@ -112,10 +120,14 @@ def test_admin_can_create_service_api_key_from_settings(client: TestClient):
     assert raw_token.startswith("mia_")
     assert _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY) == hash_api_token(raw_token)
 
-    storage_config = json.loads(get_settings().storage_config_path.read_text(encoding="utf-8"))
-    assert storage_config["apiKey"] == raw_token
+    storage_config = json.loads(storage_path.read_text(encoding="utf-8"))
+    assert "apiKey" not in storage_config
     assert "apiToken" not in storage_config
 
+    env_file = Path(os.environ["MIANOTES_ENV_FILE"])
+    assert f'MIANOTES_API_KEY="{raw_token}"' in env_file.read_text(encoding="utf-8")
+
+    get_settings.cache_clear()
     agent_client = TestClient(client.app)
     response = agent_client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
 

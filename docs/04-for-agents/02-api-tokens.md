@@ -7,7 +7,8 @@ uses.
 The easiest way to get started is through the web app. Sign in as an admin,
 open **Settings**, and use **Create API Key**. Mianotes shows the key once. Copy
 it immediately and put it in the environment of the agent, app, or tool that
-needs to connect.
+needs to connect. The service also writes the key into its own environment file
+so it keeps working after restart.
 
 ```env
 MIANOTES_API_URL=http://127.0.0.1:8200
@@ -30,20 +31,22 @@ Mianotes compares bearer tokens by hashing the presented token and comparing it
 with the public verifier stored in the active `.mianotes/mia.db`. The database does not
 store the raw key.
 
-There are two normal places the raw service key can live:
+There are two normal places the raw service key lives:
 
-- if you set `MIANOTES_API_KEY` in the web service environment, the raw secret
-  lives in that environment;
-- if you create the key from the Settings screen or `POST /api/settings/api-key`,
-  Mianotes writes the raw service key to the local `storage.json` file so it can
-  survive service restarts.
+- the web service writes `MIANOTES_API_KEY` to its configured environment file
+  when an admin creates a key in Settings;
+- agents and MCP clients should keep their copy in their own environment or
+  project `.env`.
 
-`storage.json` is a private runtime file and is ignored by Git. Keep it private.
+`storage.json` is for folder and storage configuration. It must not contain the
+raw API key.
 
-On startup and on authenticated requests, Mianotes syncs the derived public
-verifier into the active database. This lets the same service key work after a
-restart and across folder switches, while each `.mianotes/mia.db` still stores
-only the public verifier.
+On API key creation and on authenticated requests, Mianotes syncs the derived
+public verifier into the active database. The active `.mianotes/mia.db` stores
+only that public verifier, never the raw key.
+
+This lets the service-wide key be re-synced automatically after service restarts
+or folder switches without putting the raw key in `storage.json`.
 
 ## Get a key in the web app
 
@@ -58,6 +61,10 @@ requests.
 6. Click **Create API Key**.
 7. Copy the key immediately.
 8. Add it to the environment used by your agent, app, MCP server, or shell.
+
+Mianotes also writes the key to the service environment file automatically.
+Copying it is still important because this is the only time the UI shows the raw
+value for use by external tools.
 
 For a local shell:
 
@@ -114,7 +121,9 @@ curl -sS \
   "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/auth/login"
 ```
 
-Then create the service API key with that saved cookie:
+Then create the service API key with that saved cookie. The endpoint writes the
+key to the service environment file, stores only the verifier hash in the active
+database, and returns the raw key once:
 
 ```bash
 curl -sS \

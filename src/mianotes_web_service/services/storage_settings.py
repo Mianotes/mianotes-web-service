@@ -30,7 +30,6 @@ class StorageConfig:
     active_location: str
     database_file: str
     locations: list[StorageLocation]
-    api_token: str | None = None
 
     @property
     def active_folder_path(self) -> Path:
@@ -111,7 +110,6 @@ def _default_config(default_data_dir: Path) -> StorageConfig:
                 folder_path=folder_path,
             )
         ],
-        api_token=None,
     )
 
 
@@ -165,13 +163,6 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
         active_location=active_location,
         database_file=database_file,
         locations=locations,
-        api_token=(
-            payload.get("apiKey")
-            if isinstance(payload.get("apiKey"), str)
-            else payload.get("apiToken")
-            if isinstance(payload.get("apiToken"), str)
-            else None
-        ),
     )
 
 
@@ -189,8 +180,6 @@ def write_storage_config(path: Path, config: StorageConfig) -> None:
             for location in config.locations
         ],
     }
-    if config.api_token:
-        payload["apiKey"] = config.api_token
     with NamedTemporaryFile(
         "w",
         encoding="utf-8",
@@ -235,7 +224,6 @@ def add_storage_location(
         active_location=config.active_location,
         database_file=config.database_file,
         locations=[location, *config.locations],
-        api_token=config.api_token,
     )
 
 
@@ -249,7 +237,6 @@ def remove_storage_location(config: StorageConfig, *, location_id: str) -> Stora
         active_location=config.active_location,
         database_file=config.database_file,
         locations=locations,
-        api_token=config.api_token,
     )
 
 
@@ -262,14 +249,4 @@ def activate_storage_location(config: StorageConfig, *, location_id: str) -> Sto
         active_location=location.id,
         database_file=config.database_file,
         locations=config.locations,
-        api_token=config.api_token,
-    )
-
-
-def set_api_token(config: StorageConfig, raw_token: str) -> StorageConfig:
-    return StorageConfig(
-        active_location=config.active_location,
-        database_file=config.database_file,
-        locations=config.locations,
-        api_token=raw_token,
     )

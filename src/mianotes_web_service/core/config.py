@@ -61,8 +61,6 @@ class Settings(BaseSettings):
                 self.database_url = (
                     f"sqlite:///{database_path}"
                 )
-                if not self.api_token:
-                    self.api_token = storage_config.api_token
         return self
 
     @property

@@ -52,10 +52,8 @@ def _read_bearer_token(authorization: str | None) -> str | None:
 
 def _read_instance_token_context(session: Session, raw_api_token: str) -> AuthContext | None:
     settings = get_settings()
-    if not settings.api_token:
-        return None
-
-    sync_instance_api_token_public_key(session, settings.api_token)
+    if settings.api_token:
+        sync_instance_api_token_public_key(session, settings.api_token)
     if not verify_instance_api_token(session, raw_api_token):
         return None
 
