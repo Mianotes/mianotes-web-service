@@ -66,6 +66,11 @@ Mianotes also writes the key to the service environment file automatically.
 Copying it is still important because this is the only time the UI shows the raw
 value for use by external tools.
 
+For Codex, Claude Code, Cursor, and similar tools, the project `.env` file means
+a `.env` file in the folder where you start or open that tool. If that file does
+not exist yet, create it in that project folder and paste the two Mianotes lines
+into it.
+
 For a local shell:
 
 ```bash
