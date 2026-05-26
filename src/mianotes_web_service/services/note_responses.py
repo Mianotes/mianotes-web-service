@@ -32,7 +32,7 @@ def file_url(request: Request, path: str | Path) -> str:
         public_path = target.relative_to(data_dir)
     except ValueError:
         public_path = Path(path)
-    return str(request.url_for("get_folder_file", file_path=str(public_path)))
+    return f"/{public_path.as_posix().lstrip('/')}"
 
 
 def share_url(request: Request, note: Note, token: str | None = None) -> str | None:

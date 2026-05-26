@@ -53,7 +53,7 @@ def _file_url(request: Request, path: str | Path) -> str:
         public_path = target.relative_to(data_dir)
     except ValueError:
         public_path = Path(path)
-    return str(request.url_for("get_folder_file", file_path=str(public_path)))
+    return f"/{public_path.as_posix().lstrip('/')}"
 
 
 def _source_file_list_payload(note: Note, request: Request) -> list[dict[str, object]]:
