@@ -2,7 +2,7 @@
 
 Mianotes configuration uses environment variables with the `MIANOTES_` prefix.
 
-For normal local use, configure only the LLM provider and API key. Leave storage and database settings at their defaults unless you need a custom layout.
+For normal local use, configure only the LLM provider and API key. Leave storage settings at their defaults unless you need a custom layout.
 
 ## Common variables
 
@@ -10,7 +10,7 @@ For normal local use, configure only the LLM provider and API key. Leave storage
 |---|---|---|
 | `MIANOTES_HOST` | `0.0.0.0` or script default | Host interface for the web service. Use `127.0.0.1` for local-only use. |
 | `MIANOTES_PORT` | `8200` | Web service port. |
-| `MIANOTES_DATA_DIR` | `data` | Folder where Markdown notes, source files, and the default database live. |
+| `MIANOTES_DATA_DIR` | `data` | Folder where Markdown notes, source files, and the hidden `.mianotes/` runtime folder live. |
 | `MIANOTES_DATABASE_URL` | empty | Optional explicit database URL. Leave empty for normal SQLite setup. |
 | `MIANOTES_LLM_PROVIDER` | `openai` | LLM provider: `openai`, `local`, or `openai-compatible`. |
 | `MIANOTES_LLM_MODEL` | `gpt-4o-mini` | Text model used by Mia. |
@@ -52,7 +52,7 @@ Folder directories are filesystem-safe slugs and are unique across the instance.
 When `MIANOTES_DATABASE_URL` is empty, Mianotes uses SQLite at:
 
 ```text
-data/mia.db
+data/.mianotes/mia.db
 ```
 
 Most installs should leave `MIANOTES_DATABASE_URL` empty.
@@ -60,7 +60,7 @@ Most installs should leave `MIANOTES_DATABASE_URL` empty.
 To force an absolute SQLite database path:
 
 ```env
-MIANOTES_DATABASE_URL=sqlite:////absolute/path/to/mia.db
+MIANOTES_DATABASE_URL=sqlite:////absolute/path/to/.mianotes/mia.db
 ```
 
 To point the service at a specific data folder:

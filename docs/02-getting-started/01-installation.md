@@ -67,7 +67,7 @@ MIANOTES_LLM_API_KEY=sk-...
 MIANOTES_API_KEY=replace-with-a-long-random-secret
 ```
 
-Do not add database or storage variables unless you want to change the default file locations. By default, Mianotes stores SQLite at `data/mia.db` and notes under `data/`.
+Do not add database or storage variables unless you want to change the default file locations. By default, Mianotes stores SQLite at `data/.mianotes/mia.db` and notes under `data/`.
 
 ## Start the server
 

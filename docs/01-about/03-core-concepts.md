@@ -4,13 +4,13 @@ This page explains the words used throughout the documentation.
 
 ## Instance
 
-A Mianotes instance is one running web service connected to one active data folder and one active database.
+A Mianotes instance is one running web service connected to one active local folder. The private SQLite database lives inside that folder at `.mianotes/mia.db`.
 
 Small groups can share an instance by using the same master password. Everyone can read shared notes, browse by folder, browse by user, and add notes to active folders.
 
 ## User
 
-A user is a human account in the current Mianotes database. The first user becomes the admin for that database.
+A user is a human account in the current Mianotes folder. The first user becomes the admin for that folder.
 
 Browser users authenticate with a session cookie. Agents should use API tokens instead of browser sessions.
 

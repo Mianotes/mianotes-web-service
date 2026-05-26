@@ -31,10 +31,10 @@ Mianotes keeps user-facing note content as Markdown files under the active data 
 data/<folder_slug>/<title_slug>-<note_id>.md
 ```
 
-The default SQLite database lives at:
+The default SQLite database lives inside the hidden runtime folder:
 
 ```text
-data/mia.db
+data/.mianotes/mia.db
 ```
 
 SQLite stores indexes and metadata such as users, folders, tags, notes, comments, sessions, and jobs. The text stays in a Markdown file.

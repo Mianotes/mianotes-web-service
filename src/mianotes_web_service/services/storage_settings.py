@@ -7,7 +7,15 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 DEFAULT_LOCATION_ID = "default"
-DEFAULT_DATABASE_FILE = "mia.db"
+PRIVATE_STORAGE_DIR = ".mianotes"
+DATABASE_FILENAME = "mia.db"
+DEFAULT_DATABASE_FILE = f"{PRIVATE_STORAGE_DIR}/{DATABASE_FILENAME}"
+DATABASE_SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
+GITIGNORE_ENTRIES = (
+    f"{PRIVATE_STORAGE_DIR}/",
+    f"{PRIVATE_STORAGE_DIR}/{DATABASE_FILENAME}",
+    DATABASE_FILENAME,
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +54,51 @@ def _normalise_path(path: str | Path) -> Path:
     return value.resolve()
 
 
+def _normalise_database_file(value: str) -> str:
+    path = Path(value)
+    if path.name == DATABASE_FILENAME and (
+        path.parent == Path(".") or path.parent == Path("")
+    ):
+        return DEFAULT_DATABASE_FILE
+    return value
+
+
+def storage_database_path(folder_path: Path, database_file: str = DEFAULT_DATABASE_FILE) -> Path:
+    return folder_path / _normalise_database_file(database_file)
+
+
+def _ensure_storage_gitignore(folder_path: Path) -> None:
+    gitignore_path = folder_path / ".gitignore"
+    existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
+    lines = existing.splitlines()
+    next_lines = list(lines)
+    for entry in GITIGNORE_ENTRIES:
+        if entry not in lines:
+            next_lines.append(entry)
+    if next_lines != lines:
+        suffix = "\n" if next_lines else ""
+        gitignore_path.write_text("\n".join(next_lines) + suffix, encoding="utf-8")
+
+
+def _migrate_legacy_database(folder_path: Path, database_file: str) -> None:
+    database_path = storage_database_path(folder_path, database_file)
+    legacy_database_path = folder_path / DATABASE_FILENAME
+    if (
+        database_path == legacy_database_path
+        or database_path.exists()
+        or not legacy_database_path.exists()
+    ):
+        return
+
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    legacy_database_path.replace(database_path)
+    for suffix in DATABASE_SIDECAR_SUFFIXES:
+        legacy_sidecar = folder_path / f"{DATABASE_FILENAME}{suffix}"
+        next_sidecar = database_path.parent / f"{DATABASE_FILENAME}{suffix}"
+        if legacy_sidecar.exists() and not next_sidecar.exists():
+            legacy_sidecar.replace(next_sidecar)
+
+
 def _default_config(default_data_dir: Path) -> StorageConfig:
     folder_path = _normalise_path(default_data_dir)
     return StorageConfig(
@@ -69,10 +122,12 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
         return config
 
     payload = json.loads(path.read_text(encoding="utf-8"))
-    database_file = str(
-        payload.get("databaseFile")
-        or payload.get("defaultDatabase")
-        or DEFAULT_DATABASE_FILE
+    database_file = _normalise_database_file(
+        str(
+            payload.get("databaseFile")
+            or payload.get("defaultDatabase")
+            or DEFAULT_DATABASE_FILE
+        )
     )
     default_folder_path = payload.get("defaultFolderPath")
     raw_locations = payload.get("allowedStorageLocations") or []
@@ -148,10 +203,13 @@ def write_storage_config(path: Path, config: StorageConfig) -> None:
     temporary_path.replace(path)
 
 
-def ensure_storage_location(folder_path: Path) -> None:
+def ensure_storage_location(folder_path: Path, database_file: str = DEFAULT_DATABASE_FILE) -> None:
     folder_path.mkdir(parents=True, exist_ok=True)
     if not folder_path.is_dir():
         raise ValueError("Storage location must be a folder.")
+    storage_database_path(folder_path, database_file).parent.mkdir(parents=True, exist_ok=True)
+    _migrate_legacy_database(folder_path, database_file)
+    _ensure_storage_gitignore(folder_path)
     probe = folder_path / ".mianotes-write-test"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink(missing_ok=True)
@@ -164,7 +222,7 @@ def add_storage_location(
     folder_path: str,
 ) -> StorageConfig:
     normalised_path = _normalise_path(folder_path)
-    ensure_storage_location(normalised_path)
+    ensure_storage_location(normalised_path, config.database_file)
     location_id = _location_id(name, normalised_path)
     existing_ids = {location.id for location in config.locations}
     if location_id in existing_ids:
@@ -199,7 +257,7 @@ def activate_storage_location(config: StorageConfig, *, location_id: str) -> Sto
     location = next((item for item in config.locations if item.id == location_id), None)
     if location is None:
         raise LookupError("Storage location not found.")
-    ensure_storage_location(location.folder_path)
+    ensure_storage_location(location.folder_path, config.database_file)
     return StorageConfig(
         active_location=location.id,
         database_file=config.database_file,

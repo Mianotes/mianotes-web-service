@@ -45,7 +45,7 @@ ruff check .
 
 - `.env` is not committed.
 - `storage.json` is not committed.
-- `data/` and `mia.db` are not committed.
+- `data/`, `.mianotes/`, and `mia.db` are not committed.
 - Example tokens are fake.
 - Docs remind users not to give untrusted agents filesystem access to sensitive files.
 - File API blocks database files.

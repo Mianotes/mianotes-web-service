@@ -27,7 +27,7 @@ curl -sS \
 The raw key is a secret. Treat it like a password.
 
 Mianotes compares bearer tokens by hashing the presented token and comparing it
-with the public verifier stored in the active `mia.db`. The database does not
+with the public verifier stored in the active `.mianotes/mia.db`. The database does not
 store the raw key.
 
 There are two normal places the raw service key can live:
@@ -42,8 +42,8 @@ There are two normal places the raw service key can live:
 
 On startup and on authenticated requests, Mianotes syncs the derived public
 verifier into the active database. This lets the same service key work after a
-restart and across database switches, while each `mia.db` still stores only the
-public verifier.
+restart and across folder switches, while each `.mianotes/mia.db` still stores
+only the public verifier.
 
 ## Get a key in the web app
 

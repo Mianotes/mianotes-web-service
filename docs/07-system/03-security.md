@@ -16,7 +16,7 @@ Bearer tokens are sent as:
 Authorization: Bearer <token>
 ```
 
-The service-wide token is private. Mianotes stores only a derived public hash in each `mia.db`, so the same running service can switch databases without storing the raw token in any database.
+The service-wide token is private. Mianotes stores only a derived public hash in each `.mianotes/mia.db`, so the same running service can switch folders without storing the raw token in any database.
 
 ## What authentication does and does not do
 

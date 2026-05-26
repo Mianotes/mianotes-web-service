@@ -1,6 +1,6 @@
 # First run
 
-The first run creates the first user, the master password, the default database, and the first folder.
+The first run creates the first user, the master password, the default storage folder, and the first notes folder.
 
 ## What happens on first setup
 
@@ -14,11 +14,11 @@ Mianotes then:
 
 1. creates the first admin user;
 2. stores the master password hash;
-3. initialises the default database;
+3. initialises `data/.mianotes/mia.db`;
 4. seeds the default `Mianotes` folder;
 5. starts a browser session for the new user.
 
-The first user is the admin for that database.
+The first user is the admin for that folder.
 
 ## Recommended first-run flow
 

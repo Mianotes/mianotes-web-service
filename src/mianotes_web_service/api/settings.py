@@ -33,6 +33,7 @@ from mianotes_web_service.services.storage_settings import (
     add_storage_location,
     read_storage_config,
     set_api_token,
+    storage_database_path,
     write_storage_config,
 )
 
@@ -40,7 +41,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 def _database_url(folder_path: Path, database_file: str) -> str:
-    return f"sqlite:///{folder_path / database_file}"
+    return f"sqlite:///{storage_database_path(folder_path, database_file)}"
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -74,7 +75,7 @@ def _storage_response(config: StorageConfig) -> StorageSettingsRead:
     active_folder_path = config.active_folder_path
     locations: list[StorageLocationRead] = []
     for location in config.locations:
-        database_path = location.folder_path / config.database_file
+        database_path = storage_database_path(location.folder_path, config.database_file)
         notes_count, users_count, last_updated_at = _database_stats(database_path)
         locations.append(
             StorageLocationRead(
@@ -93,7 +94,7 @@ def _storage_response(config: StorageConfig) -> StorageSettingsRead:
         active_location=config.active_location,
         database_file=config.database_file,
         data_dir=str(active_folder_path),
-        database_path=str(active_folder_path / config.database_file),
+        database_path=str(storage_database_path(active_folder_path, config.database_file)),
         locations=locations,
     )
 

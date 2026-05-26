@@ -97,7 +97,8 @@ GET /api/settings/storage
 Authentication: admin session or bearer token with `admin`.
 
 Returns the active storage location, database file name, database path, and
-available storage locations with lightweight database stats.
+available storage locations with lightweight database stats. The web app labels
+these storage locations as folders.
 
 ## Add storage location
 
@@ -116,7 +117,7 @@ Request:
 }
 ```
 
-Mianotes creates `mia.db` in that folder if needed and initialises the schema.
+Mianotes creates `.mianotes/mia.db` in that folder if needed and initialises the schema.
 
 ## Switch active storage location
 
@@ -135,7 +136,7 @@ Request:
 ```
 
 The response includes `session_ended: true`. The browser session is ended
-because each database has its own users and password state.
+because each folder has its own users and password state.
 
 If Mia has queued or running jobs, the API returns `409` and asks the user to
 try again after those jobs finish.

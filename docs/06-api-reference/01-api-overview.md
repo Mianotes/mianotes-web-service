@@ -24,7 +24,7 @@ Bearer token shape:
 Authorization: Bearer mia_<token>
 ```
 
-The service-wide bearer token acts as the first admin user in the current database. Scoped bearer tokens must include the required scope or `admin`.
+The service-wide bearer token acts as the first admin user in the current folder. Scoped bearer tokens must include the required scope or `admin`.
 
 ## Common errors
 
@@ -95,7 +95,7 @@ Example response:
   "version": "0.1.0",
   "storage": {
     "data_dir": "data",
-    "database_url": "sqlite:///data/mia.db"
+    "database_url": "sqlite:///data/.mianotes/mia.db"
   }
 }
 ```

@@ -86,17 +86,17 @@ Default:
 
 ```text
 data/
-data/mia.db
+data/.mianotes/mia.db
 ```
 
 Advanced:
 
 ```env
 MIANOTES_DATA_DIR=/absolute/path/to/mianotes-data
-MIANOTES_DATABASE_URL=sqlite:////absolute/path/to/mia.db
+MIANOTES_DATABASE_URL=sqlite:////absolute/path/to/.mianotes/mia.db
 ```
 
-Admins can switch between allowed local database folders from the Settings screen.
+Admins can switch between allowed local folders from the Settings screen.
 
 ## Parser customisation
 

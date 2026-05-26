@@ -7,7 +7,11 @@ from pathlib import Path
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from mianotes_web_service.services.storage_settings import read_storage_config
+from mianotes_web_service.services.storage_settings import (
+    ensure_storage_location,
+    read_storage_config,
+    storage_database_path,
+)
 
 
 class Settings(BaseSettings):
@@ -41,14 +45,18 @@ class Settings(BaseSettings):
             if os.environ.get("MIANOTES_DATA_DIR") and not os.environ.get(
                 "MIANOTES_STORAGE_CONFIG_PATH"
             ):
-                self.database_url = f"sqlite:///{self.data_dir / 'mia.db'}"
+                ensure_storage_location(self.data_dir)
+                self.database_url = f"sqlite:///{storage_database_path(self.data_dir)}"
             else:
                 storage_config = read_storage_config(
                     self.storage_config_path,
                     default_data_dir=self.data_dir,
                 )
                 self.data_dir = storage_config.active_folder_path
-                self.database_url = f"sqlite:///{self.data_dir / storage_config.database_file}"
+                ensure_storage_location(self.data_dir, storage_config.database_file)
+                self.database_url = (
+                    f"sqlite:///{storage_database_path(self.data_dir, storage_config.database_file)}"
+                )
                 if not self.api_token:
                     self.api_token = storage_config.api_token
         return self
