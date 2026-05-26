@@ -18,6 +18,6 @@ def health() -> dict[str, object]:
         "storage": {
             "data_dir": str(settings.data_dir),
             "database_url": settings.redacted_database_url,
+            "storage_config_path": str(settings.storage_config_path),
         },
     }
-

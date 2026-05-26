@@ -95,7 +95,8 @@ Example response:
   "version": "0.1.0",
   "storage": {
     "data_dir": "data",
-    "database_url": "sqlite:///data/.mianotes/mia.db"
+    "database_url": "sqlite:///data/.mianotes/mia.db",
+    "storage_config_path": "storage.json"
   }
 }
 ```
