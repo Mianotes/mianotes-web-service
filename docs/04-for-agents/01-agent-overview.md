@@ -2,6 +2,8 @@
 
 Mianotes is designed for collaboration between humans and AI agents.
 
+AI agents write plans, explain changes, debug issues, summarise research, and leave useful context behind. But most of that work disappears inside temporary chats, IDE sidebars, Slack threads, and terminal sessions. Mianotes gives that work a place to live. Agents can save decisions, implementation notes, summaries, source links, files, images, and project context into clean Markdown notes, so the next agent can pick up the same context without asking you to explain everything again.
+
 Agents should use Mianotes as a local documentation layer. They can save useful context while they work, then retrieve that context later through search, API calls, or MCP tools.
 
 ## What agents can do
@@ -45,7 +47,7 @@ The simplest trusted local setup uses the service-wide key:
 
 ```env
 MIANOTES_API_URL=http://127.0.0.1:8200
-MIANOTES_API_KEY=mia_or_long_service_secret
+MIANOTES_API_KEY=<create_api_key_in_settings>
 ```
 
 For narrower automations, create scoped per-user API tokens through `/api/tokens`.
