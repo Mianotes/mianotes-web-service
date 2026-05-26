@@ -54,8 +54,12 @@ class Settings(BaseSettings):
                 )
                 self.data_dir = storage_config.active_folder_path
                 ensure_storage_location(self.data_dir, storage_config.database_file)
+                database_path = storage_database_path(
+                    self.data_dir,
+                    storage_config.database_file,
+                )
                 self.database_url = (
-                    f"sqlite:///{storage_database_path(self.data_dir, storage_config.database_file)}"
+                    f"sqlite:///{database_path}"
                 )
                 if not self.api_token:
                     self.api_token = storage_config.api_token
