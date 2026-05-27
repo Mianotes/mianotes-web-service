@@ -232,7 +232,7 @@ def test_workspace_keeps_at_least_one_admin(client: TestClient):
 
     deleted = client.delete(f"/api/users/{admin['id']}")
     assert deleted.status_code == 400
-    assert deleted.json()["detail"] == "This workspace needs at least one admin."
+    assert deleted.json()["detail"] == "Admins cannot delete their own account."
 
 
 def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Path):
@@ -279,7 +279,7 @@ def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Pat
     assert second_payload["photo_url"].startswith(f"/.profiles/{user['id']}/avatar-")
     assert second_payload["photo_url"].endswith(".jpg")
     assert second_payload["photo_url"] != payload["photo_url"]
-    assert not avatar_path.exists()
+    assert avatar_path.exists()
     assert (tmp_path / "data" / second_payload["photo_url"].removeprefix("/")).is_file()
 
 

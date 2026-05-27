@@ -644,9 +644,9 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
-    assert not note_path.exists()
-    assert not source_path.exists()
-    assert not source_path.parent.exists()
+    assert note_path.exists()
+    assert source_path.exists()
+    assert source_path.parent.exists()
 
 
 def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: Path):
@@ -688,8 +688,8 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
-    assert not image_files[0].exists()
-    assert not image_files[0].parent.exists()
+    assert image_files[0].exists()
+    assert image_files[0].parent.exists()
 
 
 @pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav"])

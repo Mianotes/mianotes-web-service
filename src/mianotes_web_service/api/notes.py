@@ -1,6 +1,4 @@
 from __future__ import annotations
-
-import shutil
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -50,8 +48,6 @@ from mianotes_web_service.services.note_responses import (
 from mianotes_web_service.services.note_tags import sync_note_tags
 from mianotes_web_service.services.paths import (
     note_file_path,
-    note_image_directory,
-    source_file_path,
 )
 from mianotes_web_service.services.storage import (
     render_markdown_note,
@@ -219,18 +215,5 @@ def update_note(
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = read_note_or_404(session, note_id)
     ensure_can_change_note(note, user)
-    paths = [note_file_path(note)]
-    source_paths = [source_file_path(source) for source in note.source_files]
-    paths.extend(source_paths)
-    source_dirs = {path.parent for path in source_paths}
-    image_dir = note_image_directory(note)
     session.delete(note)
     session.commit()
-    for path in paths:
-        path.unlink(missing_ok=True)
-    shutil.rmtree(image_dir, ignore_errors=True)
-    for source_dir in sorted(source_dirs, key=lambda path: len(path.parts), reverse=True):
-        try:
-            source_dir.rmdir()
-        except OSError:
-            pass

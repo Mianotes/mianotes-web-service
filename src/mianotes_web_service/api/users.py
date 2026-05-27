@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from io import BytesIO
 from pathlib import Path
 from time import time_ns
@@ -95,9 +94,6 @@ def _save_avatar(user_id: str, upload: UploadFile) -> str:
     target = get_settings().data_dir / relative_path
     target.parent.mkdir(parents=True, exist_ok=True)
     image.save(target, format="JPEG", quality=90, optimize=True)
-    for old_avatar in target.parent.glob("avatar-*.jpg"):
-        if old_avatar != target:
-            old_avatar.unlink(missing_ok=True)
     return relative_path.as_posix()
 
 
@@ -217,7 +213,12 @@ def upload_user_photo(
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: str, session: SessionDep, user: AdminUser) -> None:
-    user = _read_user_or_404(session, user_id)
-    _ensure_can_remove_admin(session, user, user)
-    session.delete(user)
+    target_user = _read_user_or_404(session, user_id)
+    if target_user.id == user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admins cannot delete their own account.",
+        )
+    _ensure_can_remove_admin(session, user, target_user)
+    session.delete(target_user)
     session.commit()
