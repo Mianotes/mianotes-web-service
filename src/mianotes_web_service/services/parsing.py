@@ -54,6 +54,9 @@ from mianotes_web_service.services.parser_runtime import (
     emit_parser_text_update as _emit_parser_text_update,
 )
 from mianotes_web_service.services.parser_runtime import (
+    log_parser_command as _log_parser_command,
+)
+from mianotes_web_service.services.parser_runtime import (
     parser_job_logging as parser_job_logging,
 )
 from mianotes_web_service.services.parser_runtime import (
@@ -120,6 +123,11 @@ DOCUMENT_UNREADABLE_MESSAGE = (
     "Some files are saved as pictures instead of selectable text. To read files "
     "like this, connect Mia to a local or cloud AI model, then upload the file again."
 )
+NO_AUDIO_SPEECH_MESSAGE = "Mia could not detect speech in the audio."
+
+
+def _is_audio_not_understood_error(exc: ParserError) -> bool:
+    return "UnknownValueError" in str(exc)
 
 
 class MarkItDownParser:
@@ -200,13 +208,19 @@ class MarkItDownParser:
 
             chunks = _split_audio_to_low_quality_mp3_chunks(path, Path(temp_dir) / "chunks")
             if not chunks:
-                raise ParserError("Audio conversion produced no transcript.")
+                raise ParserError(NO_AUDIO_SPEECH_MESSAGE)
 
             transcript_parts: list[str] = []
             for index, chunk_path in enumerate(chunks, start=1):
                 try:
                     chunk_text = normalise_parsed_markdown(_convert_with_markitdown(chunk_path))
                 except ParserError as exc:
+                    if _is_audio_not_understood_error(exc):
+                        _log_parser_command(
+                            f"skip {chunk_path.name}",
+                            NO_AUDIO_SPEECH_MESSAGE,
+                        )
+                        continue
                     raise ParserError(
                         f"Audio chunk transcription failed for {chunk_path.name}: {exc}"
                     ) from exc
@@ -218,7 +232,7 @@ class MarkItDownParser:
 
             if transcript_parts:
                 return "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
-        raise ParserError("Audio conversion produced no transcript.")
+        raise ParserError(NO_AUDIO_SPEECH_MESSAGE)
 
     def _parse_image(self, path: Path) -> ParsedDocument:
         _convert_with_markitdown(path)

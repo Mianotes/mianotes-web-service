@@ -727,6 +727,87 @@ def test_audio_parser_splits_audio_when_low_quality_mp3_fails(
     ]
 
 
+def test_audio_parser_skips_chunks_without_detected_speech(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake long audio")
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            name = Path(path).name
+            if name in {"recording.m4a", "low-quality.mp3", "chunk-000.mp3"}:
+                raise RuntimeError(
+                    "File conversion failed after 1 attempts:\n"
+                    " - AudioConverter threw UnknownValueError with message: "
+                )
+            if name == "chunk-001.mp3":
+                return SimpleNamespace(text_content="Second chunk transcript")
+            return SimpleNamespace(text_content="")
+
+    def fake_run(args, **_kwargs):
+        if args[-1] in {"-version", "--version"}:
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
+        if "segment" in args:
+            chunk_dir = Path(args[-1]).parent
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            (chunk_dir / "chunk-000.mp3").write_bytes(b"chunk one")
+            (chunk_dir / "chunk-001.mp3").write_bytes(b"chunk two")
+        else:
+            Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == "## Audio transcript\n\n### Part 2\n\nSecond chunk transcript"
+
+
+def test_audio_parser_reports_no_detected_speech_when_all_chunks_are_unreadable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake silent audio")
+
+    class FakeMarkItDown:
+        def convert(self, _path: str):
+            raise RuntimeError(
+                "File conversion failed after 1 attempts:\n"
+                " - AudioConverter threw UnknownValueError with message: "
+            )
+
+    def fake_run(args, **_kwargs):
+        if args[-1] in {"-version", "--version"}:
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
+        if "segment" in args:
+            chunk_dir = Path(args[-1]).parent
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            (chunk_dir / "chunk-000.mp3").write_bytes(b"chunk one")
+        else:
+            Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    with pytest.raises(ParserError, match=parsing.NO_AUDIO_SPEECH_MESSAGE):
+        parse_document(source)
+
+
 def test_audio_parser_reports_original_and_fallback_failures(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -996,6 +1077,43 @@ def test_parse_youtube_url_falls_back_to_ytdlp_audio(monkeypatch: pytest.MonkeyP
     assert parsed.text == "Transcript from downloaded audio"
     assert "--skip-download" in commands[0]
     assert "-f" in commands[1]
+
+
+def test_parse_youtube_url_reports_no_captions_or_speech(monkeypatch: pytest.MonkeyPatch):
+    class FakeMarkItDown:
+        def convert(self, _value: str):
+            return SimpleNamespace(text_content="[About](https://www.youtube.com/about/)")
+
+    def fake_run(command_parts, **_kwargs):
+        if "--skip-download" in command_parts:
+            return subprocess.CompletedProcess(
+                command_parts,
+                0,
+                stdout="There are no subtitles for the requested languages",
+                stderr="",
+            )
+        output_template = Path(command_parts[command_parts.index("-o") + 1])
+        audio_path = output_template.parent / "abc123.webm"
+        audio_path.write_text("audio", encoding="utf-8")
+        return subprocess.CompletedProcess(command_parts, 0, stdout="ok", stderr="")
+
+    def fake_parse_document(_path: Path):
+        raise ParserError(parsing.NO_AUDIO_SPEECH_MESSAGE)
+
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/local/bin/{name}")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parsing, "parse_document", fake_parse_document)
+
+    with pytest.raises(
+        ParserError,
+        match="This video has no captions, and Mia could not detect speech in the audio.",
+    ):
+        parse_youtube_url("https://www.youtube.com/watch?v=abc123")
 
 
 def test_youtube_downloader_executable_finds_venv_script(

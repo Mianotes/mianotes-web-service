@@ -18,6 +18,9 @@ from mianotes_web_service.services.parser_types import ParsedDocument, ParserErr
 from mianotes_web_service.services.parser_url import is_youtube_url
 
 ParseDocument = Callable[[Path], ParsedDocument]
+NO_YOUTUBE_SPEECH_MESSAGE = (
+    "This video has no captions, and Mia could not detect speech in the audio."
+)
 
 
 def caption_file_to_text(path: Path) -> str:
@@ -161,7 +164,16 @@ def parse_youtube_url(url: str, *, parse_document: ParseDocument) -> ParsedDocum
                 parser=parsed.parser,
                 source_path=Path(url),
             )
-        parsed = parse_youtube_audio_with_downloader(url, work_dir, parse_document=parse_document)
+        try:
+            parsed = parse_youtube_audio_with_downloader(
+                url,
+                work_dir,
+                parse_document=parse_document,
+            )
+        except ParserError as exc:
+            if "Mia could not detect speech in the audio." in str(exc):
+                raise ParserError(NO_YOUTUBE_SPEECH_MESSAGE) from exc
+            raise
         if parsed is not None:
             return ParsedDocument(
                 text=parsed.text,
