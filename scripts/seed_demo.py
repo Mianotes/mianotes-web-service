@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import random
 import re
 import shutil
 import sys
@@ -59,6 +60,17 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=6,
         help="Number of demo users to create from avatar filenames.",
+    )
+    parser.add_argument(
+        "--random-note-owners",
+        action="store_true",
+        help="Assign imported documentation notes across the seeded users.",
+    )
+    parser.add_argument(
+        "--note-owner-seed",
+        type=int,
+        default=42,
+        help="Seed used when distributing notes across demo users.",
     )
     parser.add_argument(
         "--data-dir",
@@ -187,7 +199,7 @@ def seed_users(
     count: int,
     data_dir: Path,
 ):
-    from mianotes_web_service.services.auth import set_master_password
+    from mianotes_web_service.services.auth import set_master_password, set_user_password
 
     admin = upsert_user(
         session,
@@ -197,6 +209,8 @@ def seed_users(
         avatar_path=None,
         data_dir=data_dir,
     )
+    set_user_password(admin, password)
+    demo_users = []
     avatar_paths = sorted(
         path
         for path in avatars_dir.iterdir()
@@ -204,7 +218,7 @@ def seed_users(
     )[:count]
     for avatar_path in avatar_paths:
         name = avatar_path.stem.strip()
-        upsert_user(
+        demo_user = upsert_user(
             session,
             email=user_email_for_name(name),
             name=name,
@@ -212,11 +226,21 @@ def seed_users(
             avatar_path=avatar_path,
             data_dir=data_dir,
         )
+        set_user_password(demo_user, password)
+        demo_users.append(demo_user)
     set_master_password(session, password)
-    return admin
+    return admin, demo_users
 
 
-def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, int]:
+def seed_docs(
+    session,
+    *,
+    owner,
+    note_owners,
+    docs_dir: Path,
+    data_dir: Path,
+    note_owner_seed: int,
+) -> tuple[int, int]:
     from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
     from mianotes_web_service.services.storage import (
         FilesystemStorage,
@@ -234,6 +258,21 @@ def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, i
         for folder in sorted(docs_dir.iterdir())
         if folder.is_dir() and re.match(r"^\d+", folder.name)
     ]
+    owner_pool = list(note_owners) or [owner]
+    randomize_note_owners = len(owner_pool) > 1
+    rng = random.Random(note_owner_seed)
+    rng.shuffle(owner_pool)
+    owner_index = 0
+
+    def next_note_owner():
+        nonlocal owner_index
+        if not randomize_note_owners:
+            return owner
+        if owner_index > 0 and owner_index % len(owner_pool) == 0:
+            rng.shuffle(owner_pool)
+        selected_owner = owner_pool[owner_index % len(owner_pool)]
+        owner_index += 1
+        return selected_owner
 
     for index, docs_folder in enumerate(doc_folders, start=1):
         folder_name = numbered_slug_title(docs_folder)
@@ -256,6 +295,7 @@ def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, i
             folder.sort_order = index * 10
 
         for markdown_path in sorted(docs_folder.glob("*.md")):
+            note_owner = next_note_owner()
             source_markdown = markdown_path.read_text(encoding="utf-8")
             title, body = markdown_title_and_body(
                 source_markdown,
@@ -266,7 +306,7 @@ def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, i
             ).one_or_none()
             note = existing_note or Note(
                 id=new_id(),
-                user_id=owner.id,
+                user_id=note_owner.id,
                 folder_id=folder.id,
                 title=title,
                 source_type="markdown",
@@ -276,7 +316,7 @@ def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, i
                 session.add(note)
 
             paths = storage.note_paths(
-                username=owner.username,
+                username=note_owner.username,
                 folder=folder.path,
                 filename=note.id,
                 title=title,
@@ -291,7 +331,7 @@ def seed_docs(session, *, owner, docs_dir: Path, data_dir: Path) -> tuple[int, i
                 paths.source_path.parent.mkdir(parents=True, exist_ok=True)
                 paths.source_path.write_text(source_markdown, encoding="utf-8")
 
-            note.user_id = owner.id
+            note.user_id = note_owner.id
             note.folder_id = folder.id
             note.title = title
             note.status = "ready"
@@ -345,7 +385,7 @@ def main() -> int:
 
     create_database()
     with SessionLocal() as session:
-        admin = seed_users(
+        admin, demo_users = seed_users(
             session,
             admin_email=args.admin_email,
             admin_name=args.admin_name,
@@ -354,11 +394,14 @@ def main() -> int:
             count=args.demo_user_count,
             data_dir=settings.data_dir,
         )
+        note_owners = [admin, *demo_users] if args.random_note_owners else [admin]
         folder_count, note_count = seed_docs(
             session,
             owner=admin,
+            note_owners=note_owners,
             docs_dir=args.docs_dir,
             data_dir=settings.data_dir,
+            note_owner_seed=args.note_owner_seed,
         )
         session.commit()
 
