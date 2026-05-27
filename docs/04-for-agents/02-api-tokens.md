@@ -26,9 +26,10 @@ curl -sS \
 ```
 
 The response contains a short-lived bearer token. Use that session token for
-follow-up requests. Mianotes stores the client name from `X-Mianotes-Client`
-inside the signed token so jobs and notes can be attributed to the right tool.
-The raw API key is never embedded in the session token.
+follow-up requests. Mianotes maps known client names from `X-Mianotes-Client`
+to a stable client ID, stores that identity inside the signed token, and uses it
+to attribute jobs to the right tool in the Console. Unknown client names default
+to `MCP`. The raw API key is never embedded in the session token.
 
 ## How Mianotes stores the key
 
@@ -98,7 +99,8 @@ curl -sS \
 ```
 
 Use a client name that describes the tool, such as `Codex`, `Claude`, `Cursor`,
-or `Slack`.
+or `Slack`. Mianotes maps known names and aliases to a stable client ID for
+Console display. Unknown names are accepted and shown as `MCP`.
 
 ## Get a key from the API
 

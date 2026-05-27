@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import ApiToken, AppSetting, User
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services.agent_clients import AgentClient, resolve_agent_client
 from mianotes_web_service.services.auth import (
     INSTANCE_API_TOKEN_PUBLIC_KEY,
     SESSION_COOKIE_NAME,
@@ -30,6 +31,7 @@ class AuthContext:
     token: ApiToken | None = None
     is_instance_token: bool = False
     client_name: str | None = None
+    client_key: str | None = None
 
     @property
     def scopes(self) -> set[str]:
@@ -42,6 +44,12 @@ class AuthContext:
     @property
     def is_browser_session(self) -> bool:
         return self.token is None and not self.is_instance_token
+
+    @property
+    def agent_client(self) -> AgentClient | None:
+        if self.client_key is None:
+            return None
+        return AgentClient(key=self.client_key, name=self.client_name or self.client_key)
 
 
 def _read_bearer_token(authorization: str | None) -> str | None:
@@ -81,8 +89,13 @@ def _read_agent_session_context(session: Session, raw_token: str) -> AuthContext
 
     user_id = payload.get("user_id") or payload.get("sub")
     client_name = payload.get("client")
+    client_key = payload.get("client_key")
     if not isinstance(user_id, str) or not isinstance(client_name, str):
         return None
+    if not isinstance(client_key, str):
+        agent_client = resolve_agent_client(client_name)
+        client_name = agent_client.name
+        client_key = agent_client.key
 
     api_token_id = payload.get("api_token_id")
     if isinstance(api_token_id, str):
@@ -91,7 +104,12 @@ def _read_agent_session_context(session: Session, raw_token: str) -> AuthContext
             return None
         if api_token.user_id != user_id:
             return None
-        return AuthContext(user=api_token.user, token=api_token, client_name=client_name)
+        return AuthContext(
+            user=api_token.user,
+            token=api_token,
+            client_name=client_name,
+            client_key=client_key,
+        )
 
     instance_token_public_key = payload.get("instance_token_public_key")
     if not isinstance(instance_token_public_key, str):
@@ -103,7 +121,12 @@ def _read_agent_session_context(session: Session, raw_token: str) -> AuthContext
     user = session.get(User, user_id)
     if user is None:
         return None
-    return AuthContext(user=user, is_instance_token=True, client_name=client_name)
+    return AuthContext(
+        user=user,
+        is_instance_token=True,
+        client_name=client_name,
+        client_key=client_key,
+    )
 
 
 def auth_context_from_bearer_token(session: Session, raw_api_token: str) -> AuthContext:

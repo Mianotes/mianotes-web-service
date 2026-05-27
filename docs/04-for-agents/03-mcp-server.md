@@ -52,7 +52,8 @@ X-Mianotes-Client: Codex
 ```
 
 The MCP server then uses the returned session token for tool calls. The session
-token contains the client name and token reference, not the raw API key.
+token contains the mapped client identity and token reference, not the raw API
+key. Unknown client names default to `MCP`.
 
 Use scoped per-user API tokens when an agent should only read notes or work in a limited role.
 

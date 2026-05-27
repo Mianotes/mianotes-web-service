@@ -318,6 +318,7 @@ class ServiceApiKeyRead(BaseModel):
 class AgentSessionRead(BaseModel):
     token: str
     token_type: str = "bearer"
+    client_key: str
     client: str
     expires_at: datetime
     user: UserRead
@@ -366,9 +367,15 @@ class MiaJobLogEntry(BaseModel):
     response: str | None = None
 
 
+class AgentClientRead(BaseModel):
+    key: str
+    name: str
+
+
 class MiaJobRead(BaseModel):
     id: str
     user: UserRead
+    client: AgentClientRead | None = None
     note_id: str | None = None
     note_title: str | None = None
     job_type: str

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, NoteStar, User
 from mianotes_web_service.domain.schemas import (
+    AgentClientRead,
     MiaJobRead,
     NoteIngestionRead,
     NoteListItem,
@@ -212,6 +213,11 @@ def mia_job_response(job) -> MiaJobRead:
     return MiaJobRead(
         id=job.id,
         user=job.user,
+        client=(
+            AgentClientRead(key=job.client_key, name=job.client_name)
+            if job.client_key and job.client_name
+            else None
+        ),
         note_id=job.note_id,
         note_title=job.note.title if job.note is not None else None,
         job_type=job.job_type,

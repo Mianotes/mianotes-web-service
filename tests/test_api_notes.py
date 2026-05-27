@@ -828,6 +828,45 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     )
 
 
+def test_agent_created_url_job_includes_client(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "agent-job@example.com",
+            "name": "Agent Job User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Agent Links"}).json()
+    created_key = client.post("/api/settings/api-key", json={})
+    raw_token = created_key.json()["token"]
+    session_response = client.post(
+        "/api/auth/agent-session",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+            "X-Mianotes-Client": "Cursor",
+        },
+    )
+    assert session_response.status_code == 201
+    session_token = session_response.json()["token"]
+
+    response = TestClient(client.app).post(
+        "/api/notes/from-url",
+        json={
+            "folder_id": folder["id"],
+            "url": "https://example.com/cursor-link",
+        },
+        headers={"Authorization": f"Bearer {session_token}"},
+    )
+
+    assert response.status_code == 201
+    job = response.json()["job"]
+    assert job["client"] == {"key": "cursor", "name": "Cursor"}
+    listed_job = client.get(f"/api/jobs/{job['id']}").json()
+    assert listed_job["client"] == {"key": "cursor", "name": "Cursor"}
+
+
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
     admin = client.post(
         "/api/auth/join",

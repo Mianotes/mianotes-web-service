@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import MiaJob, User
+from mianotes_web_service.services.agent_clients import AgentClient
 
 JOB_STATUSES = frozenset({"queued", "running", "succeeded", "failed", "cancelled"})
 MAX_JOB_LOG_ENTRIES = 60
@@ -67,6 +68,7 @@ def create_job(
     job_type: str,
     note_id: str | None = None,
     input_payload: Mapping[str, object] | None = None,
+    client: AgentClient | None = None,
 ) -> MiaJob:
     job = MiaJob(
         user_id=user.id,
@@ -76,6 +78,8 @@ def create_job(
         input_json=encode_job_payload(input_payload),
         result_json="{}",
         log_json="[]",
+        client_key=client.key if client is not None else None,
+        client_name=client.name if client is not None else None,
     )
     session.add(job)
     return job

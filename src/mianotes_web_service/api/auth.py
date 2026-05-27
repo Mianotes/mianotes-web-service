@@ -23,6 +23,7 @@ from mianotes_web_service.domain.schemas import (
     LoginRequest,
     SessionRead,
 )
+from mianotes_web_service.services.agent_clients import resolve_agent_client
 from mianotes_web_service.services.auth import (
     INSTANCE_API_TOKEN_PUBLIC_KEY,
     SESSION_COOKIE_NAME,
@@ -264,6 +265,7 @@ def create_agent_session(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(exc),
         ) from exc
+    agent_client = resolve_agent_client(client_name)
 
     context = auth_context_from_bearer_token(session, raw_api_token)
     if context.is_browser_session:
@@ -280,7 +282,8 @@ def create_agent_session(
         session_token, expires_at = create_agent_session_token(
             session,
             user=context.user,
-            client_name=client_name,
+            client_name=agent_client.name,
+            client_key=agent_client.key,
             scopes=scopes,
             instance_token_public_key=instance_token_public_key.value,
         )
@@ -290,7 +293,8 @@ def create_agent_session(
         session_token, expires_at = create_agent_session_token(
             session,
             user=context.user,
-            client_name=client_name,
+            client_name=agent_client.name,
+            client_key=agent_client.key,
             scopes=scopes,
             api_token_id=context.token.id,
         )
@@ -298,7 +302,8 @@ def create_agent_session(
     session.commit()
     return AgentSessionRead(
         token=session_token,
-        client=client_name,
+        client_key=agent_client.key,
+        client=agent_client.name,
         expires_at=expires_at,
         user=context.user,
         scopes=scopes,

@@ -178,6 +178,7 @@ def test_agent_session_exchanges_service_api_key_for_client_token(client: TestCl
 
     assert exchanged.status_code == 201
     body = exchanged.json()
+    assert body["client_key"] == "codex"
     assert body["client"] == "Codex"
     assert body["token_type"] == "bearer"
     assert body["scopes"] == ["admin"]
@@ -204,6 +205,24 @@ def test_agent_session_requires_client_header(client: TestClient):
     assert exchanged.json()["detail"] == "X-Mianotes-Client is required"
 
 
+def test_agent_session_maps_unknown_client_to_mcp(client: TestClient):
+    _join_admin(client)
+    created = client.post("/api/settings/api-key", json={})
+    raw_token = created.json()["token"]
+
+    exchanged = client.post(
+        "/api/auth/agent-session",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+            "X-Mianotes-Client": "Some New Agent",
+        },
+    )
+
+    assert exchanged.status_code == 201
+    assert exchanged.json()["client_key"] == "mcp"
+    assert exchanged.json()["client"] == "MCP"
+
+
 def test_agent_session_uses_scoped_token_and_revocation(client: TestClient):
     _join_admin(client)
     created = client.post(
@@ -220,6 +239,8 @@ def test_agent_session_uses_scoped_token_and_revocation(client: TestClient):
         },
     )
     assert exchanged.status_code == 201
+    assert exchanged.json()["client_key"] == "claude-code"
+    assert exchanged.json()["client"] == "Claude Code"
     session_token = exchanged.json()["token"]
 
     agent_client = TestClient(client.app)

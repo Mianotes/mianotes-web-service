@@ -17,7 +17,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import NotesWriteUser
+from mianotes_web_service.api.dependencies import AuthContext, AuthContextDep, NotesWriteUser
 from mianotes_web_service.api.note_access import read_note_or_404
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
@@ -95,6 +95,15 @@ def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: st
     request.app.state.job_runner.enqueue(background_tasks, job_id)
 
 
+def _ensure_notes_write(context: AuthContext):
+    if context.is_browser_session or "admin" in context.scopes or "notes:write" in context.scopes:
+        return context.user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="API token requires notes:write scope",
+    )
+
+
 @router.post("/from-text", response_model=NoteRead, status_code=status.HTTP_201_CREATED)
 def create_note_from_text(
     payload: NoteCreateFromText,
@@ -153,11 +162,12 @@ def create_note_from_file(
     request: Request,
     background_tasks: BackgroundTasks,
     session: SessionDep,
-    user: NotesWriteUser,
+    context: AuthContextDep,
     folder_id: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
 ) -> NoteRead:
+    user = _ensure_notes_write(context)
     folder = session.get(Folder, folder_id)
     if folder is None or folder.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
@@ -230,6 +240,7 @@ def create_note_from_file(
             "source_file_id": source_file.id,
             "operation": "parse_file",
         },
+        client=context.agent_client,
     )
     session.commit()
     session.refresh(job)
@@ -249,8 +260,9 @@ def create_note_from_url(
     request: Request,
     background_tasks: BackgroundTasks,
     session: SessionDep,
-    user: NotesWriteUser,
+    context: AuthContextDep,
 ) -> NoteIngestionRead:
+    user = _ensure_notes_write(context)
     folder = session.get(Folder, payload.folder_id)
     if folder is None or folder.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
@@ -304,6 +316,7 @@ def create_note_from_url(
             "operation": "parse_url",
             "url": url,
         },
+        client=context.agent_client,
     )
     session.commit()
     session.refresh(job)

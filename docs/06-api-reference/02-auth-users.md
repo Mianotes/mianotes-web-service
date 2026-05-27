@@ -108,9 +108,10 @@ Authorization: Bearer <MIANOTES_API_KEY>
 X-Mianotes-Client: Codex
 ```
 
-Mianotes validates the bearer token, maps `X-Mianotes-Client` into a
-short-lived signed session token, and returns that token for follow-up requests.
-The raw API key is not embedded in the session token.
+Mianotes validates the bearer token, maps `X-Mianotes-Client` into a stable
+client ID, signs that identity into a short-lived session token, and returns the
+token for follow-up requests. Unknown client names default to `MCP`. The raw API
+key is not embedded in the session token.
 
 Response:
 
@@ -118,6 +119,7 @@ Response:
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "bearer",
+  "client_key": "codex",
   "client": "Codex",
   "expires_at": "2026-05-27T12:00:00Z",
   "user": {

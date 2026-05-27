@@ -79,6 +79,20 @@ Response: `204 No Content`.
 ```json
 {
   "id": "dc6d54d2-f6ac-4a87-9d54-12e93243db4e",
+  "user": {
+    "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "matt",
+    "phone": null,
+    "role": null,
+    "photo_url": null,
+    "is_admin": true
+  },
+  "client": {
+    "key": "codex",
+    "name": "Codex"
+  },
   "note_id": "4a95f146-9d27-4c79-b7d8-34739aef8998",
   "job_type": "parse_file",
   "status": "queued",

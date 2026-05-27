@@ -259,6 +259,8 @@ class MiaJob(Base, TimestampMixin):
     result_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     log_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     error: Mapped[str | None] = mapped_column(Text)
+    client_key: Mapped[str | None] = mapped_column(String(80))
+    client_name: Mapped[str | None] = mapped_column(String(120))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

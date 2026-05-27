@@ -56,6 +56,8 @@ For narrower automations, create scoped per-user API tokens through `/api/tokens
 Agents should exchange the API key and client name for a short-lived agent
 session before making API calls. The session identifies the tool, such as
 `Codex`, `Claude`, `Cursor`, or `Slack`, without embedding the raw API key.
+Mianotes maps known client names to stable client IDs for Console attribution.
+Unknown client names are treated as `MCP`.
 
 ## Service-wide key vs scoped token
 
