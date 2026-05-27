@@ -25,17 +25,17 @@ from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import render_markdown_note, summarize_text
 
 FAILED_FILE_MESSAGE = (
-    "Mia couldn’t process this file.\n\n"
+    "Mia couldn't process this file.\n\n"
     "The file has been saved, but Mia could not turn it into a note this time. "
     "You can check the {console_link} screen for the technical details."
 )
 FAILED_LINK_MESSAGE = (
-    "Mia couldn’t process this link.\n\n"
+    "Mia couldn't process this link.\n\n"
     "The link has been saved, but Mia could not turn it into a note this time. "
     "You can check the {console_link} screen for the technical details."
 )
 FAILED_LINK_WITH_REASON_MESSAGE = (
-    "Mia couldn’t process this link.\n\n"
+    "Mia couldn't process this link.\n\n"
     "{reason}\n\n"
     "You can check the {console_link} screen for the technical details."
 )

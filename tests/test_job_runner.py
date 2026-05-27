@@ -277,7 +277,7 @@ def test_job_runner_keeps_logs_for_failed_jobs(
         assert job is not None
         assert note.status == "failed"
         text = Path(note.note_path).read_text(encoding="utf-8")
-        assert "Mia couldn’t process this file." in text
+        assert "Mia couldn't process this file." in text
         assert "Your file has been added to the queue" not in text
         assert f"[Console](/jobs?job={job_id}) screen" in text
         assert "Jobs screen" not in text
@@ -325,7 +325,7 @@ def test_job_runner_links_failed_url_notes_to_console_job(
         assert note is not None
         assert job is not None
         text = Path(note.note_path).read_text(encoding="utf-8")
-        assert "Mia couldn’t process this link." in text
+        assert "Mia couldn't process this link." in text
         assert (
             "The link has been saved, but Mia could not turn it into a note this time."
             in text
@@ -372,7 +372,7 @@ def test_job_runner_shows_safe_failed_url_reason_in_note(
         assert note is not None
         assert job is not None
         text = Path(note.note_path).read_text(encoding="utf-8")
-        assert "Mia couldn’t process this link." in text
+        assert "Mia couldn't process this link." in text
         assert job_runner.NO_YOUTUBE_SPEECH_MESSAGE in text
         assert (
             "The link has been saved, but Mia could not turn it into a note this time."

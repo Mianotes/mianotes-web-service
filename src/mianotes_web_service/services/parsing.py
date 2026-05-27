@@ -109,17 +109,17 @@ from mianotes_web_service.services.parser_youtube import (
 )
 
 IMAGE_NEEDS_CLOUD_MESSAGE = (
-    "Mia couldn’t read the text in this image.\n\n"
+    "Mia couldn't read the text in this image.\n\n"
     "To help Mia read images, screenshots, and scanned documents, connect Mia to "
     "a local or cloud AI model, then upload it again."
 )
 IMAGE_UNREADABLE_MESSAGE = (
-    "Mia couldn’t read the text in this image.\n\n"
+    "Mia couldn't read the text in this image.\n\n"
     "To help Mia read images, screenshots, and scanned documents, connect Mia to "
     "a local or cloud AI model, then upload it again."
 )
 DOCUMENT_UNREADABLE_MESSAGE = (
-    "Mia couldn’t read the text in this file.\n\n"
+    "Mia couldn't read the text in this file.\n\n"
     "Some files are saved as pictures instead of selectable text. To read files "
     "like this, connect Mia to a local or cloud AI model, then upload the file again."
 )

@@ -97,7 +97,7 @@ If a file still cannot be parsed, Mianotes saves a friendly message instead of
 an empty note:
 
 ```text
-Mia couldn’t read the text in this file.
+Mia couldn't read the text in this file.
 
 Some files are saved as pictures instead of selectable text. To read files like this, connect Mia to a local or cloud AI model, then upload the file again.
 ```
@@ -106,7 +106,7 @@ If an image cannot be read locally and no OpenAI image fallback is configured,
 Mianotes saves:
 
 ```text
-Mia couldn’t read the text in this image.
+Mia couldn't read the text in this image.
 
 To help Mia read images, screenshots, and scanned documents, connect Mia to a local or cloud AI model, then upload it again.
 ```
