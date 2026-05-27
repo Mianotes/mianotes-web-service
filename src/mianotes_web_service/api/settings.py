@@ -27,7 +27,11 @@ from mianotes_web_service.services.auth import (
     generate_api_token,
     sync_instance_api_token_public_key,
 )
-from mianotes_web_service.services.env_file import ensure_service_api_url, service_env_file_path, upsert_env_value
+from mianotes_web_service.services.env_file import (
+    ensure_service_api_url,
+    service_env_file_path,
+    upsert_env_value,
+)
 from mianotes_web_service.services.job_runner import InProcessJobRunner
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
