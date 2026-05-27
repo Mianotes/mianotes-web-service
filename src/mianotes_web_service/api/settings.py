@@ -9,13 +9,15 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import AdminUser, SessionDep
+from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db import session as db_session
 from mianotes_web_service.db.init import create_database
 from mianotes_web_service.db.models import MiaJob
 from mianotes_web_service.domain.schemas import (
     ServiceApiKeyRead,
+    ShareSettingsRead,
+    ShareSettingsUpdate,
     StorageLocationCreate,
     StorageLocationRead,
     StorageSettingsRead,
@@ -33,6 +35,7 @@ from mianotes_web_service.services.env_file import (
     upsert_env_value,
 )
 from mianotes_web_service.services.job_runner import InProcessJobRunner
+from mianotes_web_service.services.share_settings import get_workspace_url, set_workspace_url
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     activate_storage_location,
@@ -136,6 +139,25 @@ def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRe
     write_storage_config(get_settings().storage_config_path, _read_storage_config())
     sync_instance_api_token_public_key(session, raw_token)
     return ServiceApiKeyRead(token=raw_token, api_url=api_url)
+
+
+@router.get("/share", response_model=ShareSettingsRead)
+def share_settings(session: SessionDep, _: CurrentUser) -> ShareSettingsRead:
+    return ShareSettingsRead(workspace_url=get_workspace_url(session))
+
+
+@router.patch("/share", response_model=ShareSettingsRead)
+def update_share_settings(
+    payload: ShareSettingsUpdate,
+    session: SessionDep,
+    _: AdminUser,
+) -> ShareSettingsRead:
+    try:
+        workspace_url = set_workspace_url(session, payload.workspace_url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    session.commit()
+    return ShareSettingsRead(workspace_url=workspace_url)
 
 
 @router.post("/storage/locations", response_model=StorageSettingsRead)

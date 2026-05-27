@@ -163,6 +163,27 @@ def test_admin_api_key_creation_normalizes_localhost_api_url(client: TestClient)
     assert "localhost:8200" not in env_contents
 
 
+def test_admin_can_update_workspace_share_address(client: TestClient):
+    _join_admin(client)
+
+    initial = client.get("/api/settings/share")
+    assert initial.status_code == 200
+    assert initial.json() == {"workspace_url": None}
+
+    updated = client.patch(
+        "/api/settings/share",
+        json={"workspace_url": " https://notes.example.com/ "},
+    )
+
+    assert updated.status_code == 200
+    assert updated.json() == {"workspace_url": "https://notes.example.com"}
+    assert client.get("/api/settings/share").json() == {"workspace_url": "https://notes.example.com"}
+
+    invalid = client.patch("/api/settings/share", json={"workspace_url": "notes.example.com"})
+    assert invalid.status_code == 400
+    assert "full workspace address" in invalid.json()["detail"]
+
+
 def test_service_api_token_requires_initialized_database(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):

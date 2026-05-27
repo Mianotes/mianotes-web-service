@@ -315,6 +315,14 @@ class ServiceApiKeyRead(BaseModel):
     api_url: str
 
 
+class ShareSettingsRead(BaseModel):
+    workspace_url: str | None = None
+
+
+class ShareSettingsUpdate(BaseModel):
+    workspace_url: str | None = Field(default=None, max_length=500)
+
+
 class ApiTokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     user_id: str | None = None
