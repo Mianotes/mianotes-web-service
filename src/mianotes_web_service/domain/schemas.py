@@ -312,6 +312,7 @@ class StorageSwitchRead(BaseModel):
 
 class ServiceApiKeyRead(BaseModel):
     token: str
+    api_url: str
 
 
 class ApiTokenCreate(BaseModel):

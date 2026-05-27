@@ -35,7 +35,7 @@ REST call rules:
 1. Always use `MIANOTES_API_KEY` or `MIANOTES_API_TOKEN` from the environment; never ask the user to paste it unless no `.env` exists and no token variable is set.
 2. Never echo or display the token. It is okay to run `test -n "${MIANOTES_AUTH_TOKEN}"` but not `echo "${MIANOTES_AUTH_TOKEN}"`.
 3. If no token is set, say the Mianotes API key is missing and ask the user to add `MIANOTES_API_KEY` to the service `.env`.
-4. Check the API with `GET /api/health` before starting or restarting services.
+4. Check the API with `GET /api/health` before starting or restarting services. If `MIANOTES_API_URL` uses `localhost` and the check fails, retry once with `127.0.0.1`; if it uses `127.0.0.1` and the check fails, retry once with `localhost`.
 5. If the API is not listening, do not spend a long time rediscovering the app. Say Mia is not reachable at `MIANOTES_API_URL` and ask whether to start the service.
 
 REST curl pattern:

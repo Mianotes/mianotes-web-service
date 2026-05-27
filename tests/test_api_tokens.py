@@ -117,6 +117,7 @@ def test_admin_can_create_service_api_key_from_settings(client: TestClient):
 
     assert created.status_code == 201
     raw_token = created.json()["token"]
+    assert created.json()["api_url"] == "http://127.0.0.1:8200"
     assert raw_token.startswith("mia_")
     assert _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY) == hash_api_token(raw_token)
 
@@ -125,13 +126,41 @@ def test_admin_can_create_service_api_key_from_settings(client: TestClient):
     assert "apiToken" not in storage_config
 
     env_file = Path(os.environ["MIANOTES_ENV_FILE"])
-    assert f'MIANOTES_API_KEY="{raw_token}"' in env_file.read_text(encoding="utf-8")
+    env_contents = env_file.read_text(encoding="utf-8")
+    assert 'MIANOTES_API_URL="http://127.0.0.1:8200"' in env_contents
+    assert f'MIANOTES_API_KEY="{raw_token}"' in env_contents
 
     get_settings.cache_clear()
     agent_client = TestClient(client.app)
     response = agent_client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
 
     assert response.status_code == 200
+
+
+def test_admin_api_key_creation_preserves_custom_api_url(client: TestClient):
+    _join_admin(client)
+    env_file = Path(os.environ["MIANOTES_ENV_FILE"])
+    env_file.write_text('MIANOTES_API_URL="http://192.168.1.10:8200"\n', encoding="utf-8")
+
+    created = client.post("/api/settings/api-key", json={})
+
+    assert created.status_code == 201
+    assert created.json()["api_url"] == "http://192.168.1.10:8200"
+    assert 'MIANOTES_API_URL="http://192.168.1.10:8200"' in env_file.read_text(encoding="utf-8")
+
+
+def test_admin_api_key_creation_normalizes_localhost_api_url(client: TestClient):
+    _join_admin(client)
+    env_file = Path(os.environ["MIANOTES_ENV_FILE"])
+    env_file.write_text('MIANOTES_API_URL="http://localhost:8200"\n', encoding="utf-8")
+
+    created = client.post("/api/settings/api-key", json={})
+
+    assert created.status_code == 201
+    assert created.json()["api_url"] == "http://127.0.0.1:8200"
+    env_contents = env_file.read_text(encoding="utf-8")
+    assert 'MIANOTES_API_URL="http://127.0.0.1:8200"' in env_contents
+    assert "localhost:8200" not in env_contents
 
 
 def test_service_api_token_requires_initialized_database(
