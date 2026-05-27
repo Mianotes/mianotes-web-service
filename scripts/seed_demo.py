@@ -19,7 +19,7 @@ if str(SRC_ROOT) not in sys.path:
 
 AVATAR_SIZE = (200, 200)
 DEFAULT_PASSWORD = "mia"
-LOCAL_EMAIL_DOMAIN = "mianotes.local"
+LOCAL_EMAIL_DOMAIN = "mianotes.dev"
 UPPERCASE_WORDS = {"api", "llm", "mcp", "ocr"}
 
 
