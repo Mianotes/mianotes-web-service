@@ -1,11 +1,20 @@
+import os
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.services import parsing
+from mianotes_web_service.services import (
+    parser_image,
+    parser_markitdown,
+    parser_tools,
+    parser_url,
+    parsing,
+)
 from mianotes_web_service.services.parsing import (
     DEFAULT_BROWSER_USER_AGENT,
     DOCUMENT_UNREADABLE_MESSAGE,
@@ -45,7 +54,7 @@ def test_markitdown_parser_converts_file(tmp_path: Path, monkeypatch: pytest.Mon
     source = tmp_path / "note.md"
     source.write_text("# Hello\n\nMianotes parser layer.", encoding="utf-8")
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module(),
     )
@@ -84,7 +93,7 @@ def test_document_parser_retries_blank_document_with_ocr_plugin(
         },
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -134,7 +143,7 @@ def test_document_parser_unwraps_markitdown_ocr_blocks(
             )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -176,7 +185,7 @@ def test_document_parser_removes_unfenced_ocr_markers_and_self_closes_breaks(
             )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -213,7 +222,7 @@ def test_document_parser_self_closes_html_void_tags(
             )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -251,7 +260,7 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
             )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -283,7 +292,7 @@ def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
         lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("OpenAI is not configured")),
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -317,7 +326,7 @@ def test_document_parser_adds_feedback_when_ocr_returns_no_text(
         },
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -358,9 +367,9 @@ def test_image_parser_uses_configured_llm_options(
             "llm_prompt": "Convert this image into useful Markdown.",
         },
     )
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -388,11 +397,11 @@ def test_image_parser_uses_tesseract_before_llm(
             stdout="Receipt total\n\n\n£42.50\n",
         )
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(tesseract))
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
-    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
+    monkeypatch.setattr(shutil, "which", lambda command: str(tesseract))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
@@ -420,11 +429,11 @@ def test_image_parser_strips_ocr_code_block_indentation(
             ),
         )
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(tesseract))
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
-    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
+    monkeypatch.setattr(shutil, "which", lambda command: str(tesseract))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
@@ -457,7 +466,7 @@ def test_image_parser_strips_markdown_fence_from_llm_output(
                 )
             )
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_openai_image_options",
@@ -468,7 +477,7 @@ def test_image_parser_strips_markdown_fence_from_llm_output(
         },
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -492,11 +501,11 @@ def test_tesseract_executable_skips_broken_path_binary(
             raise OSError("Bad CPU type in executable")
         return SimpleNamespace(returncode=0, stdout="tesseract 5.5.0")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: str(broken))
-    monkeypatch.setattr(parsing, "TESSERACT_CANDIDATES", (str(working),))
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda command: str(broken))
+    monkeypatch.setattr(parser_image, "TESSERACT_CANDIDATES", (str(working),))
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
-    assert parsing._tesseract_executable() == str(working)
+    assert parser_image.tesseract_executable() == str(working)
 
 
 def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
@@ -517,9 +526,9 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
     def fake_run(*_args, **_kwargs):
         return SimpleNamespace(returncode=0, stdout="   ")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/usr/bin/tesseract")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
-    monkeypatch.setattr(parsing, "_preprocess_image_for_ocr", lambda *_args: None)
+    monkeypatch.setattr(shutil, "which", lambda command: "/usr/bin/tesseract")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_openai_image_options",
@@ -530,7 +539,7 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
         },
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -549,14 +558,14 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
     source = tmp_path / "photo.png"
     source.write_bytes(b"fake image")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_openai_image_options",
         lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("OpenAI is not configured")),
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
@@ -574,7 +583,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
     source = tmp_path / "photo.png"
     source.write_bytes(b"fake image")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: None)
+    monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_openai_image_options",
@@ -585,7 +594,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
         },
     )
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
@@ -603,7 +612,7 @@ def test_missing_markitdown_reports_unavailable(tmp_path: Path, monkeypatch: pyt
     def missing_module(_: str):
         raise ModuleNotFoundError("No module named 'markitdown'")
 
-    monkeypatch.setattr(parsing.importlib, "import_module", missing_module)
+    monkeypatch.setattr(parser_markitdown.importlib, "import_module", missing_module)
 
     with pytest.raises(ParserUnavailable, match="markitdown is not installed"):
         MarkItDownParser().parse(source)
@@ -630,10 +639,10 @@ def test_audio_parser_retries_with_low_quality_mp3(
         Path(args[-1]).write_bytes(b"low quality mp3")
         return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -688,10 +697,10 @@ def test_audio_parser_splits_audio_when_low_quality_mp3_fails(
             Path(args[-1]).write_bytes(b"low quality mp3")
         return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -740,10 +749,10 @@ def test_audio_parser_reports_original_and_fallback_failures(
             Path(args[-1]).write_bytes(b"low quality mp3")
         return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -761,12 +770,12 @@ def test_ffmpeg_executable_skips_broken_path(monkeypatch: pytest.MonkeyPatch):
             return SimpleNamespace(returncode=126, stdout="", stderr="Bad CPU type in executable")
         return SimpleNamespace(returncode=0, stdout="ffmpeg version 8.1", stderr="")
 
-    monkeypatch.setattr(parsing, "FFMPEG_CANDIDATES", ("ffmpeg", "/working/ffmpeg"))
-    monkeypatch.setattr(parsing.shutil, "which", lambda command: "/broken/ffmpeg")
-    monkeypatch.setattr(parsing.Path, "exists", lambda path: str(path) == "/working/ffmpeg")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_tools, "FFMPEG_CANDIDATES", ("ffmpeg", "/working/ffmpeg"))
+    monkeypatch.setattr(shutil, "which", lambda command: "/broken/ffmpeg")
+    monkeypatch.setattr(Path, "exists", lambda path: str(path) == "/working/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
-    assert parsing._ffmpeg_executable() == "/working/ffmpeg"
+    assert parser_tools.ffmpeg_executable() == "/working/ffmpeg"
     assert commands == [["/broken/ffmpeg", "-version"], ["/working/ffmpeg", "-version"]]
 
 
@@ -786,20 +795,20 @@ def test_audio_parser_prefers_verified_audio_tool_directory(
             return SimpleNamespace(returncode=126, stdout="", stderr="Bad CPU type in executable")
         return SimpleNamespace(returncode=0, stdout=f"{Path(args[0]).name} ok", stderr="")
 
-    monkeypatch.setattr(parsing, "AUDIO_TOOL_NAMES", ("ffmpeg", "flac"))
+    monkeypatch.setattr(parser_tools, "AUDIO_TOOL_NAMES", ("ffmpeg", "flac"))
     monkeypatch.setattr(
-        parsing,
+        parser_tools,
         "AUDIO_TOOL_VERSION_ARGS",
         {"ffmpeg": "-version", "flac": "--version"},
     )
-    monkeypatch.setattr(parsing, "AUDIO_TOOL_DIR_CANDIDATES", (str(good_dir), str(bad_dir)))
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_tools, "AUDIO_TOOL_DIR_CANDIDATES", (str(good_dir), str(bad_dir)))
+    monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setenv("PATH", f"{bad_dir}:/usr/bin")
 
-    with parsing._prefer_working_audio_tools():
-        assert parsing.os.environ["PATH"].split(":")[0] == str(good_dir)
+    with parser_tools.prefer_working_audio_tools():
+        assert os.environ["PATH"].split(":")[0] == str(good_dir)
 
-    assert parsing.os.environ["PATH"] == f"{bad_dir}:/usr/bin"
+    assert os.environ["PATH"] == f"{bad_dir}:/usr/bin"
 
 
 def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -819,7 +828,7 @@ def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.M
         requests.append((request, timeout))
         return FakeResponse()
 
-    monkeypatch.setattr(parsing, "urlopen", fake_urlopen)
+    monkeypatch.setattr(parser_url, "urlopen", fake_urlopen)
     output_path = tmp_path / "page.html"
 
     fetched_path = fetch_url_to_html("https://example.com", output_path)
@@ -840,7 +849,7 @@ def test_parse_url_fetches_html_then_converts_local_file(
 
     monkeypatch.setattr(parsing, "fetch_url_to_html", fake_fetch_url_to_html)
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: _fake_markitdown_module("Converted URL"),
     )
@@ -875,7 +884,7 @@ def test_parse_youtube_url_uses_markitdown_directly(monkeypatch: pytest.MonkeyPa
             return SimpleNamespace(text_content="# Video\n\n### Transcript\n\nTranscript text.")
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
@@ -901,11 +910,11 @@ def test_parse_youtube_url_rejects_footer_fallback(monkeypatch: pytest.MonkeyPat
             )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
-    monkeypatch.setattr(parsing.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
 
     with pytest.raises(ParserError, match="Could not extract a YouTube transcript"):
         parse_youtube_url("https://www.youtube.com/watch?v=abc123")
@@ -933,12 +942,12 @@ def test_parse_youtube_url_falls_back_to_ytdlp_captions(monkeypatch: pytest.Monk
         return subprocess.CompletedProcess(command_parts, 0, stdout="ok", stderr="")
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
-    monkeypatch.setattr(parsing.shutil, "which", lambda name: f"/usr/local/bin/{name}")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/local/bin/{name}")
+    monkeypatch.setattr(subprocess, "run", fake_run)
 
     parsed = parse_youtube_url("https://www.youtube.com/watch?v=abc123")
 
@@ -973,12 +982,12 @@ def test_parse_youtube_url_falls_back_to_ytdlp_audio(monkeypatch: pytest.MonkeyP
         )
 
     monkeypatch.setattr(
-        parsing.importlib,
+        parser_markitdown.importlib,
         "import_module",
         lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
     )
-    monkeypatch.setattr(parsing.shutil, "which", lambda name: f"/usr/local/bin/{name}")
-    monkeypatch.setattr(parsing.subprocess, "run", fake_run)
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/local/bin/{name}")
+    monkeypatch.setattr(subprocess, "run", fake_run)
     monkeypatch.setattr(parsing, "parse_document", fake_parse_document)
 
     parsed = parse_youtube_url("https://www.youtube.com/watch?v=abc123")
@@ -998,10 +1007,10 @@ def test_youtube_downloader_executable_finds_venv_script(
     python_path.write_text("", encoding="utf-8")
     downloader_path.write_text("", encoding="utf-8")
 
-    monkeypatch.setattr(parsing.shutil, "which", lambda _name: None)
-    monkeypatch.setattr(parsing.sys, "executable", str(python_path))
+    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    monkeypatch.setattr(sys, "executable", str(python_path))
 
-    assert parsing._youtube_downloader_executable() == str(downloader_path)
+    assert parser_tools.youtube_downloader_executable() == str(downloader_path)
 
 
 def test_parse_html_document_uses_trafilatura_cleaned_content(
@@ -1041,7 +1050,7 @@ def test_parse_html_document_uses_trafilatura_cleaned_content(
             return SimpleNamespace(MarkItDown=FakeMarkItDown)
         raise ModuleNotFoundError(name)
 
-    monkeypatch.setattr(parsing.importlib, "import_module", fake_import_module)
+    monkeypatch.setattr(parser_markitdown.importlib, "import_module", fake_import_module)
 
     parsed = parse_html_document(source, url="https://example.com/article")
 

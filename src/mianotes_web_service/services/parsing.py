@@ -1,88 +1,110 @@
 from __future__ import annotations
 
-import html as html_lib
-import importlib
-import os
-import re
-import shlex
-import shutil
-import subprocess
-import sys
 import tempfile
-import textwrap
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
-from dataclasses import dataclass
-from html.parser import HTMLParser
 from pathlib import Path
-from typing import Protocol
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
 
 from mianotes_web_service.services.mia import (
     MiaUnavailable,
     markitdown_llm_options,
     markitdown_openai_image_options,
 )
-
-
-class ParserError(RuntimeError):
-    pass
-
-
-class ParserUnavailable(ParserError):
-    pass
-
-
-@dataclass(frozen=True)
-class ParsedDocument:
-    text: str
-    parser: str
-    source_path: Path
-
-
-class DocumentParser(Protocol):
-    name: str
-
-    def parse(self, path: Path) -> ParsedDocument:
-        pass
-
-
-DEFAULT_BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+from mianotes_web_service.services.parser_audio import (
+    AUDIO_CHUNK_SECONDS as AUDIO_CHUNK_SECONDS,
 )
-YOUTUBE_HOSTS = {
-    "m.youtube.com",
-    "music.youtube.com",
-    "www.youtube.com",
-    "youtube.com",
-    "youtu.be",
-}
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-AUDIO_EXTENSIONS = {".aac", ".aiff", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".webm"}
-AUDIO_CHUNK_SECONDS = 300
-IMAGE_DESCRIPTION_HEADING = "# Description:"
-OCR_MIN_CHARACTERS = 20
-FENCED_CODE_BLOCK_PATTERN = re.compile(r"(```.*?```|~~~.*?~~~)", re.DOTALL)
-MARKITDOWN_OCR_BLOCK_PATTERN = re.compile(
-    r"\*?\[Image OCR\]\s*"
-    r"```(?:markdown|md|text)?\s*\n"
-    r"(?P<body>.*?)"
-    r"\n```\s*"
-    r"\[End OCR\]\*?",
-    re.IGNORECASE | re.DOTALL,
+from mianotes_web_service.services.parser_audio import (
+    AUDIO_EXTENSIONS as AUDIO_EXTENSIONS,
 )
-MARKITDOWN_OCR_MARKER_LINE_PATTERN = re.compile(
-    r"^\*?\[(?:Image OCR|End OCR)\]\*?\s*\n?",
-    re.IGNORECASE | re.MULTILINE,
+from mianotes_web_service.services.parser_audio import (
+    is_audio as _is_audio,
 )
-HTML_VOID_TAG_PATTERN = re.compile(
-    r"<(?P<tag>area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)"
-    r"(?P<attrs>\s[^<>]*?)?\s*/?>",
-    re.IGNORECASE,
+from mianotes_web_service.services.parser_audio import (
+    split_audio_to_low_quality_mp3_chunks as _split_audio_to_low_quality_mp3_chunks,
 )
+from mianotes_web_service.services.parser_audio import (
+    transcode_audio_to_low_quality_mp3 as _transcode_audio_to_low_quality_mp3,
+)
+from mianotes_web_service.services.parser_image import (
+    IMAGE_EXTENSIONS as IMAGE_EXTENSIONS,
+)
+from mianotes_web_service.services.parser_image import (
+    OCR_MIN_CHARACTERS as OCR_MIN_CHARACTERS,
+)
+from mianotes_web_service.services.parser_image import (
+    TESSERACT_CANDIDATES as TESSERACT_CANDIDATES,
+)
+from mianotes_web_service.services.parser_image import (
+    is_image as _is_image,
+)
+from mianotes_web_service.services.parser_image import (
+    tesseract_ocr as _tesseract_ocr,
+)
+from mianotes_web_service.services.parser_markdown import (
+    IMAGE_DESCRIPTION_HEADING as IMAGE_DESCRIPTION_HEADING,
+)
+from mianotes_web_service.services.parser_markdown import (
+    normalise_image_markdown as _normalise_image_markdown,
+)
+from mianotes_web_service.services.parser_markdown import (
+    normalise_parsed_markdown,
+)
+from mianotes_web_service.services.parser_markitdown import (
+    convert_with_markitdown as _convert_with_markitdown,
+)
+from mianotes_web_service.services.parser_runtime import (
+    emit_parser_text_update as _emit_parser_text_update,
+)
+from mianotes_web_service.services.parser_runtime import (
+    parser_job_logging as parser_job_logging,
+)
+from mianotes_web_service.services.parser_runtime import (
+    parser_text_updates as parser_text_updates,
+)
+from mianotes_web_service.services.parser_tools import (
+    AUDIO_TOOL_DIR_CANDIDATES as AUDIO_TOOL_DIR_CANDIDATES,
+)
+from mianotes_web_service.services.parser_tools import (
+    AUDIO_TOOL_NAMES as AUDIO_TOOL_NAMES,
+)
+from mianotes_web_service.services.parser_tools import (
+    AUDIO_TOOL_VERSION_ARGS as AUDIO_TOOL_VERSION_ARGS,
+)
+from mianotes_web_service.services.parser_tools import (
+    FFMPEG_CANDIDATES as FFMPEG_CANDIDATES,
+)
+from mianotes_web_service.services.parser_tools import (
+    YOUTUBE_DOWNLOADER_CANDIDATES as YOUTUBE_DOWNLOADER_CANDIDATES,
+)
+from mianotes_web_service.services.parser_tools import (
+    prefer_working_audio_tools as _prefer_working_audio_tools,
+)
+from mianotes_web_service.services.parser_types import (
+    DocumentParser,
+    ParsedDocument,
+    ParserError,
+)
+from mianotes_web_service.services.parser_types import (
+    ParserUnavailable as ParserUnavailable,
+)
+from mianotes_web_service.services.parser_url import (
+    DEFAULT_BROWSER_USER_AGENT,
+    fetch_url_to_html,
+)
+from mianotes_web_service.services.parser_url import (
+    YOUTUBE_HOSTS as YOUTUBE_HOSTS,
+)
+from mianotes_web_service.services.parser_url import (
+    extract_readable_html as _extract_readable_html,
+)
+from mianotes_web_service.services.parser_url import (
+    is_youtube_url as is_youtube_url,
+)
+from mianotes_web_service.services.parser_youtube import (
+    parse_youtube_audio_with_downloader,
+)
+from mianotes_web_service.services.parser_youtube import (
+    parse_youtube_url as _parse_youtube_url,
+)
+
 IMAGE_NEEDS_CLOUD_MESSAGE = (
     "Mia couldn’t read the text in this image.\n\n"
     "To help Mia read images, screenshots, and scanned documents, connect Mia to "
@@ -98,580 +120,6 @@ DOCUMENT_UNREADABLE_MESSAGE = (
     "Some files are saved as pictures instead of selectable text. To read files "
     "like this, connect Mia to a local or cloud AI model, then upload the file again."
 )
-TESSERACT_CANDIDATES = (
-    "/opt/homebrew/bin/tesseract",
-    "/usr/local/bin/tesseract",
-    "/usr/bin/tesseract",
-)
-FFMPEG_CANDIDATES = (
-    "ffmpeg",
-    "/opt/homebrew/bin/ffmpeg",
-    "/usr/local/bin/ffmpeg",
-    "/usr/bin/ffmpeg",
-)
-AUDIO_TOOL_NAMES = ("ffmpeg", "ffprobe", "flac", "metaflac")
-AUDIO_TOOL_DIR_CANDIDATES = ("/opt/homebrew/bin", "/usr/local/bin", "/usr/bin")
-AUDIO_TOOL_VERSION_ARGS = {
-    "ffmpeg": "-version",
-    "ffprobe": "-version",
-    "flac": "--version",
-    "metaflac": "--version",
-}
-YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
-ParserLogCallback = Callable[[str, str | None, str], None]
-ParserTextCallback = Callable[[str], None]
-_PARSER_LOGGER: ContextVar[ParserLogCallback | None] = ContextVar(
-    "mianotes_parser_logger",
-    default=None,
-)
-_PARSER_TEXT_CALLBACK: ContextVar[ParserTextCallback | None] = ContextVar(
-    "mianotes_parser_text_callback",
-    default=None,
-)
-
-
-@contextmanager
-def parser_job_logging(callback: ParserLogCallback) -> Iterator[None]:
-    token = _PARSER_LOGGER.set(callback)
-    try:
-        yield
-    finally:
-        _PARSER_LOGGER.reset(token)
-
-
-@contextmanager
-def parser_text_updates(callback: ParserTextCallback) -> Iterator[None]:
-    token = _PARSER_TEXT_CALLBACK.set(callback)
-    try:
-        yield
-    finally:
-        _PARSER_TEXT_CALLBACK.reset(token)
-
-
-def _log_parser_command(
-    command: str,
-    response: str | None = None,
-    *,
-    status: str = "info",
-) -> None:
-    callback = _PARSER_LOGGER.get()
-    if callback is None:
-        return
-    callback(command, response, status)
-
-
-def _emit_parser_text_update(text: str) -> None:
-    callback = _PARSER_TEXT_CALLBACK.get()
-    if callback is None:
-        return
-    callback(text)
-
-
-def _subprocess_response(completed: subprocess.CompletedProcess[str]) -> str:
-    parts = [f"exit {completed.returncode}"]
-    stdout = (getattr(completed, "stdout", "") or "").strip()
-    stderr = (getattr(completed, "stderr", "") or "").strip()
-    if stdout:
-        parts.append(f"stdout:\n{stdout}")
-    if stderr:
-        parts.append(f"stderr:\n{stderr}")
-    return "\n\n".join(parts)
-
-
-def _markitdown_class():
-    try:
-        module = importlib.import_module("markitdown")
-    except ModuleNotFoundError as exc:
-        raise ParserUnavailable("markitdown is not installed") from exc
-    return module.MarkItDown
-
-
-def _trafilatura_module():
-    try:
-        return importlib.import_module("trafilatura")
-    except ModuleNotFoundError:
-        return None
-
-
-def _is_image(path: Path) -> bool:
-    return path.suffix.lower() in IMAGE_EXTENSIONS
-
-
-def _is_audio(path: Path) -> bool:
-    return path.suffix.lower() in AUDIO_EXTENSIONS
-
-
-def _normalise_image_markdown(text: str) -> str | None:
-    if IMAGE_DESCRIPTION_HEADING not in text:
-        return None
-    description = text.split(IMAGE_DESCRIPTION_HEADING, 1)[1].strip()
-    description = _strip_outer_markdown_fence(description)
-    return description or None
-
-
-def _strip_outer_markdown_fence(text: str) -> str:
-    match = re.fullmatch(
-        r"```(?:markdown|md|text)?\s*\n(?P<body>.*?)\n```",
-        text.strip(),
-        re.DOTALL,
-    )
-    if match is None:
-        return text.strip()
-    return match.group("body").strip()
-
-
-def _normalise_ocr_text(text: str) -> str:
-    text = _strip_outer_markdown_fence(text)
-    text = textwrap.dedent(text).strip()
-    lines = [line.rstrip() for line in text.splitlines()]
-    if not lines:
-        return ""
-
-    indented_lines = [line for line in lines if line.startswith(("    ", "\t"))]
-    non_empty_lines = [line for line in lines if line.strip()]
-    if non_empty_lines and len(indented_lines) / len(non_empty_lines) >= 0.5:
-        lines = [line.lstrip() if line.strip() else line for line in lines]
-
-    return "\n".join(lines).strip()
-
-
-def _normalise_document_ocr_markdown(text: str) -> str:
-    def replace_block(match: re.Match[str]) -> str:
-        return f"\n\n{_strip_outer_markdown_fence(match.group('body'))}\n\n"
-
-    cleaned, replacements = MARKITDOWN_OCR_BLOCK_PATTERN.subn(replace_block, text)
-    cleaned, marker_replacements = MARKITDOWN_OCR_MARKER_LINE_PATTERN.subn("", cleaned)
-    if replacements == 0 and marker_replacements == 0:
-        return text
-
-    return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
-
-
-def _normalise_html_void_tags(text: str) -> str:
-    def replace_tag(match: re.Match[str]) -> str:
-        attrs = (match.group("attrs") or "").rstrip()
-        return f"<{match.group('tag').lower()}{attrs} />"
-
-    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
-    for index, part in enumerate(parts):
-        if index % 2 == 0:
-            parts[index] = HTML_VOID_TAG_PATTERN.sub(replace_tag, part)
-    return "".join(parts)
-
-
-def normalise_parsed_markdown(text: str) -> str:
-    return _normalise_html_void_tags(_normalise_document_ocr_markdown(text))
-
-
-def _convert_with_markitdown(path: Path, **options: object) -> str:
-    command = f"MarkItDown.convert({path.name})"
-    if options:
-        command = f"{command} with plugins/options"
-    _log_parser_command(command, "started", status="running")
-    converter = _markitdown_class()(**options)
-    try:
-        result = converter.convert(str(path))
-    except Exception as exc:
-        _log_parser_command(command, str(exc), status="failed")
-        raise ParserError(str(exc)) from exc
-    _log_parser_command(
-        command,
-        f"converted {len(result.text_content)} characters",
-        status="succeeded",
-    )
-    return result.text_content
-
-
-def _convert_url_with_markitdown(url: str) -> str:
-    command = f"MarkItDown.convert({url})"
-    _log_parser_command(command, "started", status="running")
-    converter = _markitdown_class()()
-    try:
-        result = converter.convert(url)
-    except Exception as exc:
-        _log_parser_command(command, str(exc), status="failed")
-        raise ParserError(str(exc)) from exc
-    _log_parser_command(
-        command,
-        f"converted {len(result.text_content)} characters",
-        status="succeeded",
-    )
-    return result.text_content
-
-
-def _executable_version_works(path: str, *, version_arg: str = "-version") -> bool:
-    command_parts = [path, version_arg]
-    command = shlex.join(command_parts)
-    try:
-        completed = subprocess.run(
-            command_parts,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError, TimeoutError) as exc:
-        _log_parser_command(command, str(exc), status="failed")
-        return False
-    if completed.returncode == 0:
-        first_line = (completed.stdout or "").splitlines()[0:1]
-        _log_parser_command(command, first_line[0] if first_line else "ok")
-        return True
-    _log_parser_command(command, _subprocess_response(completed), status="failed")
-    return False
-
-
-def _working_audio_tool_dir() -> str | None:
-    for candidate_dir in AUDIO_TOOL_DIR_CANDIDATES:
-        tool_paths = [Path(candidate_dir) / tool for tool in AUDIO_TOOL_NAMES]
-        if not all(path.exists() for path in tool_paths):
-            continue
-        if all(
-            _executable_version_works(
-                str(path),
-                version_arg=AUDIO_TOOL_VERSION_ARGS.get(path.name, "-version"),
-            )
-            for path in tool_paths
-        ):
-            return candidate_dir
-    return None
-
-
-@contextmanager
-def _prefer_working_audio_tools() -> Iterator[None]:
-    original_path = os.environ.get("PATH", "")
-    tool_dir = _working_audio_tool_dir()
-    if tool_dir is None:
-        yield
-        return
-
-    path_parts = [part for part in original_path.split(os.pathsep) if part and part != tool_dir]
-    os.environ["PATH"] = os.pathsep.join([tool_dir, *path_parts])
-    _log_parser_command("set audio tool PATH", os.environ["PATH"])
-    try:
-        yield
-    finally:
-        os.environ["PATH"] = original_path
-
-
-def _ffmpeg_executable() -> str | None:
-    seen: set[str] = set()
-    for candidate in FFMPEG_CANDIDATES:
-        if "/" in candidate:
-            path_candidate = candidate if Path(candidate).exists() else None
-            _log_parser_command(f"check executable {candidate}", path_candidate or "not found")
-        else:
-            path_candidate = shutil.which(candidate)
-            _log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
-        if not path_candidate or path_candidate in seen:
-            continue
-        seen.add(path_candidate)
-        if _executable_version_works(path_candidate):
-            return path_candidate
-    return None
-
-
-def _youtube_downloader_executable() -> str | None:
-    for candidate in YOUTUBE_DOWNLOADER_CANDIDATES:
-        path_candidate = shutil.which(candidate)
-        _log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
-        if path_candidate:
-            return path_candidate
-
-        venv_candidate = Path(sys.executable).with_name(candidate)
-        if venv_candidate.exists():
-            return str(venv_candidate)
-    return None
-
-
-def _run_youtube_downloader(command_parts: list[str], *, timeout: int = 600) -> bool:
-    command = shlex.join(command_parts)
-    _log_parser_command(command, "started", status="running")
-    try:
-        completed = subprocess.run(
-            command_parts,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.SubprocessError, TimeoutError) as exc:
-        _log_parser_command(command, str(exc), status="failed")
-        return False
-
-    if completed.returncode != 0:
-        _log_parser_command(command, _subprocess_response(completed), status="failed")
-        return False
-
-    _log_parser_command(command, _subprocess_response(completed), status="succeeded")
-    return True
-
-
-def _transcode_audio_to_low_quality_mp3(source_path: Path, output_path: Path) -> Path | None:
-    executable = _ffmpeg_executable()
-    if executable is None:
-        return None
-
-    command_parts = [
-        executable,
-        "-y",
-        "-i",
-        str(source_path),
-        "-vn",
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        "-b:a",
-        "32k",
-        str(output_path),
-    ]
-    command = shlex.join(command_parts)
-    _log_parser_command(command, "started", status="running")
-    try:
-        completed = subprocess.run(
-            command_parts,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=300,
-        )
-    except (OSError, subprocess.SubprocessError, TimeoutError):
-        _log_parser_command(command, "command failed or timed out", status="failed")
-        return None
-
-    if completed.returncode != 0 or not output_path.is_file():
-        _log_parser_command(command, _subprocess_response(completed), status="failed")
-        return None
-
-    _log_parser_command(
-        command,
-        f"{_subprocess_response(completed)}\n\nwrote {output_path.name}",
-        status="succeeded",
-    )
-    return output_path
-
-
-def _split_audio_to_low_quality_mp3_chunks(
-    source_path: Path,
-    output_dir: Path,
-    *,
-    chunk_seconds: int = AUDIO_CHUNK_SECONDS,
-) -> list[Path] | None:
-    executable = _ffmpeg_executable()
-    if executable is None:
-        return None
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_pattern = output_dir / "chunk-%03d.mp3"
-    command_parts = [
-        executable,
-        "-y",
-        "-i",
-        str(source_path),
-        "-vn",
-        "-ac",
-        "1",
-        "-ar",
-        "16000",
-        "-b:a",
-        "32k",
-        "-f",
-        "segment",
-        "-segment_time",
-        str(chunk_seconds),
-        "-reset_timestamps",
-        "1",
-        str(output_pattern),
-    ]
-    command = shlex.join(command_parts)
-    _log_parser_command(command, "started", status="running")
-    try:
-        completed = subprocess.run(
-            command_parts,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=600,
-        )
-    except (OSError, subprocess.SubprocessError, TimeoutError):
-        _log_parser_command(command, "command failed or timed out", status="failed")
-        return None
-
-    chunks = sorted(output_dir.glob("chunk-*.mp3"))
-    if completed.returncode != 0 or not chunks:
-        _log_parser_command(command, _subprocess_response(completed), status="failed")
-        return None
-
-    _log_parser_command(
-        command,
-        f"{_subprocess_response(completed)}\n\nwrote {len(chunks)} chunks",
-        status="succeeded",
-    )
-    return chunks
-
-
-def _tesseract_executable() -> str | None:
-    candidates: list[str] = []
-    path_candidate = shutil.which("tesseract")
-    _log_parser_command("shutil.which('tesseract')", path_candidate or "not found")
-    if path_candidate:
-        candidates.append(path_candidate)
-    candidates.extend(TESSERACT_CANDIDATES)
-
-    seen: set[str] = set()
-    for candidate in candidates:
-        if candidate in seen or not Path(candidate).is_file():
-            continue
-        seen.add(candidate)
-        command = shlex.join([candidate, "--version"])
-        try:
-            completed = subprocess.run(
-                [candidate, "--version"],
-                capture_output=True,
-                check=False,
-                text=True,
-                timeout=10,
-            )
-        except (OSError, subprocess.SubprocessError, TimeoutError):
-            _log_parser_command(command, "could not run version check", status="failed")
-            continue
-        _log_parser_command(
-            command,
-            _subprocess_response(completed),
-            status="succeeded" if completed.returncode == 0 else "failed",
-        )
-        if completed.returncode == 0:
-            return candidate
-    _log_parser_command("find tesseract executable", "no working executable found", status="failed")
-    return None
-
-
-def _run_tesseract(executable: str, path: Path, *, psm: str) -> str | None:
-    command_parts = [executable, str(path), "stdout", "--psm", psm]
-    command = shlex.join(command_parts)
-    try:
-        completed = subprocess.run(
-            command_parts,
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=60,
-        )
-    except (OSError, subprocess.SubprocessError, TimeoutError):
-        _log_parser_command(command, "command failed or timed out", status="failed")
-        return None
-
-    if completed.returncode != 0:
-        _log_parser_command(command, _subprocess_response(completed), status="failed")
-        return None
-
-    text = _normalise_ocr_text(re.sub(r"\n{3,}", "\n\n", completed.stdout))
-    if len(text) < OCR_MIN_CHARACTERS:
-        _log_parser_command(
-            command,
-            f"{_subprocess_response(completed)}\n\nignored: only {len(text)} readable characters",
-            status="failed",
-        )
-        return None
-    _log_parser_command(
-        command,
-        f"{_subprocess_response(completed)}\n\naccepted: {len(text)} readable characters",
-        status="succeeded",
-    )
-    return text
-
-
-def _preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | None:
-    command = f"Pillow preprocess image {source_path.name}"
-    try:
-        from PIL import Image, ImageEnhance, ImageOps
-    except ModuleNotFoundError:
-        _log_parser_command(command, "Pillow is not installed", status="failed")
-        return None
-
-    try:
-        with Image.open(source_path) as image:
-            image = ImageOps.grayscale(image)
-            image = ImageOps.autocontrast(image)
-            image = ImageEnhance.Sharpness(image).enhance(1.8)
-            if max(image.size) < 2400:
-                image = image.resize((image.width * 2, image.height * 2))
-            image.save(output_path)
-    except OSError:
-        _log_parser_command(command, "could not preprocess image", status="failed")
-        return None
-    _log_parser_command(command, f"wrote {output_path.name}", status="succeeded")
-    return output_path
-
-
-def _tesseract_ocr(path: Path) -> str | None:
-    executable = _tesseract_executable()
-    if executable is None:
-        return None
-
-    attempts: list[str] = []
-    for psm in ("6", "11"):
-        text = _run_tesseract(executable, path, psm=psm)
-        if text:
-            attempts.append(text)
-
-    with tempfile.TemporaryDirectory(prefix="mianotes-ocr-") as temp_dir:
-        processed_path = _preprocess_image_for_ocr(path, Path(temp_dir) / "image.png")
-        if processed_path is not None:
-            for psm in ("6", "11"):
-                text = _run_tesseract(executable, processed_path, psm=psm)
-                if text:
-                    attempts.append(text)
-
-    if not attempts:
-        return None
-    return max(attempts, key=len)
-
-
-class _HTMLTextExtractor(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self.parts: list[str] = []
-
-    def handle_data(self, data: str) -> None:
-        self.parts.append(data)
-
-    @property
-    def text(self) -> str:
-        return " ".join(self.parts)
-
-
-def _visible_text_length(html: str) -> int:
-    parser = _HTMLTextExtractor()
-    parser.feed(html)
-    return len(re.sub(r"\s+", " ", parser.text).strip())
-
-
-def _extract_readable_html(html_path: Path, *, url: str | None = None) -> str | None:
-    trafilatura = _trafilatura_module()
-    if trafilatura is None:
-        return None
-
-    html = html_path.read_text(encoding="utf-8", errors="ignore")
-    try:
-        extracted = trafilatura.extract(
-            html,
-            url=url,
-            output_format="html",
-            include_comments=False,
-            include_images=True,
-            include_links=True,
-            include_tables=True,
-        )
-    except TypeError:
-        extracted = trafilatura.extract(html, url=url, output_format="html")
-    except Exception:
-        return None
-
-    if not extracted or _visible_text_length(extracted) < 80:
-        return None
-    return f"<!doctype html>\n<html><body>\n{extracted}\n</body></html>\n"
 
 
 class MarkItDownParser:
@@ -834,199 +282,12 @@ def parse_html_document(path: Path, *, url: str | None = None) -> ParsedDocument
         )
 
 
-def fetch_url_to_html(
-    url: str,
-    output_path: Path,
-    *,
-    user_agent: str = DEFAULT_BROWSER_USER_AGENT,
-    timeout: int = 30,
-) -> Path:
-    request = Request(url, headers={"User-Agent": user_agent})
-    command = f"GET {url}"
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            content = response.read()
-    except (HTTPError, URLError, TimeoutError) as exc:
-        _log_parser_command(command, str(exc), status="failed")
-        raise ParserError(f"Could not fetch URL: {exc}") from exc
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(content)
-    _log_parser_command(
-        command,
-        f"saved {len(content)} bytes to {output_path.name}",
-        status="succeeded",
-    )
-    return output_path
-
-
-def is_youtube_url(url: str) -> bool:
-    try:
-        parsed = urlparse(url)
-    except ValueError:
-        return False
-    if parsed.scheme not in {"http", "https"}:
-        return False
-
-    host = (parsed.hostname or "").lower()
-    if host not in YOUTUBE_HOSTS:
-        return False
-    if host == "youtu.be":
-        return bool(parsed.path.strip("/"))
-    if parsed.path == "/watch":
-        return bool(parse_qs(parsed.query).get("v", [""])[0])
-    return parsed.path.startswith(("/shorts/", "/embed/", "/live/"))
-
-
-def _caption_file_to_text(path: Path) -> str:
-    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
-    text_lines: list[str] = []
-    previous = ""
-    for line in lines:
-        clean = line.strip()
-        if not clean:
-            continue
-        if clean.upper() == "WEBVTT" or clean.startswith(("Kind:", "Language:")):
-            continue
-        if "-->" in clean:
-            continue
-        if clean.isdigit():
-            continue
-        clean = re.sub(r"<[^>]+>", "", clean)
-        clean = html_lib.unescape(clean).strip()
-        if not clean or clean == previous:
-            continue
-        text_lines.append(clean)
-        previous = clean
-    return "\n".join(text_lines).strip()
-
-
-def _parse_youtube_captions_with_downloader(url: str, work_dir: Path) -> ParsedDocument | None:
-    executable = _youtube_downloader_executable()
-    if executable is None:
-        return None
-
-    captions_dir = work_dir / "captions"
-    captions_dir.mkdir(parents=True, exist_ok=True)
-    output_template = captions_dir / "%(id)s.%(ext)s"
-    command_parts = [
-        executable,
-        "--no-playlist",
-        "--skip-download",
-        "--write-sub",
-        "--write-auto-sub",
-        "--sub-lang",
-        "en",
-        "--sub-format",
-        "vtt",
-        "-o",
-        str(output_template),
-        url,
-    ]
-    if not _run_youtube_downloader(command_parts, timeout=300):
-        return None
-
-    caption_paths = sorted([*captions_dir.glob("*.vtt"), *captions_dir.glob("*.srt")])
-    for caption_path in caption_paths:
-        text = _caption_file_to_text(caption_path)
-        if text:
-            return ParsedDocument(
-                text=f"## YouTube transcript\n\n{text}",
-                parser="yt-dlp+captions",
-                source_path=caption_path,
-            )
-    _log_parser_command("parse yt-dlp captions", "no readable captions found", status="failed")
-    return None
-
-
-def _download_youtube_audio(url: str, work_dir: Path) -> Path | None:
-    executable = _youtube_downloader_executable()
-    if executable is None:
-        return None
-
-    audio_dir = work_dir / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    output_template = audio_dir / "%(id)s.%(ext)s"
-    command_parts = [
-        executable,
-        "--no-playlist",
-        "--max-filesize",
-        "200m",
-        "-f",
-        "bestaudio/best",
-        "-o",
-        str(output_template),
-        url,
-    ]
-    if not _run_youtube_downloader(command_parts, timeout=900):
-        return None
-
-    audio_paths = sorted(
-        path
-        for path in audio_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in AUDIO_EXTENSIONS
-    )
-    if not audio_paths:
-        _log_parser_command("find yt-dlp audio", "no supported audio file found", status="failed")
-        return None
-    return audio_paths[0]
-
-
 def _parse_youtube_audio_with_downloader(url: str, work_dir: Path) -> ParsedDocument | None:
-    audio_path = _download_youtube_audio(url, work_dir)
-    if audio_path is None:
-        return None
-    parsed = parse_document(audio_path)
-    if not parsed.text.strip():
-        return None
-    return ParsedDocument(
-        text=parsed.text,
-        parser=f"{parsed.parser}+yt-dlp-audio",
-        source_path=audio_path,
-    )
+    return parse_youtube_audio_with_downloader(url, work_dir, parse_document=parse_document)
 
 
 def parse_youtube_url(url: str) -> ParsedDocument:
-    if not is_youtube_url(url):
-        raise ParserError("URL is not a supported YouTube video URL.")
-    errors: list[str] = []
-    try:
-        text = normalise_parsed_markdown(_convert_url_with_markitdown(url))
-        if text.strip() and "### Transcript" in text:
-            return ParsedDocument(
-                text=text,
-                parser="markitdown+youtube",
-                source_path=Path(url),
-            )
-        errors.append("MarkItDown did not return a YouTube transcript.")
-    except ParserError as exc:
-        errors.append(str(exc))
-
-    with tempfile.TemporaryDirectory(prefix="mianotes-youtube-") as temp_dir:
-        work_dir = Path(temp_dir)
-        parsed = _parse_youtube_captions_with_downloader(url, work_dir)
-        if parsed is not None:
-            return ParsedDocument(
-                text=parsed.text,
-                parser=parsed.parser,
-                source_path=Path(url),
-            )
-        parsed = _parse_youtube_audio_with_downloader(url, work_dir)
-        if parsed is not None:
-            return ParsedDocument(
-                text=parsed.text,
-                parser=parsed.parser,
-                source_path=Path(url),
-            )
-
-    detail = " ".join(errors)
-    raise ParserError(
-        (
-            "Could not extract a YouTube transcript. YouTube may be rate-limiting "
-            "transcript requests, this video may not have captions available, or yt-dlp "
-            "could not download a fallback."
-        )
-        + (f" {detail}" if detail else "")
-    )
+    return _parse_youtube_url(url, parse_document=parse_document)
 
 
 def parse_url(
