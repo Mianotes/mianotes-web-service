@@ -26,6 +26,7 @@ from mianotes_web_service.api.note_access import (
 )
 from mianotes_web_service.db.models import (
     Folder,
+    MiaJob,
     Note,
     NoteStar,
 )
@@ -181,6 +182,7 @@ def update_note(
 
     next_title = payload.title or note.title
     note_path = note_file_path(note)
+    is_manual_content_edit = payload.text is not None or payload.title is not None
     if payload.text is not None:
         note_path.write_text(
             render_markdown_note(title=next_title, text=payload.text),
@@ -194,6 +196,11 @@ def update_note(
             encoding="utf-8",
         )
         note.revision_number += 1
+    if note.status == "failed" and is_manual_content_edit:
+        note.status = "ready"
+        session.execute(
+            delete(MiaJob).where(MiaJob.note_id == note.id, MiaJob.status == "failed")
+        )
     note.title = next_title
     if payload.is_published is not None:
         note.is_published = payload.is_published

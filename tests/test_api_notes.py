@@ -9,8 +9,9 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base
+from mianotes_web_service.db.models import Base, MiaJob, Note
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services import job_runner
 
 
 @pytest.fixture
@@ -34,6 +35,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.state.testing_session_factory = testing_session
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -242,6 +244,57 @@ def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path
     new_folder_notes = client.get("/api/notes", params={"folder_id": archive["id"]})
     assert old_folder_notes.json() == []
     assert new_folder_notes.json()[0]["id"] == note["id"]
+
+
+def test_updating_failed_note_clears_failed_status_and_console_job(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "failed-edit@example.com",
+            "name": "Failed Edit User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Links"}).json()
+
+    response = client.post(
+        "/api/notes/from-url",
+        json={
+            "folder_id": folder["id"],
+            "url": "https://www.youtube.com/watch?v=abc123",
+        },
+    )
+    assert response.status_code == 201
+    note = response.json()
+    job_id = note["job_id"]
+
+    with client.app.state.testing_session_factory() as session:
+        db_note = session.get(Note, note["id"])
+        db_job = session.get(MiaJob, job_id)
+        assert db_note is not None
+        assert db_job is not None
+        db_note.status = "failed"
+        db_job.status = "failed"
+        db_job.error = job_runner.NO_YOUTUBE_SPEECH_MESSAGE
+        session.commit()
+
+    failed_note = client.get(f"/api/notes/{note['id']}").json()
+    assert failed_note["status"] == "failed"
+    assert failed_note["job_status"] == "failed"
+
+    update_response = client.patch(
+        f"/api/notes/{note['id']}",
+        json={"text": "Manual notes about the chess position."},
+    )
+
+    assert update_response.status_code == 200
+    updated_note = update_response.json()
+    assert updated_note["status"] == "ready"
+    assert updated_note["job_id"] is None
+    assert updated_note["job_status"] is None
+    assert "Manual notes about the chess position." in updated_note["text"]
+    assert client.get(f"/api/jobs/{job_id}").status_code == 404
 
 
 def test_create_empty_text_note_does_not_create_source_file(

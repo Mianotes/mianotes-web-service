@@ -337,6 +337,52 @@ def test_job_runner_links_failed_url_notes_to_console_job(
         assert job.error == "link parser exploded"
 
 
+def test_job_runner_shows_safe_failed_url_reason_in_note(
+    tmp_path: Path,
+    monkeypatch,
+):
+    testing_session = _session_factory()
+    source_path = tmp_path / "data" / "folder" / "sources" / "note1234" / "page.html"
+    note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
+
+    def fake_parse_youtube_url(url: str) -> ParsedDocument:
+        raise RuntimeError(job_runner.NO_YOUTUBE_SPEECH_MESSAGE)
+
+    monkeypatch.setattr(job_runner, "parse_youtube_url", fake_parse_youtube_url)
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_url",
+            note_id=note_id,
+            input_payload={
+                "source_file_id": source_file_id,
+                "url": "https://www.youtube.com/watch?v=abc123",
+            },
+        )
+        session.commit()
+        job_id = job.id
+
+    InProcessJobRunner(testing_session).run(job_id)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        text = Path(note.note_path).read_text(encoding="utf-8")
+        assert "Mia couldn’t process this link." in text
+        assert job_runner.NO_YOUTUBE_SPEECH_MESSAGE in text
+        assert (
+            "The link has been saved, but Mia could not turn it into a note this time."
+            not in text
+        )
+        assert f"[Console](/jobs?job={job_id}) screen" in text
+        assert job.status == "failed"
+        assert job.error == job_runner.NO_YOUTUBE_SPEECH_MESSAGE
+
+
 def test_job_runner_marks_job_failed_when_finalization_crashes(
     tmp_path: Path,
     monkeypatch,

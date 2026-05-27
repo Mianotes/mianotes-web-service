@@ -11,6 +11,7 @@ from mianotes_web_service.services.jobs import (
     mark_job_running,
     mark_job_succeeded,
 )
+from mianotes_web_service.services.parser_youtube import NO_YOUTUBE_SPEECH_MESSAGE
 from mianotes_web_service.services.parsing import (
     fetch_url_to_html,
     is_youtube_url,
@@ -33,6 +34,12 @@ FAILED_LINK_MESSAGE = (
     "The link has been saved, but Mia could not turn it into a note this time. "
     "You can check the {console_link} screen for the technical details."
 )
+FAILED_LINK_WITH_REASON_MESSAGE = (
+    "Mia couldn’t process this link.\n\n"
+    "{reason}\n\n"
+    "You can check the {console_link} screen for the technical details."
+)
+USER_SAFE_FAILURE_REASONS = frozenset({NO_YOUTUBE_SPEECH_MESSAGE})
 INTERRUPTED_JOB_MESSAGE = (
     "The service stopped before this job finished. Please upload the file again."
 )
@@ -80,7 +87,7 @@ class InProcessJobRunner:
             session.rollback()
             failed_job = session.get(MiaJob, job_id)
             if failed_job is not None:
-                _mark_note_failed(failed_job)
+                _mark_note_failed(failed_job, failure_reason=str(exc))
                 append_job_log(
                     failed_job,
                     command=f"finish {failed_job.job_type}",
@@ -200,13 +207,23 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
     }
 
 
-def _mark_note_failed(job: MiaJob) -> None:
+def _mark_note_failed(job: MiaJob, *, failure_reason: str | None = None) -> None:
     if job.note is not None and job.job_type in {"parse_file", "parse_url"}:
         job.note.status = "failed"
-        message_template = (
-            FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
-        )
-        message = message_template.format(console_link=f"[Console](/jobs?job={job.id})")
+        console_link = f"[Console](/jobs?job={job.id})"
+        if (
+            job.job_type == "parse_url"
+            and failure_reason in USER_SAFE_FAILURE_REASONS
+        ):
+            message = FAILED_LINK_WITH_REASON_MESSAGE.format(
+                console_link=console_link,
+                reason=failure_reason,
+            )
+        else:
+            message_template = (
+                FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
+            )
+            message = message_template.format(console_link=console_link)
         note_file_path(job.note).write_text(
             render_markdown_note(title=job.note.title, text=message),
             encoding="utf-8",
