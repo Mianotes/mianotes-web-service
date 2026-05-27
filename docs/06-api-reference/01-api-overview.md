@@ -16,7 +16,8 @@ Protected endpoints accept one of:
 
 - browser session cookie created by the auth flow;
 - service-wide API key configured with `MIANOTES_API_KEY`;
-- scoped per-user API token.
+- scoped per-user API token;
+- short-lived agent session token returned by `POST /api/auth/agent-session`.
 
 Bearer token shape:
 
@@ -25,6 +26,17 @@ Authorization: Bearer mia_<token>
 ```
 
 The service-wide bearer token acts as the first admin user in the current folder. Scoped bearer tokens must include the required scope or `admin`.
+
+Agent clients should exchange their API key for a short-lived agent session and
+send a client name for attribution:
+
+```http
+POST /api/auth/agent-session
+Authorization: Bearer mia_<token>
+X-Mianotes-Client: Codex
+```
+
+The returned session token is also sent as `Authorization: Bearer <token>`.
 
 ## Common errors
 

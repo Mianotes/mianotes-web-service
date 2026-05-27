@@ -163,6 +163,74 @@ def test_admin_api_key_creation_normalizes_localhost_api_url(client: TestClient)
     assert "localhost:8200" not in env_contents
 
 
+def test_agent_session_exchanges_service_api_key_for_client_token(client: TestClient):
+    _join_admin(client)
+    created = client.post("/api/settings/api-key", json={})
+    raw_token = created.json()["token"]
+
+    exchanged = client.post(
+        "/api/auth/agent-session",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+            "X-Mianotes-Client": "Codex",
+        },
+    )
+
+    assert exchanged.status_code == 201
+    body = exchanged.json()
+    assert body["client"] == "Codex"
+    assert body["token_type"] == "bearer"
+    assert body["scopes"] == ["admin"]
+    assert body["token"] != raw_token
+    assert raw_token not in body["token"]
+
+    agent_client = TestClient(client.app)
+    response = agent_client.get("/api/users", headers={"Authorization": f"Bearer {body['token']}"})
+
+    assert response.status_code == 200
+
+
+def test_agent_session_requires_client_header(client: TestClient):
+    _join_admin(client)
+    created = client.post("/api/settings/api-key", json={})
+    raw_token = created.json()["token"]
+
+    exchanged = client.post(
+        "/api/auth/agent-session",
+        headers={"Authorization": f"Bearer {raw_token}"},
+    )
+
+    assert exchanged.status_code == 422
+    assert exchanged.json()["detail"] == "X-Mianotes-Client is required"
+
+
+def test_agent_session_uses_scoped_token_and_revocation(client: TestClient):
+    _join_admin(client)
+    created = client.post(
+        "/api/tokens",
+        json={"name": "Claude", "scopes": ["folders:read"]},
+    )
+    raw_token = created.json()["token"]
+
+    exchanged = client.post(
+        "/api/auth/agent-session",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+            "X-Mianotes-Client": "Claude",
+        },
+    )
+    assert exchanged.status_code == 201
+    session_token = exchanged.json()["token"]
+
+    agent_client = TestClient(client.app)
+    headers = {"Authorization": f"Bearer {session_token}"}
+    assert agent_client.get("/api/folders", headers=headers).status_code == 200
+    assert agent_client.get("/api/users", headers=headers).status_code == 403
+
+    assert client.delete(f"/api/tokens/{created.json()['id']}").status_code == 204
+    assert agent_client.get("/api/folders", headers=headers).status_code == 401
+
+
 def test_admin_can_update_workspace_share_address(client: TestClient):
     _join_admin(client)
 

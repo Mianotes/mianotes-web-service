@@ -37,9 +37,12 @@ def test_mcp_stdio_main_handles_initialize(monkeypatch):
 
 
 def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
-    seen = {}
+    seen = []
 
     class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
         def __enter__(self):
             return self
 
@@ -47,18 +50,27 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
             return None
 
         def read(self):
-            return json.dumps([{"id": "folder-1", "name": "Demo"}]).encode("utf-8")
+            return json.dumps(self.payload).encode("utf-8")
 
     def fake_urlopen(request, timeout: int):
-        seen["url"] = request.full_url
-        seen["method"] = request.get_method()
-        seen["timeout"] = timeout
-        seen["authorization"] = request.get_header("Authorization")
-        return FakeResponse()
+        seen.append(
+            {
+                "url": request.full_url,
+                "method": request.get_method(),
+                "timeout": timeout,
+                "authorization": request.get_header("Authorization"),
+                "client": request.get_header("X-mianotes-client"),
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        return FakeResponse([{"id": "folder-1", "name": "Demo"}])
 
     monkeypatch.setenv("MIANOTES_API_URL", "http://127.0.0.1:8200/")
     monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
+    monkeypatch.setenv("MIANOTES_CLIENT_NAME", "Codex")
     monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
     response = handle_request(
         {
@@ -77,12 +89,22 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
     assert json.loads(response["result"]["content"][0]["text"]) == [
         {"id": "folder-1", "name": "Demo"}
     ]
-    assert seen == {
-        "url": "http://127.0.0.1:8200/api/folders?include_archived=True",
-        "method": "GET",
-        "timeout": 30,
-        "authorization": "Bearer mia_test_token",
-    }
+    assert seen == [
+        {
+            "url": "http://127.0.0.1:8200/api/auth/agent-session",
+            "method": "POST",
+            "timeout": 30,
+            "authorization": "Bearer mia_test_token",
+            "client": "Codex",
+        },
+        {
+            "url": "http://127.0.0.1:8200/api/folders?include_archived=True",
+            "method": "GET",
+            "timeout": 30,
+            "authorization": "Bearer agent-session-token",
+            "client": None,
+        },
+    ]
 
 
 def test_mcp_tool_call_reports_missing_api_key(monkeypatch):

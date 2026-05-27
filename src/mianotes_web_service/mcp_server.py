@@ -13,6 +13,7 @@ from mianotes_web_service import __version__
 JsonObject = dict[str, Any]
 
 DEFAULT_API_URL = "http://127.0.0.1:8200"
+_AGENT_SESSION_TOKEN: str | None = None
 
 
 TOOL_DEFINITIONS: list[JsonObject] = [
@@ -137,11 +138,40 @@ def _api_url() -> str:
     return os.environ.get("MIANOTES_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
-def _api_token() -> str:
+def _raw_api_token() -> str:
     token = os.environ.get("MIANOTES_API_KEY") or os.environ.get("MIANOTES_API_TOKEN")
     if not token:
         raise RuntimeError("MIANOTES_API_KEY is required")
     return token
+
+
+def _client_name() -> str:
+    return os.environ.get("MIANOTES_CLIENT_NAME") or os.environ.get("MIANOTES_CLIENT") or "MCP"
+
+
+def _api_token() -> str:
+    global _AGENT_SESSION_TOKEN
+    if _AGENT_SESSION_TOKEN:
+        return _AGENT_SESSION_TOKEN
+
+    request = Request(
+        f"{_api_url()}/api/auth/agent-session",
+        data=b"{}",
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {_raw_api_token()}",
+            "Content-Type": "application/json",
+            "X-Mianotes-Client": _client_name(),
+        },
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8")
+        raise RuntimeError(f"Mianotes API returned {exc.code}: {detail}") from exc
+    _AGENT_SESSION_TOKEN = str(payload["token"])
+    return _AGENT_SESSION_TOKEN
 
 
 def _request(

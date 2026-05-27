@@ -93,6 +93,47 @@ curl -sS \
   "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/auth/session"
 ```
 
+## Create agent session
+
+```text
+POST /api/auth/agent-session
+```
+
+Authentication: bearer API key or scoped API token.
+
+Required headers:
+
+```http
+Authorization: Bearer <MIANOTES_API_KEY>
+X-Mianotes-Client: Codex
+```
+
+Mianotes validates the bearer token, maps `X-Mianotes-Client` into a
+short-lived signed session token, and returns that token for follow-up requests.
+The raw API key is not embedded in the session token.
+
+Response:
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "client": "Codex",
+  "expires_at": "2026-05-27T12:00:00Z",
+  "user": {
+    "id": "c5ddebcc-e434-4e1a-bc8a-48263eb0095d",
+    "email": "matt@example.com",
+    "name": "Matt",
+    "username": "matt",
+    "phone": null,
+    "role": null,
+    "photo_url": null,
+    "is_admin": true
+  },
+  "scopes": ["admin"]
+}
+```
+
 ## Logout
 
 ```text

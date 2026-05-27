@@ -14,6 +14,7 @@ Prefer Mianotes MCP tools when available. If MCP tools are not available, use th
 - Default API URL: `http://127.0.0.1:8200`
 - Override with `MIANOTES_API_URL`.
 - Authenticate with `MIANOTES_API_KEY`; fall back to `MIANOTES_API_TOKEN` only for older installs.
+- For REST calls, first exchange the API key for an agent session with `X-Mianotes-Client: Codex`, then use the returned session token.
 - Before REST API calls, load the service `.env` if the variables are not already set and the current working directory is the Mianotes web service project root. Do not search unrelated personal folders or print the `.env` contents.
 - Never print, save, quote, log, or commit `MIANOTES_API_KEY`, `MIANOTES_API_TOKEN`, passwords, cookies, or other private credentials.
 
@@ -28,21 +29,31 @@ fi
 
 MIANOTES_API_URL="${MIANOTES_API_URL:-http://127.0.0.1:8200}"
 MIANOTES_AUTH_TOKEN="${MIANOTES_API_KEY:-${MIANOTES_API_TOKEN:-}}"
+MIANOTES_CLIENT_NAME="${MIANOTES_CLIENT_NAME:-Codex}"
+
+MIANOTES_SESSION_TOKEN="$(
+  curl -sS -X POST \
+    -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
+    -H "X-Mianotes-Client: ${MIANOTES_CLIENT_NAME}" \
+    "${MIANOTES_API_URL}/api/auth/agent-session" \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["token"])'
+)"
 ```
 
 REST call rules:
 
 1. Always use `MIANOTES_API_KEY` or `MIANOTES_API_TOKEN` from the environment; never ask the user to paste it unless no `.env` exists and no token variable is set.
-2. Never echo or display the token. It is okay to run `test -n "${MIANOTES_AUTH_TOKEN}"` but not `echo "${MIANOTES_AUTH_TOKEN}"`.
-3. If no token is set, say the Mianotes API key is missing and ask the user to add `MIANOTES_API_KEY` to the service `.env`.
-4. Check the API with `GET /api/health` before starting or restarting services. If `MIANOTES_API_URL` uses `localhost` and the check fails, retry once with `127.0.0.1`; if it uses `127.0.0.1` and the check fails, retry once with `localhost`.
-5. If the API is not listening, do not spend a long time rediscovering the app. Say Mia is not reachable at `MIANOTES_API_URL` and ask whether to start the service.
+2. Exchange the API key for an agent session with `POST /api/auth/agent-session` and `X-Mianotes-Client: Codex`; use the returned session token for follow-up calls.
+3. Never echo or display tokens. It is okay to run `test -n "${MIANOTES_AUTH_TOKEN}"` but not `echo "${MIANOTES_AUTH_TOKEN}"`.
+4. If no token is set, say the Mianotes API key is missing and ask the user to add `MIANOTES_API_KEY` to the service `.env`.
+5. Check the API with `GET /api/health` before starting or restarting services. If `MIANOTES_API_URL` uses `localhost` and the check fails, retry once with `127.0.0.1`; if it uses `127.0.0.1` and the check fails, retry once with `localhost`.
+6. If the API is not listening, do not spend a long time rediscovering the app. Say Mia is not reachable at `MIANOTES_API_URL` and ask whether to start the service.
 
 REST curl pattern:
 
 ```bash
 curl -sS \
-  -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
+  -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
   "${MIANOTES_API_URL}/api/search?q=settings&limit=10"
 ```
 
@@ -148,7 +159,7 @@ Example:
 
 ```bash
 curl -sS \
-  -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
+  -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
   "${MIANOTES_API_URL}/api/context?folder=Mianotes&title=Settings%20Page&limit=5"
 ```
 

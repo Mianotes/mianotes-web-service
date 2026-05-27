@@ -24,6 +24,7 @@ Agents need access to the API URL and token:
 ```env
 MIANOTES_API_URL=http://127.0.0.1:8200
 MIANOTES_API_KEY=mia_or_service_key_here
+MIANOTES_CLIENT_NAME=Codex
 ```
 
 If the agent starts from a different shell than the web service, make sure the agent environment contains these variables.
@@ -42,7 +43,9 @@ or:
 python -m mianotes_web_service.mcp_server
 ```
 
-The MCP server reads `MIANOTES_API_URL` and `MIANOTES_API_KEY`, then calls the REST API.
+The MCP server reads `MIANOTES_API_URL`, `MIANOTES_API_KEY`, and
+`MIANOTES_CLIENT_NAME`. It exchanges the API key for a short-lived agent session,
+then calls the REST API with that session token.
 
 ## REST-capable agents
 
@@ -51,8 +54,16 @@ Any agent that can make HTTP requests can use the REST API directly.
 Minimal search example:
 
 ```bash
+MIANOTES_SESSION_TOKEN="$(
+  curl -sS -X POST \
+    -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
+    -H "X-Mianotes-Client: ${MIANOTES_CLIENT_NAME:-Codex}" \
+    "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/auth/agent-session" \
+    | python3 -c 'import json, sys; print(json.load(sys.stdin)["token"])'
+)"
+
 curl -sS \
-  -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
+  -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
   "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/search?q=settings"
 ```
 
@@ -61,7 +72,7 @@ Minimal note creation example:
 ```bash
 curl -sS \
   -X POST \
-  -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
+  -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
     "folder_id": "<folder-id>",

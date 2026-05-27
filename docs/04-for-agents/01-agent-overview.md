@@ -48,9 +48,14 @@ The simplest trusted local setup uses the service-wide key:
 ```env
 MIANOTES_API_URL=http://127.0.0.1:8200
 MIANOTES_API_KEY=<create_api_key_in_settings>
+MIANOTES_CLIENT_NAME=Codex
 ```
 
 For narrower automations, create scoped per-user API tokens through `/api/tokens`.
+
+Agents should exchange the API key and client name for a short-lived agent
+session before making API calls. The session identifies the tool, such as
+`Codex`, `Claude`, `Cursor`, or `Slack`, without embedding the raw API key.
 
 ## Service-wide key vs scoped token
 

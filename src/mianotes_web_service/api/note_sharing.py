@@ -8,12 +8,12 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import ShareWriteUser
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_by_share_token,
     read_note_or_404,
 )
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import NoteRead
 from mianotes_web_service.services.note_responses import note_response

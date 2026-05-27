@@ -26,7 +26,9 @@ MIANOTES_API_URL=${MIANOTES_API_URL:-http://127.0.0.1:8200} \
 mianotes-mcp
 ```
 
-The MCP process needs `MIANOTES_API_KEY` in its environment.
+The MCP process needs `MIANOTES_API_KEY` in its environment. Set
+`MIANOTES_CLIENT_NAME` so Mianotes can attribute jobs and notes to the calling
+tool.
 
 ## Authentication
 
@@ -35,9 +37,22 @@ By default, MCP clients use the service-wide `MIANOTES_API_KEY`.
 ```env
 MIANOTES_API_URL=http://127.0.0.1:8200
 MIANOTES_API_KEY=mia_or_service_key_here
+MIANOTES_CLIENT_NAME=Codex
 ```
 
 `MIANOTES_API_TOKEN` is still accepted as a backwards-compatible alias.
+
+On startup, the MCP server exchanges `MIANOTES_API_KEY` and
+`MIANOTES_CLIENT_NAME` for a short-lived agent session:
+
+```http
+POST /api/auth/agent-session
+Authorization: Bearer <MIANOTES_API_KEY>
+X-Mianotes-Client: Codex
+```
+
+The MCP server then uses the returned session token for tool calls. The session
+token contains the client name and token reference, not the raw API key.
 
 Use scoped per-user API tokens when an agent should only read notes or work in a limited role.
 

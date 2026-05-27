@@ -5,17 +5,14 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
+from mianotes_web_service.api.dependencies import (
+    NotesReadUser,
+    SessionDep,
+    auth_context_from_bearer_token,
+)
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, SourceFile
-from mianotes_web_service.services.auth import (
-    SESSION_COOKIE_NAME,
-    decode_api_token_scopes,
-    read_api_token,
-    read_session_user,
-    sync_instance_api_token_public_key,
-    verify_instance_api_token,
-)
+from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 
 router = APIRouter(tags=["files"])
@@ -60,15 +57,11 @@ def _has_authenticated_file_access(request: Request, session: Session) -> bool:
     if raw_api_token is None:
         return False
 
-    api_token = read_api_token(session, raw_api_token)
-    if api_token is not None:
-        scopes = set(decode_api_token_scopes(api_token.scopes))
-        return "admin" in scopes or "notes:read" in scopes
-
-    settings = get_settings()
-    if settings.api_token:
-        sync_instance_api_token_public_key(session, settings.api_token)
-    return verify_instance_api_token(session, raw_api_token)
+    try:
+        context = auth_context_from_bearer_token(session, raw_api_token)
+    except HTTPException:
+        return False
+    return "admin" in context.scopes or "notes:read" in context.scopes
 
 
 def _published_markdown_response(file_path: str, session: Session) -> FileResponse:

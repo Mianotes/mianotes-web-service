@@ -15,13 +15,20 @@ MIANOTES_API_URL=http://127.0.0.1:8200
 MIANOTES_API_KEY=mia_paste_the_key_here
 ```
 
-Use that value as a bearer token:
+Use that value to create an agent session:
 
 ```bash
 curl -sS \
+  -X POST \
   -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
-  "${MIANOTES_API_URL}/api/auth/session"
+  -H "X-Mianotes-Client: Codex" \
+  "${MIANOTES_API_URL}/api/auth/agent-session"
 ```
+
+The response contains a short-lived bearer token. Use that session token for
+follow-up requests. Mianotes stores the client name from `X-Mianotes-Client`
+inside the signed token so jobs and notes can be attributed to the right tool.
+The raw API key is never embedded in the session token.
 
 ## How Mianotes stores the key
 
@@ -80,13 +87,18 @@ MIANOTES_API_URL=http://127.0.0.1:8200
 MIANOTES_API_KEY=mia_paste_the_key_here
 ```
 
-Then test it:
+Then create an agent session:
 
 ```bash
 curl -sS \
+  -X POST \
   -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
-  "${MIANOTES_API_URL}/api/auth/session"
+  -H "X-Mianotes-Client: Codex" \
+  "${MIANOTES_API_URL}/api/auth/agent-session"
 ```
+
+Use a client name that describes the tool, such as `Codex`, `Claude`, `Cursor`,
+or `Slack`.
 
 ## Get a key from the API
 
@@ -140,13 +152,15 @@ The response contains the raw key once:
 }
 ```
 
-Save it somewhere private, then use it as `MIANOTES_API_KEY` for clients:
+Save it somewhere private, then exchange it for a short-lived agent session:
 
 ```bash
 export MIANOTES_API_KEY="mia_generated_key_returned_once"
 curl -sS \
+  -X POST \
   -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
-  "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/folders"
+  -H "X-Mianotes-Client: Codex" \
+  "${MIANOTES_API_URL:-http://127.0.0.1:8200}/api/auth/agent-session"
 ```
 
 If you already have an admin bearer token, you can create a new service API key
@@ -165,16 +179,22 @@ curl -sS \
 const apiUrl = process.env.MIANOTES_API_URL ?? "http://127.0.0.1:8200";
 const apiKey = process.env.MIANOTES_API_KEY;
 
-const response = await fetch(`${apiUrl}/api/search?q=settings`, {
+const sessionResponse = await fetch(`${apiUrl}/api/auth/agent-session`, {
+  method: "POST",
   headers: {
     Authorization: `Bearer ${apiKey}`,
+    "X-Mianotes-Client": "Codex",
   },
 });
 
-if (!response.ok) {
-  throw new Error(`Mianotes API returned ${response.status}`);
+if (!sessionResponse.ok) {
+  throw new Error(`Mianotes API returned ${sessionResponse.status}`);
 }
 
+const { token } = await sessionResponse.json();
+const response = await fetch(`${apiUrl}/api/search?q=settings`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
 const results = await response.json();
 console.log(results);
 ```
@@ -182,6 +202,7 @@ console.log(results);
 ## Use the token from Python
 
 ```python
+import json
 import os
 import urllib.parse
 import urllib.request
@@ -191,11 +212,25 @@ api_key = os.environ["MIANOTES_API_KEY"]
 query = urllib.parse.urlencode({"q": "settings"})
 
 request = urllib.request.Request(
-    f"{api_url}/api/search?{query}",
-    headers={"Authorization": f"Bearer {api_key}"},
+    f"{api_url}/api/auth/agent-session",
+    data=b"{}",
+    method="POST",
+    headers={
+        "Authorization": f"Bearer {api_key}",
+        "X-Mianotes-Client": "Codex",
+        "Content-Type": "application/json",
+    },
 )
 
 with urllib.request.urlopen(request) as response:
+    session_token = json.loads(response.read().decode("utf-8"))["token"]
+
+search_request = urllib.request.Request(
+    f"{api_url}/api/search?{query}",
+    headers={"Authorization": f"Bearer {session_token}"},
+)
+
+with urllib.request.urlopen(search_request) as response:
     print(response.read().decode("utf-8"))
 ```
 

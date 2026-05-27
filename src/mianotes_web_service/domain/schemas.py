@@ -315,6 +315,15 @@ class ServiceApiKeyRead(BaseModel):
     api_url: str
 
 
+class AgentSessionRead(BaseModel):
+    token: str
+    token_type: str = "bearer"
+    client: str
+    expires_at: datetime
+    user: UserRead
+    scopes: list[str]
+
+
 class ShareSettingsRead(BaseModel):
     workspace_url: str | None = None
 

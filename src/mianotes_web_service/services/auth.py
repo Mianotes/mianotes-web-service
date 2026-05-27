@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
+import json
 import secrets
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
@@ -17,8 +19,10 @@ WORKSPACE_ACCESS_MODE_KEY = "workspace_access_mode"
 WORKSPACE_ACCESS_MODE_OPEN = "open"
 WORKSPACE_ACCESS_MODE_ADMIN_ONLY = "admin_only"
 INSTANCE_API_TOKEN_PUBLIC_KEY = "instance_api_token_public_key"
+AGENT_SESSION_SIGNING_KEY = "agent_session_signing_key"
 SESSION_COOKIE_NAME = "mianotes_session"
 SESSION_DAYS = 90
+AGENT_SESSION_HOURS = 12
 API_TOKEN_PREFIX = "mia"
 ALLOWED_API_TOKEN_SCOPES = frozenset(
     {
@@ -122,6 +126,104 @@ def create_session_token(session: Session, user: User) -> SessionToken:
     )
     session.add(token)
     return token
+
+
+def _base64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+
+def _base64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(f"{value}{padding}".encode("ascii"))
+
+
+def _agent_session_signing_key(session: Session, *, create: bool = False) -> str | None:
+    setting = session.get(AppSetting, AGENT_SESSION_SIGNING_KEY)
+    if setting is not None:
+        return setting.value
+    if not create:
+        return None
+    secret = secrets.token_urlsafe(48)
+    session.add(AppSetting(key=AGENT_SESSION_SIGNING_KEY, value=secret))
+    return secret
+
+
+def normalize_agent_client_name(client_name: str) -> str:
+    normalized = " ".join(client_name.strip().split())
+    if not normalized:
+        raise ValueError("X-Mianotes-Client is required")
+    if len(normalized) > 80:
+        raise ValueError("X-Mianotes-Client must be 80 characters or fewer")
+    if any(ord(character) < 32 for character in normalized):
+        raise ValueError("X-Mianotes-Client contains unsupported characters")
+    return normalized
+
+
+def create_agent_session_token(
+    session: Session,
+    *,
+    user: User,
+    client_name: str,
+    scopes: Iterable[str],
+    api_token_id: str | None = None,
+    instance_token_public_key: str | None = None,
+) -> tuple[str, datetime]:
+    signing_key = _agent_session_signing_key(session, create=True)
+    assert signing_key is not None
+    now = datetime.now(UTC)
+    expires_at = now + timedelta(hours=AGENT_SESSION_HOURS)
+    header = {"alg": "HS256", "typ": "JWT"}
+    payload = {
+        "iss": "mianotes",
+        "typ": "agent_session",
+        "sub": user.id,
+        "user_id": user.id,
+        "client": normalize_agent_client_name(client_name),
+        "scopes": normalize_api_token_scopes(scopes),
+        "api_token_id": api_token_id,
+        "instance_token_public_key": instance_token_public_key,
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+    }
+    encoded_header = _base64url_encode(
+        json.dumps(header, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    )
+    encoded_payload = _base64url_encode(
+        json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    )
+    signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
+    signature = hmac.new(signing_key.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    return f"{encoded_header}.{encoded_payload}.{_base64url_encode(signature)}", expires_at
+
+
+def decode_agent_session_token(session: Session, raw_token: str) -> dict[str, object] | None:
+    signing_key = _agent_session_signing_key(session)
+    if signing_key is None:
+        return None
+    try:
+        encoded_header, encoded_payload, encoded_signature = raw_token.split(".", 2)
+        signing_input = f"{encoded_header}.{encoded_payload}".encode("ascii")
+        expected_signature = hmac.new(
+            signing_key.encode("utf-8"),
+            signing_input,
+            hashlib.sha256,
+        ).digest()
+        actual_signature = _base64url_decode(encoded_signature)
+        if not hmac.compare_digest(expected_signature, actual_signature):
+            return None
+        header = json.loads(_base64url_decode(encoded_header))
+        payload = json.loads(_base64url_decode(encoded_payload))
+    except (binascii.Error, ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+    if header.get("alg") != "HS256" or header.get("typ") != "JWT":
+        return None
+    if payload.get("iss") != "mianotes" or payload.get("typ") != "agent_session":
+        return None
+    exp = payload.get("exp")
+    if not isinstance(exp, int) or exp < int(datetime.now(UTC).timestamp()):
+        return None
+    return payload
 
 
 def read_session_user(session: Session, token_id: str | None) -> User | None:

@@ -1,14 +1,22 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
+from mianotes_web_service.api.dependencies import (
+    CurrentUser,
+    SessionDep,
+    _read_bearer_token,
+    auth_context_from_bearer_token,
+)
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
+from mianotes_web_service.db.models import AppSetting, Folder, Note, SourceFile, User, new_id
 from mianotes_web_service.domain.schemas import (
+    AgentSessionRead,
     EmailCheck,
     EmailCheckResult,
     JoinRequest,
@@ -16,12 +24,16 @@ from mianotes_web_service.domain.schemas import (
     SessionRead,
 )
 from mianotes_web_service.services.auth import (
+    INSTANCE_API_TOKEN_PUBLIC_KEY,
     SESSION_COOKIE_NAME,
     WORKSPACE_ACCESS_MODE_ADMIN_ONLY,
     WORKSPACE_ACCESS_MODE_OPEN,
+    create_agent_session_token,
     create_session_token,
+    decode_api_token_scopes,
     get_master_password_hash,
     get_workspace_access_mode,
+    normalize_agent_client_name,
     set_master_password,
     set_user_password,
     set_workspace_access_mode,
@@ -229,6 +241,68 @@ def login(payload: LoginRequest, response: Response, session: SessionDep) -> Ses
 @router.get("/session", response_model=SessionRead)
 def session_info(user: CurrentUser) -> SessionRead:
     return SessionRead(user=user)
+
+
+@router.post("/agent-session", response_model=AgentSessionRead, status_code=status.HTTP_201_CREATED)
+def create_agent_session(
+    session: SessionDep,
+    authorization: Annotated[str | None, Header()] = None,
+    x_mianotes_client: Annotated[str | None, Header(alias="X-Mianotes-Client")] = None,
+) -> AgentSessionRead:
+    raw_api_token = _read_bearer_token(authorization)
+    if raw_api_token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
+    if x_mianotes_client is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="X-Mianotes-Client is required",
+        )
+    try:
+        client_name = normalize_agent_client_name(x_mianotes_client)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    context = auth_context_from_bearer_token(session, raw_api_token)
+    if context.is_browser_session:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
+
+    if context.is_instance_token:
+        scopes = ["admin"]
+        instance_token_public_key = session.get(AppSetting, INSTANCE_API_TOKEN_PUBLIC_KEY)
+        if instance_token_public_key is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API token",
+            )
+        session_token, expires_at = create_agent_session_token(
+            session,
+            user=context.user,
+            client_name=client_name,
+            scopes=scopes,
+            instance_token_public_key=instance_token_public_key.value,
+        )
+    else:
+        assert context.token is not None
+        scopes = decode_api_token_scopes(context.token.scopes)
+        session_token, expires_at = create_agent_session_token(
+            session,
+            user=context.user,
+            client_name=client_name,
+            scopes=scopes,
+            api_token_id=context.token.id,
+        )
+
+    session.commit()
+    return AgentSessionRead(
+        token=session_token,
+        client=client_name,
+        expires_at=expires_at,
+        user=context.user,
+        scopes=scopes,
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
