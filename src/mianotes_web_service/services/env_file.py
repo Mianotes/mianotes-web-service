@@ -21,7 +21,7 @@ def _quote_env_value(value: str) -> str:
 def _unquote_env_value(value: str) -> str:
     value = value.strip()
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        return value[1:-1]
+        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
     return value
 
 
