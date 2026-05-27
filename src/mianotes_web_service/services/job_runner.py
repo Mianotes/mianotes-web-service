@@ -26,12 +26,12 @@ from mianotes_web_service.services.storage import render_markdown_note, summariz
 FAILED_FILE_MESSAGE = (
     "Mia couldn’t process this file.\n\n"
     "The file has been saved, but Mia could not turn it into a note this time. "
-    "You can check the Jobs screen for the technical details."
+    "You can check the {console_link} screen for the technical details."
 )
 FAILED_LINK_MESSAGE = (
     "Mia couldn’t process this link.\n\n"
     "The link has been saved, but Mia could not turn it into a note this time. "
-    "You can check the Jobs screen for the technical details."
+    "You can check the {console_link} screen for the technical details."
 )
 INTERRUPTED_JOB_MESSAGE = (
     "The service stopped before this job finished. Please upload the file again."
@@ -203,7 +203,10 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
 def _mark_note_failed(job: MiaJob) -> None:
     if job.note is not None and job.job_type in {"parse_file", "parse_url"}:
         job.note.status = "failed"
-        message = FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
+        message_template = (
+            FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
+        )
+        message = message_template.format(console_link=f"[Console](/jobs?job={job.id})")
         note_file_path(job.note).write_text(
             render_markdown_note(title=job.note.title, text=message),
             encoding="utf-8",

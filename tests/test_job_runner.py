@@ -279,7 +279,8 @@ def test_job_runner_keeps_logs_for_failed_jobs(
         text = Path(note.note_path).read_text(encoding="utf-8")
         assert "Mia couldn’t process this file." in text
         assert "Your file has been added to the queue" not in text
-        assert "Jobs screen" in text
+        assert f"[Console](/jobs?job={job_id}) screen" in text
+        assert "Jobs screen" not in text
         assert "parser exploded" not in text
         assert job.status == "failed"
         assert job.error == "parser exploded"
@@ -287,6 +288,53 @@ def test_job_runner_keeps_logs_for_failed_jobs(
         assert log[0]["command"] == "start parse_file"
         assert log[-1]["command"] == "finish parse_file"
         assert log[-1]["response"] == "parser exploded"
+
+
+def test_job_runner_links_failed_url_notes_to_console_job(
+    tmp_path: Path,
+    monkeypatch,
+):
+    testing_session = _session_factory()
+    source_path = tmp_path / "data" / "folder" / "sources" / "note1234" / "page.html"
+    note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
+
+    def fake_fetch_url_to_html(url: str, output_path: Path):
+        raise RuntimeError("link parser exploded")
+
+    monkeypatch.setattr(job_runner, "fetch_url_to_html", fake_fetch_url_to_html)
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_url",
+            note_id=note_id,
+            input_payload={
+                "source_file_id": source_file_id,
+                "url": "https://example.com/article",
+            },
+        )
+        session.commit()
+        job_id = job.id
+
+    InProcessJobRunner(testing_session).run(job_id)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        text = Path(note.note_path).read_text(encoding="utf-8")
+        assert "Mia couldn’t process this link." in text
+        assert (
+            "The link has been saved, but Mia could not turn it into a note this time."
+            in text
+        )
+        assert f"[Console](/jobs?job={job_id}) screen" in text
+        assert "Jobs screen" not in text
+        assert "link parser exploded" not in text
+        assert job.status == "failed"
+        assert job.error == "link parser exploded"
 
 
 def test_job_runner_marks_job_failed_when_finalization_crashes(
