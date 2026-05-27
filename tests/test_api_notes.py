@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base, MiaJob, Note
+from mianotes_web_service.db.models import Base, MiaJob, Note, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services import job_runner
 
@@ -959,6 +959,17 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert comments.status_code == 200
     assert [item["body"] for item in comments.json()] == ["This is useful for the next call."]
 
+    avatar_relative_path = Path(".profiles") / user["id"] / "avatar-seed.jpg"
+    avatar_path = get_settings().data_dir / avatar_relative_path
+    avatar_path.parent.mkdir(parents=True)
+    avatar_path.write_bytes(b"shared-avatar")
+    session_factory = client.app.state.testing_session_factory
+    with session_factory() as session:
+        db_user = session.get(User, user["id"])
+        assert db_user is not None
+        db_user.avatar_path = avatar_relative_path.as_posix()
+        session.commit()
+
     shared = client.post(f"/api/notes/{note['id']}/share")
     assert shared.status_code == 200
     share_url = shared.json()["share_url"]
@@ -969,10 +980,20 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert guest_note.json()["id"] == note["id"]
     assert guest_note.json()["share_url"] == share_url
 
+    shared_avatar = TestClient(client.app).get(
+        share_url.removeprefix("http://testserver") + "/avatar"
+    )
+    assert shared_avatar.status_code == 200
+    assert shared_avatar.content == b"shared-avatar"
+
     disabled = client.delete(f"/api/notes/{note['id']}/share")
     assert disabled.status_code == 204
     guest_missing = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
     assert guest_missing.status_code == 404
+    avatar_missing = TestClient(client.app).get(
+        share_url.removeprefix("http://testserver") + "/avatar"
+    )
+    assert avatar_missing.status_code == 404
 
 
 def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(

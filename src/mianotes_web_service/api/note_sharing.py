@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import ShareWriteUser
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_by_share_token,
@@ -31,6 +32,21 @@ SessionDep = Annotated[Session, Depends(get_session)]
 def get_shared_note(token: str, session: SessionDep, request: Request) -> NoteRead:
     note = read_note_by_share_token(session, token)
     return note_response(note, request, share_token=token)
+
+
+@router.get("/shared/{token}/avatar", name="get_shared_avatar")
+def get_shared_avatar(token: str, session: SessionDep) -> FileResponse:
+    note = read_note_by_share_token(session, token)
+    if note.user is None or not note.user.avatar_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+    data_dir = get_settings().data_dir.resolve()
+    target = (data_dir / note.user.avatar_path).resolve()
+    if data_dir not in target.parents and target != data_dir:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(target)
 
 
 @router.get("/shared/{token}/files/{source_file_id}", name="get_shared_source_file")
