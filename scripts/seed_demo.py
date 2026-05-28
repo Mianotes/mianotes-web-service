@@ -6,7 +6,9 @@ import os
 import random
 import re
 import shutil
+import sqlite3
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from PIL import Image, ImageOps
@@ -22,6 +24,15 @@ AVATAR_SIZE = (200, 200)
 DEFAULT_PASSWORD = "mia"
 LOCAL_EMAIL_DOMAIN = "mianotes.dev"
 UPPERCASE_WORDS = {"api", "llm", "mcp", "ocr"}
+WORKSPACE_USER_REFERENCE_COLUMNS = (
+    ("folders", "user_id"),
+    ("folders", "archived_by_user_id"),
+    ("notes", "user_id"),
+    ("comments", "user_id"),
+    ("note_stars", "user_id"),
+    ("mia_jobs", "user_id"),
+    ("published_sites", "user_id"),
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -197,6 +208,104 @@ def upsert_user(
     if avatar_path is not None:
         user.avatar_path = save_avatar(data_dir, user.id, avatar_path)
     return user
+
+
+def workspace_table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
+    return (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+            (table_name,),
+        ).fetchone()
+        is not None
+    )
+
+
+def parse_legacy_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def sync_workspace_users(session, *, workspace_database_path: Path) -> tuple[int, int, int]:
+    from mianotes_web_service.db.models import User, utc_now
+
+    if not workspace_database_path.exists():
+        return 0, 0, 0
+
+    with sqlite3.connect(workspace_database_path) as workspace_connection:
+        workspace_connection.row_factory = sqlite3.Row
+        if not workspace_table_exists(workspace_connection, "users"):
+            return 0, 0, 0
+
+        imported_count = 0
+        duplicate_email_count = 0
+        updated_reference_count = 0
+        id_map: dict[str, str] = {}
+        legacy_users = list(
+            workspace_connection.execute(
+                """
+                SELECT
+                    id, email, name, username, phone, role, avatar_path, is_admin,
+                    password_hash, created_at, updated_at
+                FROM users
+                ORDER BY created_at
+                """
+            )
+        )
+
+        for legacy_user in legacy_users:
+            existing_by_id = session.get(User, legacy_user["id"])
+            if existing_by_id is not None:
+                continue
+
+            existing_by_email = session.scalars(
+                select(User).where(User.email == legacy_user["email"])
+            ).one_or_none()
+            if existing_by_email is not None:
+                id_map[legacy_user["id"]] = existing_by_email.id
+                duplicate_email_count += 1
+                continue
+
+            user = User(
+                id=legacy_user["id"],
+                email=legacy_user["email"],
+                name=legacy_user["name"],
+                username=legacy_user["username"],
+                phone=legacy_user["phone"],
+                role=legacy_user["role"],
+                avatar_path=legacy_user["avatar_path"],
+                is_admin=bool(legacy_user["is_admin"]),
+                password_hash=legacy_user["password_hash"],
+                created_at=parse_legacy_datetime(legacy_user["created_at"]) or utc_now(),
+                updated_at=parse_legacy_datetime(legacy_user["updated_at"]) or utc_now(),
+            )
+            session.add(user)
+            imported_count += 1
+
+        if id_map:
+            for old_id, new_id in id_map.items():
+                for table_name, column_name in WORKSPACE_USER_REFERENCE_COLUMNS:
+                    if not workspace_table_exists(workspace_connection, table_name):
+                        continue
+                    table_columns = {
+                        row["name"]
+                        for row in workspace_connection.execute(f"PRAGMA table_info({table_name})")
+                    }
+                    if column_name not in table_columns:
+                        continue
+                    cursor = workspace_connection.execute(
+                        f"UPDATE {table_name} SET {column_name} = ? WHERE {column_name} = ?",
+                        (new_id, old_id),
+                    )
+                    updated_reference_count += cursor.rowcount
+            workspace_connection.commit()
+
+        return imported_count, duplicate_email_count, updated_reference_count
 
 
 def seed_users(
@@ -399,7 +508,8 @@ def main() -> int:
         reset_storage(settings)
 
     from mianotes_web_service.db.init import create_database, create_system_database
-    from mianotes_web_service.db.session import SessionLocal, SystemSessionLocal
+    from mianotes_web_service.db.session import SessionLocal, SystemSessionLocal, default_workspace
+    from mianotes_web_service.services.storage_settings import storage_database_path
 
     if args.users_only:
         create_system_database()
@@ -410,7 +520,19 @@ def main() -> int:
 
     folder_count = 0
     note_count = 0
+    imported_count = 0
+    duplicate_email_count = 0
+    updated_reference_count = 0
     with session_factory() as session:
+        if args.users_only:
+            workspace = default_workspace()
+            imported_count, duplicate_email_count, updated_reference_count = sync_workspace_users(
+                session,
+                workspace_database_path=storage_database_path(
+                    workspace.folder_path,
+                    workspace.database_file,
+                ),
+            )
         admin, demo_users = seed_users(
             session,
             admin_email=args.admin_email,
@@ -434,7 +556,12 @@ def main() -> int:
         session.commit()
 
     if args.users_only:
-        print(f"Seeded {len(demo_users)} demo users and admin {args.admin_email}.")
+        print(
+            f"Seeded {len(demo_users)} demo users and admin {args.admin_email}. "
+            f"Imported {imported_count} existing workspace users, mapped "
+            f"{duplicate_email_count} duplicate emails, and updated "
+            f"{updated_reference_count} workspace references."
+        )
     else:
         print(
             f"Seeded {note_count} notes in {folder_count} docs folders, "
