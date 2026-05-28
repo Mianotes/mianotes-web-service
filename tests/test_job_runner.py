@@ -7,7 +7,12 @@ from sqlalchemy.pool import StaticPool
 from mianotes_web_service.db.models import Base, Folder, Note, SourceFile, User
 from mianotes_web_service.services import job_runner, parsing
 from mianotes_web_service.services.job_runner import InProcessJobRunner
-from mianotes_web_service.services.jobs import create_job, decode_job_log, decode_job_payload
+from mianotes_web_service.services.jobs import (
+    append_job_log,
+    create_job,
+    decode_job_log,
+    decode_job_payload,
+)
 from mianotes_web_service.services.parsing import ParsedDocument
 
 
@@ -459,3 +464,51 @@ def test_fail_interrupted_jobs_marks_running_jobs_failed(
         log = decode_job_log(job.log_json)
         assert log[-1]["command"] == "finish parse_file"
         assert log[-1]["response"] == job_runner.INTERRUPTED_JOB_MESSAGE
+
+
+def test_fail_interrupted_jobs_reports_last_running_step(
+    tmp_path: Path,
+):
+    testing_session = _session_factory()
+    note_id, source_file_id = _seed_note(testing_session, tmp_path)
+
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_file",
+            note_id=note_id,
+            input_payload={"source_file_id": source_file_id},
+        )
+        job.status = "running"
+        append_job_log(
+            job,
+            command="MarkItDown.convert(original.pdf) with plugins/options",
+            response="started",
+            status="running",
+        )
+        session.commit()
+        job_id = job.id
+
+    with testing_session() as session:
+        job_runner.fail_interrupted_jobs(session)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        expected = (
+            "Mia was interrupted while running "
+            "`MarkItDown.convert(original.pdf) with plugins/options`. "
+            "Please upload the file again."
+        )
+        assert note.status == "failed"
+        assert job.status == "failed"
+        assert job.error == expected
+        text = Path(note.note_path).read_text(encoding="utf-8")
+        assert "Mia couldn't process this file." in text
+        log = decode_job_log(job.log_json)
+        assert log[-1]["command"] == "finish parse_file"
+        assert log[-1]["response"] == expected

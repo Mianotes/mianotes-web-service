@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from mianotes_web_service.db.models import MiaJob, Note, SourceFile
 from mianotes_web_service.services.jobs import (
     append_job_log,
+    decode_job_log,
     decode_job_payload,
     mark_job_failed,
     mark_job_running,
@@ -42,6 +43,10 @@ FAILED_LINK_WITH_REASON_MESSAGE = (
 USER_SAFE_FAILURE_REASONS = frozenset({NO_YOUTUBE_SPEECH_MESSAGE})
 INTERRUPTED_JOB_MESSAGE = (
     "The service stopped before this job finished. Please upload the file again."
+)
+INTERRUPTED_JOB_WITH_STEP_MESSAGE = (
+    "Mia was interrupted while running `{command}`. "
+    "Please upload the file again."
 )
 
 
@@ -110,16 +115,30 @@ def fail_interrupted_jobs(session: Session) -> None:
         .all()
     )
     for job in jobs:
-        _mark_note_failed(job)
+        message = _interrupted_job_message(job)
+        _mark_note_failed(job, failure_reason=message)
         append_job_log(
             job,
             command=f"finish {job.job_type}",
-            response=INTERRUPTED_JOB_MESSAGE,
+            response=message,
             status="failed",
         )
-        mark_job_failed(job, INTERRUPTED_JOB_MESSAGE)
+        mark_job_failed(job, message)
     if jobs:
         session.commit()
+
+
+def _interrupted_job_message(job: MiaJob) -> str:
+    for entry in reversed(decode_job_log(job.log_json)):
+        if entry.get("status") != "running":
+            continue
+        command = entry.get("command")
+        if not isinstance(command, str) or not command:
+            continue
+        if command.startswith("start "):
+            continue
+        return INTERRUPTED_JOB_WITH_STEP_MESSAGE.format(command=command)
+    return INTERRUPTED_JOB_MESSAGE
 
 
 def _run_job(session: Session, job: MiaJob) -> dict[str, object]:
