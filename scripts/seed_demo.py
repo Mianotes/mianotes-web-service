@@ -26,7 +26,7 @@ UPPERCASE_WORDS = {"api", "llm", "mcp", "ocr"}
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Seed a Mianotes database with docs, demo users, and profile photos."
+        description="Seed Mianotes with demo users and optional documentation notes."
     )
     parser.add_argument(
         "--admin-email",
@@ -65,6 +65,11 @@ def parse_args() -> argparse.Namespace:
         "--random-note-owners",
         action="store_true",
         help="Assign imported documentation notes across the seeded users.",
+    )
+    parser.add_argument(
+        "--users-only",
+        action="store_true",
+        help="Seed only global users and profile photos, without creating workspace notes.",
     )
     parser.add_argument(
         "--note-owner-seed",
@@ -362,7 +367,7 @@ def seed_docs(
 
 def main() -> int:
     args = parse_args()
-    if not args.docs_dir.is_dir():
+    if not args.users_only and not args.docs_dir.is_dir():
         print(f"Docs directory not found: {args.docs_dir}", file=sys.stderr)
         return 2
     if not args.avatars_dir.is_dir():
@@ -380,11 +385,19 @@ def main() -> int:
     if args.reset:
         reset_storage(settings)
 
-    from mianotes_web_service.db.init import create_database
-    from mianotes_web_service.db.session import SessionLocal
+    from mianotes_web_service.db.init import create_database, create_system_database
+    from mianotes_web_service.db.session import SessionLocal, SystemSessionLocal
 
-    create_database()
-    with SessionLocal() as session:
+    if args.users_only:
+        create_system_database()
+        session_factory = SystemSessionLocal
+    else:
+        create_database()
+        session_factory = SessionLocal
+
+    folder_count = 0
+    note_count = 0
+    with session_factory() as session:
         admin, demo_users = seed_users(
             session,
             admin_email=args.admin_email,
@@ -394,21 +407,25 @@ def main() -> int:
             count=args.demo_user_count,
             data_dir=settings.data_dir,
         )
-        note_owners = [admin, *demo_users] if args.random_note_owners else [admin]
-        folder_count, note_count = seed_docs(
-            session,
-            owner=admin,
-            note_owners=note_owners,
-            docs_dir=args.docs_dir,
-            data_dir=settings.data_dir,
-            note_owner_seed=args.note_owner_seed,
-        )
+        if not args.users_only:
+            note_owners = [admin, *demo_users] if args.random_note_owners else [admin]
+            folder_count, note_count = seed_docs(
+                session,
+                owner=admin,
+                note_owners=note_owners,
+                docs_dir=args.docs_dir,
+                data_dir=settings.data_dir,
+                note_owner_seed=args.note_owner_seed,
+            )
         session.commit()
 
-    print(
-        f"Seeded {note_count} notes in {folder_count} docs folders, "
-        f"{args.demo_user_count} demo users, and admin {args.admin_email}."
-    )
+    if args.users_only:
+        print(f"Seeded {len(demo_users)} demo users and admin {args.admin_email}.")
+    else:
+        print(
+            f"Seeded {note_count} notes in {folder_count} docs folders, "
+            f"{len(demo_users)} demo users, and admin {args.admin_email}."
+        )
     return 0
 
 
