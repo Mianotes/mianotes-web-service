@@ -85,7 +85,7 @@ class InProcessJobRunner:
         if isinstance(self.session_factory, sessionmaker):
             return self.session_factory
         if workspace is None:
-            from mianotes_web_service.db.session import default_workspace
+            from mianotes_web_service.db.workspace_routing import default_workspace
 
             workspace = default_workspace()
         return self.session_factory(workspace)

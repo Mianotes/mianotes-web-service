@@ -202,8 +202,14 @@ def test_seed_demo_users_only_syncs_existing_workspace_users(tmp_path: Path):
                 "2026-01-01 00:00:00",
             ),
         )
-        connection.execute("INSERT INTO mia_jobs (id, user_id) VALUES (?, ?)", ("job-admin", "legacy-admin"))
-        connection.execute("INSERT INTO mia_jobs (id, user_id) VALUES (?, ?)", ("job-member", "legacy-member"))
+        connection.execute(
+            "INSERT INTO mia_jobs (id, user_id) VALUES (?, ?)",
+            ("job-admin", "legacy-admin"),
+        )
+        connection.execute(
+            "INSERT INTO mia_jobs (id, user_id) VALUES (?, ?)",
+            ("job-member", "legacy-member"),
+        )
 
     synced = subprocess.run(
         [

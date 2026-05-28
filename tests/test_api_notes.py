@@ -8,11 +8,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from mianotes_web_service.api.note_ingestion import _enqueue_job
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base, MiaJob, Note, User
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.api.note_ingestion import _enqueue_job
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 

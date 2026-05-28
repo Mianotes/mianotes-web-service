@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from . import __version__
 from .api.routes import api_router
 from .db.init import create_all_configured_workspace_databases, create_system_database
-from .db.session import _storage_config, sessionmaker_for_workspace
+from .db.workspace_routing import sessionmaker_for_workspace, storage_config
 from .services.job_runner import InProcessJobRunner, fail_interrupted_jobs
 from .services.workspace_context import (
     WorkspaceContext,
@@ -22,7 +22,7 @@ def create_app() -> FastAPI:
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         create_system_database()
         create_all_configured_workspace_databases()
-        config = _storage_config()
+        config = storage_config()
         for location in config.locations:
             workspace = WorkspaceContext(
                 id=location.id,

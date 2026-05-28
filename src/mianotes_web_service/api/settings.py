@@ -10,7 +10,7 @@ from fastapi import APIRouter, Cookie, HTTPException, status
 
 from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, SessionDep
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db import session as db_session
+from mianotes_web_service.db.engine import create_database_engine
 from mianotes_web_service.db.init import create_workspace_database
 from mianotes_web_service.db.models import SessionToken
 from mianotes_web_service.domain.schemas import (
@@ -171,7 +171,7 @@ def create_storage_location(payload: StorageLocationCreate, _: AdminUser) -> Sto
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     new_location = next_config.locations[0]
-    new_engine = db_session.create_database_engine(
+    new_engine = create_database_engine(
         _database_url(new_location.folder_path, next_config.database_file)
     )
     try:

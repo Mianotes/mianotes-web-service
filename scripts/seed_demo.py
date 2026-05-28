@@ -508,15 +508,19 @@ def main() -> int:
         reset_storage(settings)
 
     from mianotes_web_service.db.init import create_database, create_system_database
-    from mianotes_web_service.db.session import SessionLocal, SystemSessionLocal, default_workspace
+    from mianotes_web_service.db.workspace_routing import (
+        default_workspace,
+        sessionmaker_for_workspace,
+        system_sessionmaker,
+    )
     from mianotes_web_service.services.storage_settings import storage_database_path
 
     if args.users_only:
         create_system_database()
-        session_factory = SystemSessionLocal
+        session_factory = system_sessionmaker()
     else:
         create_database()
-        session_factory = SessionLocal
+        session_factory = sessionmaker_for_workspace(default_workspace())
 
     folder_count = 0
     note_count = 0

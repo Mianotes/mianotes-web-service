@@ -4,14 +4,14 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from mianotes_web_service.db import session as db_session
+from mianotes_web_service.db.engine import create_database_engine
 from mianotes_web_service.db.init import (
     create_database,
     create_system_database,
     create_workspace_database,
 )
 from mianotes_web_service.db.models import ApiToken, Folder, SessionToken, User
-from mianotes_web_service.db import session as db_session
-from mianotes_web_service.db.session import create_database_engine
 from mianotes_web_service.services.auth import create_session_token
 from mianotes_web_service.services.workspace_context import (
     WorkspaceContext,

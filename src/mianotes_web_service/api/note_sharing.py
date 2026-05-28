@@ -16,9 +16,9 @@ from mianotes_web_service.api.note_access import (
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note
-from mianotes_web_service.db.session import (
-    _storage_config,
-    get_session,
+from mianotes_web_service.db.session import get_session
+from mianotes_web_service.db.workspace_routing import (
+    configured_workspaces,
     sessionmaker_for_workspace,
 )
 from mianotes_web_service.domain.schemas import NoteRead
@@ -41,16 +41,7 @@ SharedResult = TypeVar("SharedResult")
 
 
 def _configured_workspaces() -> list[WorkspaceContext]:
-    config = _storage_config()
-    return [
-        WorkspaceContext(
-            id=location.id,
-            name=location.name,
-            folder_path=location.folder_path,
-            database_file=config.database_file,
-        )
-        for location in config.locations
-    ]
+    return configured_workspaces()
 
 
 def _with_shared_note(
