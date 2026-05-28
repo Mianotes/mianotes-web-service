@@ -584,3 +584,40 @@ def test_fail_interrupted_jobs_reports_last_running_step(
         log = decode_job_log(job.log_json)
         assert log[-1]["command"] == "finish parse_file"
         assert log[-1]["response"] == expected
+
+
+def test_fail_interrupted_jobs_recreates_missing_note_parent(
+    tmp_path: Path,
+):
+    testing_session = _session_factory()
+    note_id, source_file_id = _seed_note(testing_session, tmp_path)
+
+    with testing_session() as session:
+        user = session.query(User).one()
+        note = session.get(Note, note_id)
+        assert note is not None
+        note.note_path = str(tmp_path / "missing" / "folder" / "queued.md")
+        job = create_job(
+            session,
+            user,
+            job_type="parse_file",
+            note_id=note_id,
+            input_payload={"source_file_id": source_file_id},
+        )
+        job.status = "queued"
+        session.commit()
+        job_id = job.id
+
+    with testing_session() as session:
+        job_runner.fail_interrupted_jobs(session)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        note_path = Path(note.note_path)
+        assert note.status == "failed"
+        assert job.status == "failed"
+        assert note_path.exists()
+        assert "Mia couldn't process this file." in note_path.read_text(encoding="utf-8")

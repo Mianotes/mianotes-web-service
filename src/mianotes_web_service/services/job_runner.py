@@ -205,6 +205,15 @@ def _job_source_file(session: Session, payload: dict[str, object]) -> SourceFile
     return source_file
 
 
+def _write_note_markdown(note: Note, text: str) -> None:
+    path = note_file_path(note)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        render_markdown_note(title=note.title, text=text),
+        encoding="utf-8",
+    )
+
+
 def _run_parse_file_job(session: Session, job: MiaJob) -> dict[str, object]:
     payload = decode_job_payload(job.input_json)
     note = _job_note(session, job)
@@ -220,10 +229,7 @@ def _run_parse_file_job(session: Session, job: MiaJob) -> dict[str, object]:
         status="succeeded",
     )
     session.commit()
-    note_file_path(note).write_text(
-        render_markdown_note(title=note.title, text=parsed.text),
-        encoding="utf-8",
-    )
+    _write_note_markdown(note, parsed.text)
     note.status = "ready"
     note.summary = summarize_text(parsed.text)
     return {
@@ -252,10 +258,7 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
     else:
         html_path = fetch_url_to_html(url, source_file_path(source_file))
         parsed = parse_html_document(html_path, url=url)
-    note_file_path(note).write_text(
-        render_markdown_note(title=note.title, text=parsed.text),
-        encoding="utf-8",
-    )
+    _write_note_markdown(note, parsed.text)
     note.status = "ready"
     note.summary = summarize_text(parsed.text)
     return {
@@ -283,10 +286,7 @@ def _mark_note_failed(job: MiaJob, *, failure_reason: str | None = None) -> None
                 FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
             )
             message = message_template.format(console_link=console_link)
-        note_file_path(job.note).write_text(
-            render_markdown_note(title=job.note.title, text=message),
-            encoding="utf-8",
-        )
+        _write_note_markdown(job.note, message)
         job.note.summary = summarize_text(message)
 
 
@@ -295,10 +295,7 @@ def _persist_note_text_update(session: Session, job_id: str, text: str) -> None:
     if job is None or job.note is None or job.job_type not in {"parse_file", "parse_url"}:
         return
     job.note.status = "parsing"
-    note_file_path(job.note).write_text(
-        render_markdown_note(title=job.note.title, text=text),
-        encoding="utf-8",
-    )
+    _write_note_markdown(job.note, text)
     job.note.summary = summarize_text(text)
     session.commit()
 
