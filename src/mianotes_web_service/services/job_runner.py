@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -24,6 +26,12 @@ from mianotes_web_service.services.parsing import (
 )
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import render_markdown_note, summarize_text
+from mianotes_web_service.services.workspace_context import (
+    WorkspaceContext,
+    current_workspace,
+    reset_current_workspace,
+    set_current_workspace,
+)
 
 FAILED_FILE_MESSAGE = (
     "Mia couldn't process this file.\n\n"
@@ -51,20 +59,39 @@ INTERRUPTED_JOB_WITH_STEP_MESSAGE = (
 
 
 class InProcessJobRunner:
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    def __init__(
+        self,
+        session_factory: (
+            sessionmaker[Session]
+            | Callable[[WorkspaceContext], sessionmaker[Session]]
+        ),
+    ) -> None:
         self.session_factory = session_factory
 
     def enqueue(self, background_tasks: BackgroundTasks, job_id: str) -> None:
-        background_tasks.add_task(self.run, job_id)
+        background_tasks.add_task(self.run, job_id, current_workspace())
 
-    def run(self, job_id: str) -> None:
+    def _session_factory(self, workspace: WorkspaceContext | None) -> sessionmaker[Session]:
+        if isinstance(self.session_factory, sessionmaker):
+            return self.session_factory
+        if workspace is None:
+            from mianotes_web_service.db.session import default_workspace
+
+            workspace = default_workspace()
+        return self.session_factory(workspace)
+
+    def run(self, job_id: str, workspace: WorkspaceContext | None = None) -> None:
+        context_token = set_current_workspace(workspace) if workspace is not None else None
         try:
-            with self.session_factory() as session:
+            with self._session_factory(workspace)() as session:
                 self._run_with_session(session, job_id)
         except Exception as exc:
-            with self.session_factory() as session:
+            with self._session_factory(workspace)() as session:
                 _mark_job_crashed(session, job_id, exc)
             return
+        finally:
+            if context_token is not None:
+                reset_current_workspace(context_token)
 
     def _run_with_session(self, session: Session, job_id: str) -> None:
         job = session.get(MiaJob, job_id)

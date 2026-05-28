@@ -1,6 +1,6 @@
 # Ollama, OpenAI, and local models
 
-Mia calls language models through a provider boundary. This lets one Mianotes instance use OpenAI, a local Ollama-style server, or another OpenAI-compatible endpoint without changing the REST API or MCP server.
+Mia calls language models through a provider boundary. This lets one Mianotes app use OpenAI, a local Ollama-style server, or another OpenAI-compatible endpoint without changing the REST API or MCP server.
 
 ## Local Ollama setup
 

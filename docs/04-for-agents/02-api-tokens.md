@@ -46,7 +46,7 @@ There are two normal places the raw service key lives:
 - agents and MCP clients should keep their copy in their own environment or
   project `.env`.
 
-`storage.json` is for folder and storage configuration. It must not contain the
+`workspaces.json` is for workspace and storage configuration. It must not contain the
 raw API key.
 
 On API key creation and on authenticated requests, Mianotes syncs the derived
@@ -54,7 +54,7 @@ public verifier into the active database. The active `.mianotes/mia.db` stores
 only that public verifier, never the raw key.
 
 This lets the service-wide key be re-synced automatically after service restarts
-or folder switches without putting the raw key in `storage.json`.
+or workspace switches without putting the raw key in `workspaces.json`.
 
 ## Get a key in the web app
 
@@ -253,7 +253,7 @@ shell can see the same environment variables.
 
 `MIANOTES_API_KEY` is the service-wide key. It is best for trusted local agents,
 MCP servers, and scripts that should act with admin-level access to the current
-Mianotes instance.
+Mianotes workspace.
 
 Mianotes also supports scoped per-user API tokens through `/api/tokens`. Use
 scoped tokens when a tool should have narrower permissions, such as read-only

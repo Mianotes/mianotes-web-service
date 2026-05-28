@@ -14,6 +14,7 @@ from mianotes_web_service.services.paths import (
     source_file_path,
 )
 from mianotes_web_service.services.storage import FilesystemStorage
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 
 def validate_stored_moves(moves: list[tuple[Path, Path]]) -> None:
@@ -46,7 +47,9 @@ def move_note_to_folder(note: Note, target_folder: Folder) -> None:
     current_folder = note.folder
     current_folder_dir = folder_directory(current_folder) if current_folder else None
     target_folder_dir = folder_directory(target_folder)
-    FilesystemStorage(get_settings().data_dir).prepare_folder_directory(target_folder_dir)
+    FilesystemStorage(current_data_dir(get_settings().data_dir)).prepare_folder_directory(
+        target_folder_dir
+    )
 
     current_note_path = note_file_path(note)
     note_filename = note.filename or current_note_path.name

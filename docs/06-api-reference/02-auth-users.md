@@ -43,7 +43,7 @@ POST /api/auth/join
 
 Authentication: none.
 
-If no Mianotes instance has been initialized, this endpoint creates the first admin user and stores the master password.
+If no Mianotes workspace has been initialized, this endpoint creates the first admin user and stores the master password.
 
 Request:
 

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
+from mianotes_web_service.services.workspace_context import current_workspace_id
 
 MASTER_PASSWORD_KEY = "master_password_hash"
 WORKSPACE_ACCESS_MODE_KEY = "workspace_access_mode"
@@ -122,6 +123,7 @@ def create_session_token(session: Session, user: User) -> SessionToken:
     token = SessionToken(
         id=secrets.token_urlsafe(32),
         user_id=user.id,
+        workspace_id=current_workspace_id(),
         expires_at=datetime.now(UTC) + timedelta(days=SESSION_DAYS),
     )
     session.add(token)

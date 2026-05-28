@@ -63,7 +63,7 @@ Unknown client names are treated as `MCP`.
 
 | Credential | Best for | Notes |
 |---|---|---|
-| `MIANOTES_API_KEY` | Trusted local agents and MCP servers | Acts with admin-level access to the current instance. |
+| `MIANOTES_API_KEY` | Trusted local agents and MCP servers | Acts with admin-level access across configured workspaces. |
 | Scoped token | Limited automations | Can grant only the scopes needed, such as `notes:read`. |
 | Browser session | Humans in the web app | Do not use browser cookies for agents. |
 
@@ -72,5 +72,23 @@ Unknown client names are treated as `MCP`.
 The MCP server is intentionally thin. It calls the same REST API as other agent clients. It does not bypass the API, read the database directly, or write files directly.
 
 That keeps one permission model for the web app, REST clients, automation scripts, and MCP agents.
+
+## Workspace targeting
+
+Mianotes can manage multiple workspaces. Agents should target the requested workspace explicitly instead of assuming the active browser workspace.
+
+MCP tools accept a `workspace` argument for workspace-content calls. REST clients should send:
+
+```http
+X-Mianotes-Workspace: <workspace-id>
+```
+
+Use these shorthand forms in prompts and agent instructions:
+
+- `Mia(<workspace>: <search_query>)` searches a workspace.
+- `Mia(<workspace>/<folder>: <search_query>)` searches a folder inside a workspace.
+- `Mia(<workspace>/<folder>)` saves content into that workspace and folder.
+
+When saving with `Mia(<workspace>/<folder>)`, create a useful title from the content if the user did not provide one.
 
 Read next: [API tokens](02-api-tokens.md) or [MCP server](03-mcp-server.md).

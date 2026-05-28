@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from mianotes_web_service.services.storage_settings import (
     ensure_storage_location,
     read_storage_config,
-    storage_database_path,
+    system_database_path,
 )
 
 
@@ -22,7 +21,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     api_key: str | None = None
     api_token: str | None = None
-    storage_config_path: Path = Field(default=Path("storage.json"))
+    storage_config_path: Path = Field(default=Path("workspaces.json"))
     llm_provider: str = "openai"
     llm_model: str | None = None
     llm_image_model: str | None = None
@@ -42,25 +41,15 @@ class Settings(BaseSettings):
         if not self.api_token:
             self.api_token = self.api_key
         if not self.database_url:
-            if os.environ.get("MIANOTES_DATA_DIR") and not os.environ.get(
-                "MIANOTES_STORAGE_CONFIG_PATH"
-            ):
-                ensure_storage_location(self.data_dir)
-                self.database_url = f"sqlite:///{storage_database_path(self.data_dir)}"
-            else:
-                storage_config = read_storage_config(
-                    self.storage_config_path,
-                    default_data_dir=self.data_dir,
-                )
-                self.data_dir = storage_config.active_folder_path
-                ensure_storage_location(self.data_dir, storage_config.database_file)
-                database_path = storage_database_path(
-                    self.data_dir,
-                    storage_config.database_file,
-                )
-                self.database_url = (
-                    f"sqlite:///{database_path}"
-                )
+            storage_config = read_storage_config(
+                self.storage_config_path,
+                default_data_dir=self.data_dir,
+            )
+            ensure_storage_location(
+                storage_config.active_folder_path,
+                storage_config.database_file,
+            )
+            self.database_url = f"sqlite:///{system_database_path(self.data_dir)}"
         return self
 
     @property

@@ -65,7 +65,7 @@ Typical folders:
 - roadmaps
 - launch plans
 
-Team members can add tags across folders, comment on notes, and create read-only share links when someone outside the instance needs access to a single note.
+Team members can add tags across folders, comment on notes, and create read-only share links when someone outside the workspace needs access to a single note.
 
 ## Researchers
 

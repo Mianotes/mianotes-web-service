@@ -45,7 +45,7 @@ data/<folder_slug>/<title_slug>-<note_id[:8]>.md
 data/<folder_slug>/sources/<note_id[:8]>/original.<ext>
 ```
 
-Folder directories are filesystem-safe slugs and are unique across the instance. Source files live under each folder's `sources/` directory.
+Folder directories are filesystem-safe slugs and are unique inside a workspace. Source files live under each folder's `sources/` directory.
 
 ## Database defaults
 

@@ -4,9 +4,9 @@ This page explains the words used throughout the documentation.
 
 ## Instance
 
-A Mianotes instance is one running web service connected to one active local folder. The private SQLite database lives inside that folder at `.mianotes/mia.db`.
+A Mianotes workspace is a top-level knowledge area backed by a local folder. The private workspace SQLite database lives inside that folder at `.mianotes/mia.db`.
 
-Small groups can share an instance by using the same master password. Everyone can read shared notes, browse by folder, browse by user, and add notes to active folders.
+Small groups can share a Mianotes app by using the same master password. Everyone can read shared notes, browse by folder, browse by user, and add notes to active folders.
 
 ## User
 

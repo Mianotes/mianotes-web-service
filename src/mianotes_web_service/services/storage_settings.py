@@ -9,6 +9,7 @@ from tempfile import NamedTemporaryFile
 DEFAULT_LOCATION_ID = "default"
 PRIVATE_STORAGE_DIR = ".mianotes"
 DATABASE_FILENAME = "mia.db"
+SYSTEM_DATABASE_FILENAME = "system.db"
 DEFAULT_DATABASE_FILE = f"{PRIVATE_STORAGE_DIR}/{DATABASE_FILENAME}"
 DATABASE_SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
 GITIGNORE_ENTRIES = (
@@ -64,6 +65,10 @@ def _normalise_database_file(value: str) -> str:
 
 def storage_database_path(folder_path: Path, database_file: str = DEFAULT_DATABASE_FILE) -> Path:
     return folder_path / _normalise_database_file(database_file)
+
+
+def system_database_path(data_dir: Path) -> Path:
+    return _normalise_path(data_dir) / SYSTEM_DATABASE_FILENAME
 
 
 def _ensure_storage_gitignore(folder_path: Path) -> None:

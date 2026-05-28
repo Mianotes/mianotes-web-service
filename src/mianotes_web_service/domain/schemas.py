@@ -307,7 +307,7 @@ class StorageSwitchRequest(BaseModel):
 
 class StorageSwitchRead(BaseModel):
     storage: StorageSettingsRead
-    session_ended: bool = True
+    session_ended: bool = False
 
 
 class ServiceApiKeyRead(BaseModel):

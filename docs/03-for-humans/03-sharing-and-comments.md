@@ -1,6 +1,6 @@
 # Sharing and comments
 
-Mianotes supports shared discussion inside the instance and read-only note sharing outside it.
+Mianotes supports shared discussion inside the workspace and read-only note sharing outside it.
 
 ## Comments
 
@@ -43,11 +43,11 @@ Mia prompts:
 
 Share links are note-level and read-only.
 
-Use a share link when someone outside the Mianotes instance needs access to one note but should not join the whole workspace.
+Use a share link when someone outside the Mianotes workspace needs access to one note but should not join the whole workspace.
 
 Important properties:
 
-- a share link does not grant full instance access;
+- a share link does not grant full workspace access;
 - share links can be revoked;
 - admins can share any note;
 - normal users can share notes they created.

@@ -60,6 +60,7 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
                 "timeout": timeout,
                 "authorization": request.get_header("Authorization"),
                 "client": request.get_header("X-mianotes-client"),
+                "workspace": request.get_header("X-mianotes-workspace"),
             }
         )
         if request.full_url.endswith("/api/auth/agent-session"):
@@ -96,6 +97,7 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
             "timeout": 30,
             "authorization": "Bearer mia_test_token",
             "client": "Codex",
+            "workspace": None,
         },
         {
             "url": "http://127.0.0.1:8200/api/folders?include_archived=True",
@@ -103,8 +105,59 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
             "timeout": 30,
             "authorization": "Bearer agent-session-token",
             "client": None,
+            "workspace": None,
         },
     ]
+
+
+def test_mcp_tool_call_sends_workspace_header(monkeypatch):
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        seen.append(
+            {
+                "url": request.full_url,
+                "workspace": request.get_header("X-mianotes-workspace"),
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        return FakeResponse([])
+
+    monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "method": "tools/call",
+            "params": {
+                "name": "search_notes",
+                "arguments": {"workspace": "research", "q": "getting started"},
+            },
+        }
+    )
+
+    assert response is not None
+    assert seen[-1] == {
+        "url": "http://127.0.0.1:8200/api/search?q=getting+started",
+        "workspace": "research",
+    }
 
 
 def test_mcp_tool_call_reports_missing_api_key(monkeypatch):

@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from mianotes_web_service.db.models import Comment, Note, User
+from mianotes_web_service.db.models import Note, User
 from mianotes_web_service.services.share import get_share_secret, hash_share_token
 
 
@@ -13,10 +13,9 @@ def read_note_or_404(session: Session, note_id: str) -> Note:
         select(Note)
         .where(Note.id == note_id)
         .options(
-            joinedload(Note.user),
             joinedload(Note.folder),
             joinedload(Note.source_files),
-            joinedload(Note.comments).joinedload(Comment.user),
+            joinedload(Note.comments),
             joinedload(Note.tags),
             joinedload(Note.jobs),
         )
@@ -36,10 +35,9 @@ def read_note_by_share_token(session: Session, token: str) -> Note:
         select(Note)
         .where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
         .options(
-            joinedload(Note.user),
             joinedload(Note.folder),
             joinedload(Note.source_files),
-            joinedload(Note.comments).joinedload(Comment.user),
+            joinedload(Note.comments),
             joinedload(Note.tags),
         )
     )

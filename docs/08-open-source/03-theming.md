@@ -135,7 +135,7 @@ When the frontend app grows a formal theme system, document these decisions here
 - Markdown rendering styles;
 - note status badges;
 - accessibility contrast rules;
-- whether themes are per-user, per-instance, or build-time only.
+- whether themes are per-user, per-workspace, or build-time only.
 
 ## Suggested theme documentation template
 

@@ -13,6 +13,7 @@ from mianotes_web_service.db.models import Note, NoteStar
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
 from mianotes_web_service.services.paths import markdown_root, note_file_path, source_file_path
 from mianotes_web_service.services.search import search_markdown_files
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -47,7 +48,7 @@ def _is_starred_by_user(session: Session, note_id: str, user_id: str) -> bool:
 
 
 def _file_url(request: Request, path: str | Path) -> str:
-    data_dir = get_settings().data_dir.resolve()
+    data_dir = current_data_dir(get_settings().data_dir).resolve()
     target = Path(path).resolve()
     try:
         public_path = target.relative_to(data_dir)

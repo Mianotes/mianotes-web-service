@@ -21,6 +21,7 @@ from mianotes_web_service.services.publishing import (
     list_publish_themes,
     publish_site,
 )
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(prefix="/publish", tags=["publish"])
 
@@ -100,8 +101,9 @@ def download_published_site(
             detail="Published site not found",
         )
 
-    html_root = (get_settings().data_dir / "html").resolve()
-    site_dir = (get_settings().data_dir / site.html_path).resolve()
+    data_dir = current_data_dir(get_settings().data_dir)
+    html_root = (data_dir / "html").resolve()
+    site_dir = (data_dir / site.html_path).resolve()
     if html_root not in site_dir.parents or not site_dir.is_dir():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

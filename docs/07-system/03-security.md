@@ -56,7 +56,7 @@ Recommended blocked targets include:
 - internal-only hostnames;
 - domains that should never be indexed into shared knowledge.
 
-Hosted deployments should also consider blocking private network ranges unless the instance is intentionally allowed to index internal resources.
+Hosted deployments should also consider blocking private network ranges unless the workspace is intentionally allowed to index internal resources.
 
 ## Path blocklist
 

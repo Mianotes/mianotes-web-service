@@ -4,7 +4,7 @@ The first run creates the first user, the master password, the default storage f
 
 ## What happens on first setup
 
-When no Mianotes instance has been configured yet, the first user joins through:
+When no Mianotes workspace has been configured yet, the first user joins through:
 
 ```text
 POST /api/auth/join
@@ -37,7 +37,7 @@ When the response contains:
 }
 ```
 
-show a setup screen that explains that the first password becomes the master password for this Mianotes instance.
+show a setup screen that explains that the first password becomes the master password for this Mianotes workspace.
 
 ## First folder
 

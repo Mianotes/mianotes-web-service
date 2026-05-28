@@ -56,7 +56,7 @@ def list_jobs(
     recent_succeeded_cutoff = datetime.now(UTC) - RECENT_SUCCEEDED_JOB_WINDOW
     statement = (
         select(MiaJob)
-        .options(joinedload(MiaJob.user), joinedload(MiaJob.note))
+        .options(joinedload(MiaJob.note))
         .where(
             or_(
                 MiaJob.status.in_(("queued", "running", "failed")),
@@ -81,7 +81,7 @@ def get_job(job_id: str, session: SessionDep, user: NotesReadUser) -> MiaJobRead
     job = session.scalars(
         select(MiaJob)
         .where(MiaJob.id == job_id)
-        .options(joinedload(MiaJob.user), joinedload(MiaJob.note))
+        .options(joinedload(MiaJob.note))
     ).one_or_none()
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")

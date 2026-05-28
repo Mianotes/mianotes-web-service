@@ -24,7 +24,7 @@ existing version.
 
 ## Manual tests with temporary storage
 
-Use the temporary storage wrapper when you want to run manual smoke tests, seed data, or start a throwaway service instance:
+Use the temporary storage wrapper when you want to run manual smoke tests, seed data, or start a throwaway service:
 
 ```bash
 ./scripts/with-temp-storage.sh pytest

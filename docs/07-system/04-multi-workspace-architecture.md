@@ -1,8 +1,6 @@
 # Multi-workspace architecture
 
-This document describes the target architecture for supporting multiple Mianotes workspaces from one running app.
-
-It is a design spec, not the current implementation.
+This document describes the architecture for supporting multiple Mianotes workspaces from one running app.
 
 ## Goal
 

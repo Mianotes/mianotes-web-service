@@ -4,18 +4,18 @@ Mianotes is built around shared knowledge with light ownership. Humans and AI ag
 
 ## A normal human workflow
 
-1. Create or join a Mianotes instance.
+1. Create or join a Mianotes workspace.
 2. Create a folder for a project, topic, class, client, trip, or research area.
 3. Add a note from text, file, image, URL, or audio.
 4. Let Mianotes convert the source into Markdown.
 5. Review the note in the web app.
 6. Add tags for discovery.
 7. Ask Mia to summarise, extract, or restructure content when useful.
-8. Share a read-only link when someone outside the instance needs access.
+8. Share a read-only link when someone outside the workspace needs access.
 
-## Shared instances
+## Shared workspaces
 
-Teams, families, developers, researchers, and other small groups can use the same master password to join a Mianotes instance.
+Teams, families, developers, researchers, and other small groups can use the same master password to join a Mianotes workspace.
 
 Everyone can:
 

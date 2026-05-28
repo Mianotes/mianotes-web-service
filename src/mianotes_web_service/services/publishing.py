@@ -56,6 +56,7 @@ from mianotes_web_service.services.publishing_theme import (
     read_publish_theme,
     write_theme_assets,
 )
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 
 def publish_site(session: Session, user: User, payload: PublishRequest) -> PublishedSite:
@@ -74,7 +75,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     ]
     version = str(payload.site_configuration.get("version") or theme.version)
     next_version_slug = version_slug(version)
-    data_dir = get_settings().data_dir
+    data_dir = current_data_dir(get_settings().data_dir)
     html_root = data_dir / "html"
     version_dir = html_root / next_version_slug
     if version_dir.exists():

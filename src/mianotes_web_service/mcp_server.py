@@ -18,8 +18,16 @@ _AGENT_SESSION_TOKEN: str | None = None
 
 TOOL_DEFINITIONS: list[JsonObject] = [
     {
+        "name": "list_workspaces",
+        "description": "List configured Mianotes workspaces.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
         "name": "list_folders",
-        "description": "List Mianotes folders.",
+        "description": "List folders in a Mianotes workspace.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -134,6 +142,22 @@ TOOL_DEFINITIONS: list[JsonObject] = [
 ]
 
 
+for tool in TOOL_DEFINITIONS:
+    if tool["name"] == "list_workspaces":
+        continue
+    schema = tool.get("inputSchema")
+    if not isinstance(schema, dict):
+        continue
+    properties = schema.setdefault("properties", {})
+    if isinstance(properties, dict):
+        properties["workspace"] = {
+            "type": "string",
+            "description": (
+                "Workspace id to use for this call. Omit to use the current/default workspace."
+            ),
+        }
+
+
 def _api_url() -> str:
     return os.environ.get("MIANOTES_API_URL", DEFAULT_API_URL).rstrip("/")
 
@@ -180,6 +204,7 @@ def _request(
     *,
     query: JsonObject | None = None,
     body: JsonObject | None = None,
+    workspace: str | None = None,
 ) -> Any:
     url = f"{_api_url()}{path}"
     if query:
@@ -187,14 +212,17 @@ def _request(
         if clean_query:
             url = f"{url}?{urlencode(clean_query)}"
     data = None if body is None else json.dumps(body).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {_api_token()}",
+        "Content-Type": "application/json",
+    }
+    if workspace:
+        headers["X-Mianotes-Workspace"] = workspace
     request = Request(
         url,
         data=data,
         method=method,
-        headers={
-            "Authorization": f"Bearer {_api_token()}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     try:
         with urlopen(request, timeout=30) as response:
@@ -205,29 +233,56 @@ def _request(
     return json.loads(payload) if payload else None
 
 
+def _workspace_argument(arguments: JsonObject) -> str | None:
+    workspace = arguments.get("workspace")
+    return workspace if isinstance(workspace, str) and workspace else None
+
+
+def _without_workspace(arguments: JsonObject) -> JsonObject:
+    return {key: value for key, value in arguments.items() if key != "workspace"}
+
+
 def call_tool(name: str, arguments: JsonObject) -> Any:
+    workspace = _workspace_argument(arguments)
     if name == "list_folders":
-        return _request("GET", "/api/folders", query=arguments)
+        return _request(
+            "GET",
+            "/api/folders",
+            query=_without_workspace(arguments),
+            workspace=workspace,
+        )
+    if name == "list_workspaces":
+        return _request("GET", "/api/settings/storage")
     if name == "create_folder":
-        return _request("POST", "/api/folders", body={"name": arguments["name"]})
+        return _request(
+            "POST",
+            "/api/folders",
+            body={"name": arguments["name"]},
+            workspace=workspace,
+        )
     if name == "list_notes":
-        return _request("GET", "/api/notes", query=arguments)
+        return _request(
+            "GET",
+            "/api/notes",
+            query=_without_workspace(arguments),
+            workspace=workspace,
+        )
     if name == "get_note":
-        return _request("GET", f"/api/notes/{arguments['note_id']}")
+        return _request("GET", f"/api/notes/{arguments['note_id']}", workspace=workspace)
     if name == "create_note":
         body = {
             key: arguments[key]
             for key in ("folder_id", "text", "title", "tags")
             if key in arguments
         }
-        return _request("POST", "/api/notes/from-text", body=body)
+        return _request("POST", "/api/notes/from-text", body=body, workspace=workspace)
     if name == "create_note_from_url":
         body = {
             key: arguments[key]
             for key in ("folder_id", "url", "title", "tags")
             if key in arguments
         }
-        return _request("POST", "/api/notes/from-url", body=body)
+        return _request("POST", "/api/notes/from-url", body=body, workspace=workspace)
     if name == "update_note":
         note_id = arguments["note_id"]
         body = {
@@ -235,21 +290,28 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
             for key in ("folder_id", "title", "text", "is_published", "tags")
             if key in arguments
         }
-        return _request("PATCH", f"/api/notes/{note_id}", body=body)
+        return _request("PATCH", f"/api/notes/{note_id}", body=body, workspace=workspace)
     if name == "add_comment":
         return _request(
             "POST",
             f"/api/notes/{arguments['note_id']}/comments",
             body={"body": arguments["body"]},
+            workspace=workspace,
         )
     if name == "set_tags":
         return _request(
             "PUT",
             f"/api/notes/{arguments['note_id']}/tags",
             body={"tags": arguments["tags"]},
+            workspace=workspace,
         )
     if name == "search_notes":
-        return _request("GET", "/api/search", query=arguments)
+        return _request(
+            "GET",
+            "/api/search",
+            query=_without_workspace(arguments),
+            workspace=workspace,
+        )
     raise RuntimeError(f"Unknown tool: {name}")
 
 

@@ -44,7 +44,7 @@ ruff check .
 ## Security checks
 
 - `.env` is not committed.
-- `storage.json` is not committed.
+- `workspaces.json` is not committed.
 - `data/`, `.mianotes/`, and `mia.db` are not committed.
 - Example tokens are fake.
 - Docs remind users not to give untrusted agents filesystem access to sensitive files.

@@ -65,6 +65,6 @@ Use stars for notes you personally need to revisit.
 
 ## Publishing and sharing
 
-A note can be shared with a read-only link. Share links are note-level and revocable. A share link does not grant full instance access.
+A note can be shared with a read-only link. Share links are note-level and revocable. A share link does not grant full workspace access.
 
 For details, see [Sharing and comments](03-sharing-and-comments.md).

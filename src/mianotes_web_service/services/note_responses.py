@@ -19,6 +19,7 @@ from mianotes_web_service.services.jobs import decode_job_log, decode_job_payloa
 from mianotes_web_service.services.parsing import normalise_parsed_markdown
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import summarize_markdown_note
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 MISSING_NOTE_FILE_DETAIL = (
     "This note still exists in the database, but its Markdown file no longer exists "
@@ -27,7 +28,7 @@ MISSING_NOTE_FILE_DETAIL = (
 
 
 def file_url(request: Request, path: str | Path) -> str:
-    data_dir = get_settings().data_dir.resolve()
+    data_dir = current_data_dir(get_settings().data_dir).resolve()
     target = Path(path).resolve()
     try:
         public_path = target.relative_to(data_dir)
