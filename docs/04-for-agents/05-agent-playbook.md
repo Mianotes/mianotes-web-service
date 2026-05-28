@@ -59,6 +59,22 @@ What the next human or agent should do.
 
 If the agent creates a note from a file or URL, the response will include a `job_api_url`. Poll the job until it succeeds.
 
+User prompts may look like:
+
+```text
+Import this link into Mia(workspace: Research, folder: Sources):
+https://example.com/article
+```
+
+```text
+Read this PDF and save the key points in Mia(workspace: My App, folder: Research).
+```
+
+```text
+Transcribe this YouTube video and save it in Mia(workspace: Course Notes, folder: Lectures):
+https://www.youtube.com/watch?v=...
+```
+
 ```bash
 curl -sS \
   -H "Authorization: Bearer ${MIANOTES_API_KEY}" \

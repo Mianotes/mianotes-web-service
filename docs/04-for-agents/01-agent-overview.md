@@ -14,6 +14,7 @@ An agent can:
 - add notes from text;
 - create notes from URLs;
 - upload files through the REST API;
+- convert documents, links, images, and audio into Markdown notes;
 - read notes;
 - update notes;
 - set tags;
@@ -106,5 +107,31 @@ Read docs/ and document this app in Mia(workspace: Mianotes, folder: Documentati
 ```
 
 When saving with `Mia(workspace: ..., folder: ...)`, create a useful title from the content if the user did not provide one.
+
+## Converting source material
+
+Agents can ask Mianotes to convert source material into Markdown notes.
+
+Examples:
+
+```text
+Import this link into Mia(workspace: Research, folder: Sources):
+https://example.com/article
+```
+
+```text
+Read this PDF and save the key points in Mia(workspace: My App, folder: Research).
+```
+
+```text
+Convert docs/product-spec.docx into a note in Mia(workspace: My App, folder: Specs).
+```
+
+```text
+Transcribe this YouTube video and save it in Mia(workspace: Course Notes, folder: Lectures):
+https://www.youtube.com/watch?v=...
+```
+
+Links and files are ingested as background jobs. Agents should create the note, poll the returned job URL until it succeeds, then fetch the final Markdown note.
 
 Read next: [API tokens](02-api-tokens.md) or [MCP server](03-mcp-server.md).
