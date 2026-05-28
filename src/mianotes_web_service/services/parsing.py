@@ -90,6 +90,7 @@ from mianotes_web_service.services.parser_types import (
 )
 from mianotes_web_service.services.parser_url import (
     DEFAULT_BROWSER_USER_AGENT,
+    fetch_url_to_file,
     fetch_url_to_html,
 )
 from mianotes_web_service.services.parser_url import (
@@ -100,6 +101,9 @@ from mianotes_web_service.services.parser_url import (
 )
 from mianotes_web_service.services.parser_url import (
     is_youtube_url as is_youtube_url,
+)
+from mianotes_web_service.services.parser_url import (
+    url_source_extension as url_source_extension,
 )
 from mianotes_web_service.services.parser_youtube import (
     parse_youtube_audio_with_downloader,
@@ -313,5 +317,13 @@ def parse_url(
     if work_dir is None:
         with tempfile.TemporaryDirectory(prefix="mianotes-url-") as temp_dir:
             return parse_url(url, work_dir=Path(temp_dir), user_agent=user_agent)
+    source_extension = url_source_extension(url)
+    if source_extension and source_extension not in {".htm", ".html"}:
+        source_path = fetch_url_to_file(
+            url,
+            work_dir / f"source{source_extension}",
+            user_agent=user_agent,
+        )
+        return parse_document(source_path)
     html_path = fetch_url_to_html(url, work_dir / "page.html", user_agent=user_agent)
     return parse_html_document(html_path, url=url)

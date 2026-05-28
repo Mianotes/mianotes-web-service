@@ -21,6 +21,27 @@ YOUTUBE_HOSTS = {
     "youtube.com",
     "youtu.be",
 }
+REMOTE_FILE_EXTENSIONS = {
+    ".csv",
+    ".doc",
+    ".docx",
+    ".htm",
+    ".html",
+    ".jpeg",
+    ".jpg",
+    ".m4a",
+    ".md",
+    ".markdown",
+    ".mp3",
+    ".odt",
+    ".pdf",
+    ".png",
+    ".rtf",
+    ".tif",
+    ".tiff",
+    ".txt",
+    ".wav",
+}
 
 
 def trafilatura_module():
@@ -75,7 +96,20 @@ def extract_readable_html(html_path: Path, *, url: str | None = None) -> str | N
     return f"<!doctype html>\n<html><body>\n{extracted}\n</body></html>\n"
 
 
-def fetch_url_to_html(
+def url_source_extension(url: str) -> str | None:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"}:
+        return None
+    extension = Path(parsed.path).suffix.lower()
+    if extension in REMOTE_FILE_EXTENSIONS:
+        return extension
+    return None
+
+
+def fetch_url_to_file(
     url: str,
     output_path: Path,
     *,
@@ -98,6 +132,21 @@ def fetch_url_to_html(
         status="succeeded",
     )
     return output_path
+
+
+def fetch_url_to_html(
+    url: str,
+    output_path: Path,
+    *,
+    user_agent: str = DEFAULT_BROWSER_USER_AGENT,
+    timeout: int = 30,
+) -> Path:
+    return fetch_url_to_file(
+        url,
+        output_path,
+        user_agent=user_agent,
+        timeout=timeout,
+    )
 
 
 def is_youtube_url(url: str) -> bool:

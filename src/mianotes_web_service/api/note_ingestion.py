@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import mimetypes
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlparse
@@ -35,6 +36,7 @@ from mianotes_web_service.services.note_responses import (
     note_response,
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
+from mianotes_web_service.services.parser_url import url_source_extension
 from mianotes_web_service.services.storage import (
     FilesystemStorage,
     infer_title,
@@ -271,6 +273,7 @@ def create_note_from_url(
     url = str(payload.url)
     parsed_url = urlparse(url)
     title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
+    source_extension = url_source_extension(url) or ".html"
     note_id = new_id()
     storage = FilesystemStorage(current_data_dir(get_settings().data_dir))
     paths = storage.write_url_note_placeholder(
@@ -279,6 +282,7 @@ def create_note_from_url(
         title=title,
         filename=note_id,
         url=url,
+        source_extension=source_extension,
     )
     if paths.source_path is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -301,7 +305,7 @@ def create_note_from_url(
         filename=str(paths.source_path.relative_to(paths.directory)),
         file_path=str(paths.source_path),
         original_filename=url[:500],
-        content_type="text/html",
+        content_type=mimetypes.types_map.get(source_extension, "application/octet-stream"),
     )
     session.add(source_file)
     session.flush()

@@ -56,6 +56,13 @@ Clients should poll the job endpoint until the job reaches `succeeded`.
 
 ## URL ingestion
 
+For direct links to supported files, such as PDFs, documents, images, text files,
+and audio files:
+
+1. Mianotes detects the file extension from the URL.
+2. The original file is downloaded into the note's `sources/` directory.
+3. Mianotes passes the saved file to the same parser path used for uploads.
+
 For web pages:
 
 1. Mianotes downloads HTML using a browser-like user agent.

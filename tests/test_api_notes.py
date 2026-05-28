@@ -828,6 +828,38 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     )
 
 
+def test_create_note_from_url_preserves_remote_file_extension(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "pdf-url@example.com",
+            "name": "PDF URL User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Remote PDFs"}).json()
+
+    response = client.post(
+        "/api/notes/from-url",
+        json={
+            "folder_id": folder["id"],
+            "url": "https://cdn.openai.com/business-guides-and-resources/identifying-and-scaling-ai-use-cases.pdf",
+        },
+    )
+
+    assert response.status_code == 201
+    note = response.json()
+    assert note["source_type"] == "link"
+    assert note["source_files"][0]["original_filename"].endswith(
+        "/identifying-and-scaling-ai-use-cases.pdf"
+    )
+    assert note["source_files"][0]["content_type"] == "application/pdf"
+    assert note["source_files"][0]["url"].endswith(
+        f"/markdown/remote-pdfs/sources/{note['id'][:8]}/original.pdf"
+    )
+
+
 def test_agent_created_url_job_includes_client(client: TestClient):
     client.post(
         "/api/auth/join",

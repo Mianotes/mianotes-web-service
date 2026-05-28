@@ -16,6 +16,7 @@ from mianotes_web_service.services.jobs import (
 )
 from mianotes_web_service.services.parser_youtube import NO_YOUTUBE_SPEECH_MESSAGE
 from mianotes_web_service.services.parsing import (
+    fetch_url_to_file,
     fetch_url_to_html,
     is_youtube_url,
     parse_document,
@@ -236,6 +237,9 @@ def _run_parse_url_job(session: Session, job: MiaJob) -> dict[str, object]:
 
     if is_youtube_url(url):
         parsed = parse_youtube_url(url)
+    elif source_file_path(source_file).suffix.lower() not in {".htm", ".html"}:
+        source_path = fetch_url_to_file(url, source_file_path(source_file))
+        parsed = parse_document(source_path)
     else:
         html_path = fetch_url_to_html(url, source_file_path(source_file))
         parsed = parse_html_document(html_path, url=url)

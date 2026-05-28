@@ -140,13 +140,14 @@ class FilesystemStorage:
         title: str,
         filename: str,
         url: str,
+        source_extension: str = ".html",
     ) -> NotePaths:
         paths = self.note_paths(
             username=username,
             folder=folder,
             filename=filename,
             title=title,
-            source_extension=".html",
+            source_extension=source_extension,
         )
         self.prepare_folder_directory(paths.directory)
         if paths.source_path is not None:

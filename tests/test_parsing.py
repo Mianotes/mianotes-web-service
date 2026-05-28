@@ -943,6 +943,34 @@ def test_parse_url_fetches_html_then_converts_local_file(
     assert "source=page.html" in parsed.text
 
 
+def test_parse_url_downloads_remote_file_then_converts_source_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    fetched: list[tuple[str, Path]] = []
+
+    def fake_fetch_url_to_file(url: str, output_path: Path, **_kwargs):
+        fetched.append((url, output_path))
+        output_path.write_bytes(b"%PDF-1.4")
+        return output_path
+
+    monkeypatch.setattr(parsing, "fetch_url_to_file", fake_fetch_url_to_file)
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("Converted PDF"),
+    )
+
+    url = "https://cdn.openai.com/business-guides-and-resources/identifying-and-scaling-ai-use-cases.pdf"
+    parsed = parse_url(url, work_dir=tmp_path)
+
+    assert fetched == [(url, tmp_path / "source.pdf")]
+    assert parsed.parser == "markitdown"
+    assert parsed.source_path == tmp_path / "source.pdf"
+    assert "Converted PDF" in parsed.text
+    assert "source=source.pdf" in parsed.text
+
+
 def test_is_youtube_url_accepts_common_video_urls():
     assert is_youtube_url("https://www.youtube.com/watch?v=abc123")
     assert is_youtube_url("https://youtu.be/abc123")

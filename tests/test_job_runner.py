@@ -157,6 +157,56 @@ def test_job_runner_parses_regular_url_with_html_fetch(
         assert decode_job_payload(job.result_json)["parser"] == "markitdown"
 
 
+def test_job_runner_parses_remote_file_url_as_document(
+    tmp_path: Path,
+    monkeypatch,
+):
+    testing_session = _session_factory()
+    source_path = tmp_path / "data" / "folder" / "sources" / "note1234" / "original.pdf"
+    note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
+    fetched: list[tuple[str, Path]] = []
+    parsed_paths: list[Path] = []
+
+    def fake_fetch_url_to_file(url: str, output_path: Path):
+        fetched.append((url, output_path))
+        output_path.write_bytes(b"%PDF-1.4")
+        return output_path
+
+    def fake_parse_document(path: Path) -> ParsedDocument:
+        parsed_paths.append(path)
+        return ParsedDocument(text="Parsed PDF URL", parser="markitdown", source_path=path)
+
+    monkeypatch.setattr(job_runner, "fetch_url_to_file", fake_fetch_url_to_file)
+    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_url",
+            note_id=note_id,
+            input_payload={
+                "source_file_id": source_file_id,
+                "url": "https://cdn.example.com/report.pdf",
+            },
+        )
+        session.commit()
+        job_id = job.id
+
+    InProcessJobRunner(testing_session).run(job_id)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        assert fetched == [("https://cdn.example.com/report.pdf", source_path)]
+        assert parsed_paths == [source_path]
+        assert note.status == "ready"
+        assert "Parsed PDF URL" in Path(note.note_path).read_text(encoding="utf-8")
+        assert decode_job_payload(job.result_json)["parser"] == "markitdown"
+
+
 def test_job_runner_parses_youtube_url_with_markitdown_url_converter(
     tmp_path: Path,
     monkeypatch,
