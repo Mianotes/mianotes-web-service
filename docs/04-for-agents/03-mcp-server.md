@@ -40,8 +40,6 @@ MIANOTES_API_KEY=mia_or_service_key_here
 MIANOTES_CLIENT_NAME=Codex
 ```
 
-`MIANOTES_API_TOKEN` is still accepted as a backwards-compatible alias.
-
 On startup, the MCP server exchanges `MIANOTES_API_KEY` and
 `MIANOTES_CLIENT_NAME` for a short-lived agent session:
 
@@ -57,9 +55,9 @@ key. Unknown client names default to `MCP`.
 
 Use scoped per-user API tokens when an agent should only read notes or work in a limited role.
 
-## Current MCP tools
+## MCP tools
 
-The current MCP surface includes tools for:
+The MCP surface includes tools for:
 
 - listing folders;
 - creating folders;
@@ -90,14 +88,14 @@ Agents should poll `job_api_url` until the job reaches `succeeded`, then call `g
 
 ## File ingestion
 
-The MCP server does not currently expose binary file upload. File ingestion is available through:
+File ingestion is available through the REST API:
 
 ```text
 POST /api/notes/from-file
 ```
 
-An MCP file-ingestion tool can be added later if agent clients need to pass local files through the MCP surface.
+Use the REST file upload endpoint when an agent needs to send local files to Mia.
 
 ## Design rule
 
-The MCP server should stay thin. It should not read `mia.db`, bypass REST permissions, or write files directly. The API remains the single authority for permissions, parsing, job state, and persistence.
+The MCP server stays thin. It does not read `mia.db`, bypass REST permissions, or write files directly. The API remains the single authority for permissions, parsing, job state, and persistence.

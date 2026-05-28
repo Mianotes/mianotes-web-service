@@ -17,7 +17,7 @@ Mia can help with:
 
 ## Mia belongs in the backend
 
-Mia should be implemented as a backend service and agent layer, not frontend-only behaviour.
+Mia runs as a backend service and agent layer, not frontend-only behaviour.
 
 The web app can collect prompts and show results, but the backend owns:
 

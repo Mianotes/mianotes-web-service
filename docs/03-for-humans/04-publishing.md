@@ -61,7 +61,7 @@ without adding notes, **New notes** should be empty.
 
 ## Themes
 
-Mianotes currently ships two static publishing themes:
+Mianotes ships two static publishing themes:
 
 | Theme ID | Name | Use |
 |---|---|---|

@@ -17,7 +17,7 @@ The parser can handle common source types such as:
 - archives;
 - YouTube URLs and other URLs supported by the parser stack.
 
-The file upload endpoint currently supports these extensions:
+The file upload endpoint supports these extensions:
 
 ```text
 .csv
@@ -124,4 +124,4 @@ Install `ffmpeg` separately if you plan to parse audio or video sources.
 
 ## Parser design rule
 
-Keep specialist parsers behind the same adapter boundary. The API contract should not change when a new local or hosted parser is added.
+Keep specialist parsers behind the same adapter boundary so the API contract stays stable.

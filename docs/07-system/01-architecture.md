@@ -61,7 +61,7 @@ SQLite tracks:
 - share tokens;
 - Mia jobs.
 
-The repository and service boundaries should stay clean enough to support a future PostgreSQL adapter without changing the public API contract.
+The repository and service boundaries keep storage concerns separate from the public API contract.
 
 ## Jobs
 

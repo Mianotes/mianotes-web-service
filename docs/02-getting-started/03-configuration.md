@@ -18,7 +18,6 @@ For normal local use, configure only the LLM provider and API key. Leave storage
 | `MIANOTES_LLM_API_KEY` | empty | LLM provider API key or local placeholder. |
 | `MIANOTES_LLM_IMAGE_MODEL` | empty | Optional multimodal OpenAI model for image OCR fallback. |
 | `MIANOTES_API_KEY` | empty | Service-wide bearer token used by local agents and MCP. |
-| `MIANOTES_API_TOKEN` | empty | Backwards-compatible alias accepted for API token use. |
 
 ## Ports
 
@@ -27,7 +26,6 @@ Mianotes services use the `8200` range:
 ```text
 8200  web service
 8201  alternate local service
-8202  future service
 ```
 
 To start on another port during development:

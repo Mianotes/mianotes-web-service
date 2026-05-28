@@ -7,7 +7,7 @@ This page gives practical patterns for agents using Mianotes.
 1. Search Mianotes for relevant context.
 2. Read the most relevant notes fully.
 3. Create a new note if the task is new.
-4. Add tags that will help future agents find it.
+4. Add tags that will help other agents find it.
 
 Example search:
 

@@ -2,16 +2,16 @@
 
 This page is the home for customisation guidance.
 
-Mianotes has two kinds of customisation today:
+Mianotes has two kinds of customisation:
 
 - runtime configuration for the web service, parser, storage, and model providers;
 - static publishing themes used when notes are exported as documentation sites.
 
-The main web app does not yet have a public theme API. Treat its visual design as application code. The static site publisher does have a small theme boundary.
+Treat the main web app visual design as application code. Static site publishing themes use a small theme boundary.
 
 ## Static publishing themes
 
-Mianotes currently ships two static publishing themes:
+Mianotes ships two static publishing themes:
 
 | Theme ID | Name | Purpose |
 |---|---|---|
@@ -77,7 +77,6 @@ See [Configuration options](../02-getting-started/03-configuration.md) for envir
 ```text
 8200  web service
 8201  alternate local service
-8202  future service
 ```
 
 ## Storage customisation
@@ -102,7 +101,7 @@ Admins can switch between allowed local folders from the Settings screen.
 
 The parser stack is adapter-based. The default adapter uses Microsoft MarkItDown, with additional URL cleanup, source storage, OCR, and optional OpenAI image fallback.
 
-Specialist local or hosted parsers should be added behind the same parser adapter boundary so API behaviour remains stable.
+Specialist local or hosted parsers belong behind the same parser adapter boundary so API behaviour remains stable.
 
 ## LLM customisation
 
@@ -123,9 +122,9 @@ MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
 MIANOTES_LLM_API_KEY=ollama
 ```
 
-## Web app theme conventions to document when added
+## Web app theme conventions
 
-When the frontend app grows a formal theme system, document these decisions here:
+Keep these decisions documented when changing the web app visual system:
 
 - colour tokens;
 - typography scale;

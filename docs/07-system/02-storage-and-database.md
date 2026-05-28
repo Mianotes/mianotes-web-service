@@ -51,9 +51,9 @@ Each location points to a workspace folder that contains, or can contain, a `.mi
 
 Users, sessions, API keys, and global settings live in `data/system.db`.
 
-## Why `storage.example.json` exists
+## `storage.example.json`
 
-The repository includes `storage.example.json` as a legacy template only. It is safe to commit because it does not represent a real user machine. New installs use `workspaces.json`.
+The repository includes `storage.example.json` as a safe example configuration. It does not represent a real user machine and can be committed.
 
 The real `workspaces.json` is created and updated by each installation. It is ignored by Git because it can contain local filesystem paths that only make sense on that computer or server.
 
@@ -100,7 +100,7 @@ MIANOTES_DATA_DIR=/absolute/path/to/mianotes-data
 
 When `MIANOTES_DATA_DIR` is set and `MIANOTES_STORAGE_CONFIG_PATH` is not set, Mianotes uses that folder as the default workspace folder and creates `data/system.db` for global state. This is mainly useful for tests and scripted deployments.
 
-## Files that should stay private
+## Private files
 
 Do not commit these to a public repository:
 
