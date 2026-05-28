@@ -211,6 +211,11 @@ class NoteListItem(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NoteWorkspaceRead(BaseModel):
+    workspace_id: str
+    workspace_name: str
+
+
 class SearchResult(BaseModel):
     note: NoteListItem
     line_number: int

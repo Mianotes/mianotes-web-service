@@ -23,6 +23,8 @@ from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_or_404,
 )
+from mianotes_web_service.core.config import get_settings
+from mianotes_web_service.db import session as db_session
 from mianotes_web_service.db.models import (
     Folder,
     MiaJob,
@@ -35,6 +37,7 @@ from mianotes_web_service.domain.schemas import (
     NoteRead,
     NoteStarUpdate,
     NoteUpdate,
+    NoteWorkspaceRead,
     TagsUpdate,
 )
 from mianotes_web_service.services.mia import prompt_markdown
@@ -55,6 +58,8 @@ from mianotes_web_service.services.storage import (
     replace_markdown_title,
     summarize_text,
 )
+from mianotes_web_service.services.storage_settings import read_storage_config
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -99,6 +104,36 @@ def list_notes(
     if needs_summary_backfill:
         session.commit()
     return items
+
+
+@router.get("/{note_id}/workspace", response_model=NoteWorkspaceRead)
+def get_note_workspace(
+    note_id: str,
+    _: NotesReadUser,
+) -> NoteWorkspaceRead:
+    settings = get_settings()
+    config = read_storage_config(
+        settings.storage_config_path,
+        default_data_dir=settings.data_dir,
+    )
+    for location in config.locations:
+        workspace = WorkspaceContext(
+            id=location.id,
+            name=location.name,
+            folder_path=location.folder_path,
+            database_file=config.database_file,
+        )
+        session_factory = db_session.sessionmaker_for_workspace(workspace)
+        with session_factory() as workspace_session:
+            note_exists = workspace_session.scalar(
+                select(exists().where(Note.id == note_id))
+            )
+            if note_exists:
+                return NoteWorkspaceRead(
+                    workspace_id=location.id,
+                    workspace_name=location.name,
+                )
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Note not found")
 
 
 @router.get("/{note_id}", response_model=NoteRead)
