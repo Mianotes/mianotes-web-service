@@ -1,5 +1,6 @@
 from collections.abc import Generator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +12,9 @@ from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base, MiaJob, Note, User
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.api.note_ingestion import _enqueue_job
 from mianotes_web_service.services import job_runner
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 
 @pytest.fixture
@@ -40,6 +43,30 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
         yield test_client
     app.dependency_overrides.clear()
     get_settings.cache_clear()
+
+
+def test_enqueue_job_uses_session_workspace(tmp_path: Path):
+    calls = []
+
+    class FakeJobRunner:
+        def enqueue(self, background_tasks, job_id: str, workspace=None):
+            calls.append((background_tasks, job_id, workspace))
+
+    background_tasks = object()
+    workspace = WorkspaceContext(
+        id="blog",
+        name="Blog",
+        folder_path=tmp_path / "blog",
+        database_file="mia.db",
+    )
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(job_runner=FakeJobRunner()))
+    )
+    session = SimpleNamespace(info={"workspace": workspace})
+
+    _enqueue_job(request, background_tasks, "job-id", session)
+
+    assert calls == [(background_tasks, "job-id", workspace)]
 
 
 def test_create_note_from_text_writes_files_and_db_records(client: TestClient, tmp_path: Path):

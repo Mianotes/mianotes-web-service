@@ -42,7 +42,7 @@ from mianotes_web_service.services.storage import (
     infer_title,
     summarize_text,
 )
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.workspace_context import WorkspaceContext, current_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -94,8 +94,18 @@ def _source_type_from_filename(filename: str) -> str:
     return SOURCE_TYPE_BY_EXTENSION.get(Path(filename).suffix.lower(), "file")
 
 
-def _enqueue_job(request: Request, background_tasks: BackgroundTasks, job_id: str) -> None:
-    request.app.state.job_runner.enqueue(background_tasks, job_id)
+def _enqueue_job(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    job_id: str,
+    session: Session,
+) -> None:
+    workspace = session.info.get("workspace")
+    request.app.state.job_runner.enqueue(
+        background_tasks,
+        job_id,
+        workspace if isinstance(workspace, WorkspaceContext) else None,
+    )
 
 
 def _ensure_notes_write(context: AuthContext):
@@ -247,7 +257,7 @@ def create_note_from_file(
     )
     session.commit()
     session.refresh(job)
-    _enqueue_job(request, background_tasks, job.id)
+    _enqueue_job(request, background_tasks, job.id, session)
     return note_ingestion_response(
         read_note_or_404(session, note.id),
         job,
@@ -325,7 +335,7 @@ def create_note_from_url(
     )
     session.commit()
     session.refresh(job)
-    _enqueue_job(request, background_tasks, job.id)
+    _enqueue_job(request, background_tasks, job.id, session)
     return note_ingestion_response(
         read_note_or_404(session, note.id),
         job,

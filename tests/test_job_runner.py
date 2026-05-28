@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -14,6 +15,7 @@ from mianotes_web_service.services.jobs import (
     decode_job_payload,
 )
 from mianotes_web_service.services.parsing import ParsedDocument
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 
 def _session_factory() -> sessionmaker[Session]:
@@ -69,6 +71,26 @@ def _seed_note(
             source_file_id = source_file.id
         session.commit()
         return note.id, source_file_id
+
+
+def test_job_runner_enqueue_uses_request_workspace(tmp_path: Path):
+    runner = InProcessJobRunner(_session_factory())
+    background_tasks = SimpleNamespace(calls=[])
+
+    def add_task(func, *args):
+        background_tasks.calls.append((func, args))
+
+    background_tasks.add_task = add_task
+    workspace = WorkspaceContext(
+        id="blog",
+        name="Blog",
+        folder_path=tmp_path / "blog",
+        database_file="mia.db",
+    )
+
+    runner.enqueue(background_tasks, "job-id", workspace)
+
+    assert background_tasks.calls == [(runner.run, ("job-id", workspace))]
 
 
 def test_job_runner_parses_file_and_updates_note(

@@ -69,8 +69,17 @@ class InProcessJobRunner:
     ) -> None:
         self.session_factory = session_factory
 
-    def enqueue(self, background_tasks: BackgroundTasks, job_id: str) -> None:
-        background_tasks.add_task(self.run, job_id, current_workspace())
+    def enqueue(
+        self,
+        background_tasks: BackgroundTasks,
+        job_id: str,
+        workspace: WorkspaceContext | None = None,
+    ) -> None:
+        background_tasks.add_task(
+            self.run,
+            job_id,
+            workspace if workspace is not None else current_workspace(),
+        )
 
     def _session_factory(self, workspace: WorkspaceContext | None) -> sessionmaker[Session]:
         if isinstance(self.session_factory, sessionmaker):
