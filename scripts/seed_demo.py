@@ -72,6 +72,11 @@ def parse_args() -> argparse.Namespace:
         help="Seed only global users and profile photos, without creating workspace notes.",
     )
     parser.add_argument(
+        "--preserve-existing-passwords",
+        action="store_true",
+        help="Keep passwords for existing users and the existing master password.",
+    )
+    parser.add_argument(
         "--note-owner-seed",
         type=int,
         default=42,
@@ -203,8 +208,13 @@ def seed_users(
     avatars_dir: Path,
     count: int,
     data_dir: Path,
+    preserve_existing_passwords: bool = False,
 ):
-    from mianotes_web_service.services.auth import set_master_password, set_user_password
+    from mianotes_web_service.services.auth import (
+        get_master_password_hash,
+        set_master_password,
+        set_user_password,
+    )
 
     admin = upsert_user(
         session,
@@ -214,7 +224,8 @@ def seed_users(
         avatar_path=None,
         data_dir=data_dir,
     )
-    set_user_password(admin, password)
+    if not preserve_existing_passwords or not admin.password_hash:
+        set_user_password(admin, password)
     demo_users = []
     avatar_paths = sorted(
         path
@@ -231,9 +242,11 @@ def seed_users(
             avatar_path=avatar_path,
             data_dir=data_dir,
         )
-        set_user_password(demo_user, password)
+        if not preserve_existing_passwords or not demo_user.password_hash:
+            set_user_password(demo_user, password)
         demo_users.append(demo_user)
-    set_master_password(session, password)
+    if not preserve_existing_passwords or get_master_password_hash(session) is None:
+        set_master_password(session, password)
     return admin, demo_users
 
 
@@ -406,6 +419,7 @@ def main() -> int:
             avatars_dir=args.avatars_dir,
             count=args.demo_user_count,
             data_dir=settings.data_dir,
+            preserve_existing_passwords=args.preserve_existing_passwords,
         )
         if not args.users_only:
             note_owners = [admin, *demo_users] if args.random_note_owners else [admin]

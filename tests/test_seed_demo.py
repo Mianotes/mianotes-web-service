@@ -49,5 +49,52 @@ def test_seed_demo_users_only_creates_system_users_without_workspace_content(tmp
 
     with sqlite3.connect(system_database) as connection:
         users = connection.execute("SELECT email, name, is_admin FROM users").fetchall()
+        original_password_hash = connection.execute(
+            "SELECT password_hash FROM users WHERE email = ?",
+            ("admin@example.com",),
+        ).fetchone()[0]
+        original_master_hash = connection.execute(
+            "SELECT value FROM app_settings WHERE key = ?",
+            ("master_password_hash",),
+        ).fetchone()[0]
 
     assert users == [("admin@example.com", "Admin User", 1)]
+
+    preserved = subprocess.run(
+        [
+            sys.executable,
+            "scripts/seed_demo.py",
+            "--admin-email",
+            "admin@example.com",
+            "--admin-name",
+            "Admin User",
+            "--avatars-dir",
+            str(avatars_dir),
+            "--demo-user-count",
+            "0",
+            "--password",
+            "changed-password",
+            "--users-only",
+            "--preserve-existing-passwords",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert preserved.returncode == 0, preserved.stderr
+
+    with sqlite3.connect(system_database) as connection:
+        next_password_hash = connection.execute(
+            "SELECT password_hash FROM users WHERE email = ?",
+            ("admin@example.com",),
+        ).fetchone()[0]
+        next_master_hash = connection.execute(
+            "SELECT value FROM app_settings WHERE key = ?",
+            ("master_password_hash",),
+        ).fetchone()[0]
+
+    assert next_password_hash == original_password_hash
+    assert next_master_hash == original_master_hash
