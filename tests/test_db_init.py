@@ -10,6 +10,7 @@ from mianotes_web_service.db.init import (
     create_workspace_database,
 )
 from mianotes_web_service.db.models import ApiToken, Folder, SessionToken, User
+from mianotes_web_service.db import session as db_session
 from mianotes_web_service.db.session import create_database_engine
 from mianotes_web_service.services.auth import create_session_token
 from mianotes_web_service.services.workspace_context import (
@@ -137,6 +138,31 @@ def test_reset_current_workspace_tolerates_different_context(tmp_path):
     token = copy_context().run(set_current_workspace, workspace)
 
     reset_current_workspace(token)
+
+
+def test_get_session_cleanup_tolerates_different_context(tmp_path, monkeypatch):
+    workspace = WorkspaceContext(
+        id="research",
+        name="Research",
+        folder_path=tmp_path / "research",
+        database_file=".mianotes/mia.db",
+    )
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'research' / '.mianotes' / 'mia.db'}")
+    create_workspace_database(engine)
+    SessionLocal = sessionmaker(
+        bind=engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+    )
+    monkeypatch.setattr(db_session, "resolve_workspace", lambda **_kwargs: workspace)
+    monkeypatch.setattr(db_session, "sessionmaker_for_workspace", lambda _workspace: SessionLocal)
+
+    session_dependency = db_session.get_session(object())
+    opened_session = copy_context().run(lambda: next(session_dependency))
+
+    assert opened_session.info["workspace"] == workspace
+    session_dependency.close()
 
 
 def test_create_database_adds_password_hash_to_existing_users_table():
