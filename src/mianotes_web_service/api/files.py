@@ -14,10 +14,20 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, SourceFile
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import note_file_path, source_file_path
+from mianotes_web_service.services.storage_settings import (
+    DATABASE_FILENAME,
+    DATABASE_SIDECAR_SUFFIXES,
+    SYSTEM_DATABASE_FILENAME,
+)
 from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(tags=["files"])
-PRIVATE_DATA_FILENAMES = {"mia.db", "mia.db-wal", "mia.db-shm", "mia.db-journal"}
+PRIVATE_DATA_FILENAMES = {
+    DATABASE_FILENAME,
+    SYSTEM_DATABASE_FILENAME,
+    *(f"{DATABASE_FILENAME}{suffix}" for suffix in DATABASE_SIDECAR_SUFFIXES),
+    *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in DATABASE_SIDECAR_SUFFIXES),
+}
 
 
 def _file_response(file_path: str, *, no_store: bool = False) -> FileResponse:

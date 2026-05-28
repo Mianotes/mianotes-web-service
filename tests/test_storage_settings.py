@@ -45,6 +45,10 @@ def test_add_storage_location_places_new_database_first(tmp_path: Path):
     assert ".mianotes/" in gitignore
     assert ".mianotes/mia.db" in gitignore
     assert "mia.db" in gitignore
+    assert "system.db" in gitignore
+    assert "system.db-wal" in gitignore
+    assert "system.db-shm" in gitignore
+    assert "system.db-journal" in gitignore
 
 
 def test_storage_config_preserves_location_order(tmp_path: Path):

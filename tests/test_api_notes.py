@@ -165,7 +165,14 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
 
     assert client.get(f"/data/meeting-notes/{note_filename}.md").status_code == 404
     (tmp_path / "data" / "mia.db").write_text("private database", encoding="utf-8")
+    (tmp_path / "data" / "system.db").write_text("private system database", encoding="utf-8")
+    (tmp_path / "data" / "system.db-wal").write_text(
+        "private system database sidecar",
+        encoding="utf-8",
+    )
     assert client.get("/mia.db").status_code == 404
+    assert client.get("/system.db").status_code == 404
+    assert client.get("/system.db-wal").status_code == 404
 
 
 def test_get_note_normalizes_legacy_parser_markdown(client: TestClient, tmp_path: Path):

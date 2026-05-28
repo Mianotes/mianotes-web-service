@@ -23,6 +23,10 @@ Mianotes also writes a `.gitignore` into each selected storage folder:
 .mianotes/
 .mianotes/mia.db
 mia.db
+system.db
+system.db-wal
+system.db-shm
+system.db-journal
 ```
 
 This keeps private runtime data out of Git repositories when users choose a project folder.
@@ -109,7 +113,8 @@ workspaces.json
 data/
 .mianotes/
 mia.db
+system.db
 .env
 ```
 
-Database files are never served by the file API. Source and Markdown files are served through controlled routes, but `mia.db` is blocked.
+Database files are never served by the file API. Source and Markdown files are served through controlled routes, but `mia.db`, `system.db`, and their SQLite sidecars are blocked.
