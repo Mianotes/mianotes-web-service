@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -21,12 +21,15 @@ _current_workspace: ContextVar[WorkspaceContext | None] = ContextVar(
 )
 
 
-def set_current_workspace(workspace: WorkspaceContext):
+def set_current_workspace(workspace: WorkspaceContext | None) -> Token[WorkspaceContext | None]:
     return _current_workspace.set(workspace)
 
 
-def reset_current_workspace(token) -> None:
-    _current_workspace.reset(token)
+def reset_current_workspace(token: Token[WorkspaceContext | None]) -> None:
+    try:
+        _current_workspace.reset(token)
+    except ValueError:
+        _current_workspace.set(None)
 
 
 def current_workspace() -> WorkspaceContext | None:

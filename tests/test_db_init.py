@@ -1,3 +1,5 @@
+from contextvars import copy_context
+
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -123,6 +125,18 @@ def test_session_token_records_current_workspace(tmp_path):
         stored_token = session.get(SessionToken, session_token.id)
         assert stored_token is not None
         assert stored_token.workspace_id == "research"
+
+
+def test_reset_current_workspace_tolerates_different_context(tmp_path):
+    workspace = WorkspaceContext(
+        id="research",
+        name="Research",
+        folder_path=tmp_path / "research",
+        database_file=".mianotes/mia.db",
+    )
+    token = copy_context().run(set_current_workspace, workspace)
+
+    reset_current_workspace(token)
 
 
 def test_create_database_adds_password_hash_to_existing_users_table():
