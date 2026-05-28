@@ -83,12 +83,28 @@ MCP tools accept a `workspace` argument for workspace-content calls. REST client
 X-Mianotes-Workspace: <workspace-id>
 ```
 
-Use these shorthand forms in prompts and agent instructions:
+Use this prompt syntax when asking an agent to use Mianotes:
 
-- `Mia(<workspace>: <search_query>)` searches a workspace.
-- `Mia(<workspace>/<folder>: <search_query>)` searches a folder inside a workspace.
-- `Mia(<workspace>/<folder>)` saves content into that workspace and folder.
+- `Mia(workspace: My Project, query: deployment notes)` searches a workspace.
+- `Mia(workspace: My Project, folder: Docs)` retrieves context from a folder.
+- `Mia(workspace: My Project, folder: Docs, query: publishing workflow)` searches inside a folder.
+- `Mia(workspace: My Project, folder: Docs, note: Architecture)` retrieves a specific note.
+- `Mia(workspace: My Project, folder: Architecture)` saves content into that workspace and folder when the user asks the agent to save something.
 
-When saving with `Mia(<workspace>/<folder>)`, create a useful title from the content if the user did not provide one.
+Examples:
+
+```text
+Before answering, search Mia(workspace: My Project, folder: Docs, note: Architecture).
+```
+
+```text
+Save our architecture discussion in Mia(workspace: My App, folder: Architecture).
+```
+
+```text
+Read docs/ and document this app in Mia(workspace: Mianotes, folder: Documentation).
+```
+
+When saving with `Mia(workspace: ..., folder: ...)`, create a useful title from the content if the user did not provide one.
 
 Read next: [API tokens](02-api-tokens.md) or [MCP server](03-mcp-server.md).

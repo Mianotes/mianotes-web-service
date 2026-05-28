@@ -129,17 +129,19 @@ The same key works across all workspaces.
 
 Agent and MCP tools must be workspace-aware. They should accept an explicit workspace argument where possible.
 
-Mianotes skills and agent docs should support these shorthands after the workspace-aware API exists:
+Mianotes skills and agent docs should support explicit workspace syntax:
 
 ```text
-Mia(<workspace>: <search_query>)
-Mia(<workspace>/<folder>: <search_query>)
-Mia(<workspace>/<folder>)
+Mia(workspace: My Project, query: deployment notes)
+Mia(workspace: My Project, folder: Docs)
+Mia(workspace: My Project, folder: Docs, query: publishing workflow)
+Mia(workspace: My Project, folder: Docs, note: Architecture)
+Mia(workspace: My Project, folder: Architecture)
 ```
 
-The first two forms are GET operations. The agent should search the selected workspace, optionally scoped to the folder, using the user's query in their own words.
+The query and note forms are GET operations. The agent should search or fetch context from the selected workspace, optionally scoped to the folder, using the user's query in their own words.
 
-The third form is a PUT operation. The agent should save the requested content into the selected workspace and folder, creating a short useful title based on the content.
+When the user asks the agent to save content with `Mia(workspace: ..., folder: ...)`, the agent should save the requested content into the selected workspace and folder, creating a short useful title based on the content.
 
 If an agent cannot target the requested workspace, it should say so instead of using another workspace.
 
