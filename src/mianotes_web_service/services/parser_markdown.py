@@ -106,6 +106,7 @@ AUTOLINK_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)>"
 )
+ACCIDENTAL_TEXT_DIRECTIVE_PATTERN = re.compile(r"(?<![\\:]):(?=[A-Za-z])")
 
 
 def normalise_image_markdown(text: str) -> str | None:
@@ -174,6 +175,14 @@ def escape_mdx_unsafe_angle_brackets(text: str) -> str:
     return "".join(parts)
 
 
+def escape_mdx_unsafe_directives(text: str) -> str:
+    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            parts[index] = ACCIDENTAL_TEXT_DIRECTIVE_PATTERN.sub(r"\\:", part)
+    return "".join(parts)
+
+
 def _escape_mdx_unsafe_angle_brackets_in_markdown(text: str) -> str:
     output: list[str] = []
     index = 0
@@ -210,6 +219,8 @@ def _escape_angle_brackets(text: str) -> str:
 
 
 def normalise_parsed_markdown(text: str) -> str:
-    return escape_mdx_unsafe_angle_brackets(
-        normalise_html_void_tags(normalise_document_ocr_markdown(text))
+    return escape_mdx_unsafe_directives(
+        escape_mdx_unsafe_angle_brackets(
+            normalise_html_void_tags(normalise_document_ocr_markdown(text))
+        )
     )

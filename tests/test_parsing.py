@@ -350,6 +350,53 @@ def test_document_parser_preserves_html_tags_autolinks_and_code_when_escaping_md
     )
 
 
+def test_document_parser_escapes_accidental_text_directives(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "paper.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "1v82241.4062:viXra\n"
+                    "Bash(prefix:npm)\n"
+                    "model():what the model can reach\n\n"
+                    ":::note\n"
+                    "Keep real admonitions available.\n"
+                    ":::\n\n"
+                    "```text\n"
+                    "prefix:npm stays literal in code\n"
+                    "```\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "1v82241.4062\\:viXra\n"
+        "Bash(prefix\\:npm)\n"
+        "model()\\:what the model can reach\n\n"
+        ":::note\n"
+        "Keep real admonitions available.\n"
+        ":::\n\n"
+        "```text\n"
+        "prefix:npm stays literal in code\n"
+        "```\n"
+    )
+
+
 def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
