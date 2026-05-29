@@ -40,15 +40,9 @@ Run a local health check with:
 mianotes doctor
 ```
 
-The macOS package creates its own Python virtual environment for Mianotes, but the Mac must already have Python 3.11 or newer available. If the installer cannot find Python, install Python from python.org or Homebrew, then run the package again.
+The macOS package bundles the runtime Mianotes needs to run, including Python, ripgrep, ffmpeg, and ffprobe. Apple Silicon packages also include a bundled Tesseract OCR binary and English OCR data.
 
-For full search, file parsing, image OCR, and audio/video support, Mianotes can use these local tools when they are available:
-
-```bash
-brew install python ripgrep ffmpeg tesseract
-```
-
-`mianotes doctor` shows whether those tools are available.
+`mianotes doctor` shows which bundled tools are available on the current Mac and whether any optional system fallback tools are being used.
 
 ## Ubuntu
 
