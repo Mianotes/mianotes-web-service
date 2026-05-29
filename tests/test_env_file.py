@@ -18,8 +18,8 @@ def test_service_env_file_path_prefers_explicit_env_file(monkeypatch, tmp_path: 
     assert service_env_file_path() == env_file
 
 
-def test_service_env_file_path_uses_legacy_env_file_path(monkeypatch, tmp_path: Path):
-    env_file = tmp_path / "legacy.env"
+def test_service_env_file_path_uses_env_file_path_fallback(monkeypatch, tmp_path: Path):
+    env_file = tmp_path / "fallback.env"
     monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
     monkeypatch.setenv("MIANOTES_ENV_FILE_PATH", str(env_file))
 

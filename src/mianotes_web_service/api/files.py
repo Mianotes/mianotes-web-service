@@ -18,7 +18,7 @@ from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
     DATABASE_FILENAME,
-    DATABASE_SIDECAR_SUFFIXES,
+    SQLITE_SIDECAR_SUFFIXES,
     SYSTEM_DATABASE_FILENAME,
 )
 from mianotes_web_service.services.workspace_context import current_data_dir
@@ -27,8 +27,8 @@ router = APIRouter(tags=["files"])
 PRIVATE_DATA_FILENAMES = {
     DATABASE_FILENAME,
     SYSTEM_DATABASE_FILENAME,
-    *(f"{DATABASE_FILENAME}{suffix}" for suffix in DATABASE_SIDECAR_SUFFIXES),
-    *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in DATABASE_SIDECAR_SUFFIXES),
+    *(f"{DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
+    *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
 }
 
 

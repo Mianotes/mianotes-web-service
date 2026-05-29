@@ -181,12 +181,12 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/system.db-wal").status_code == 404
 
 
-def test_get_note_normalizes_legacy_parser_markdown(client: TestClient, tmp_path: Path):
+def test_get_note_normalizes_parser_markdown(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
         json={
-            "email": "legacy-parser@example.com",
-            "name": "Legacy Parser User",
+            "email": "parser@example.com",
+            "name": "Parser User",
             "password": "house-password",
             "password_confirmation": "house-password",
         },
@@ -197,14 +197,14 @@ def test_get_note_normalizes_legacy_parser_markdown(client: TestClient, tmp_path
         json={
             "user_id": user["id"],
             "folder_id": folder["id"],
-            "title": "Legacy OCR",
+            "title": "Parser OCR",
             "text": "Temporary text.",
         },
     ).json()
-    note_filename = f"legacy-ocr-{note['id'][:8]}.md"
+    note_filename = f"parser-ocr-{note['id'][:8]}.md"
     note_path = tmp_path / "data" / "markdown" / "research" / note_filename
     note_path.write_text(
-        "# Legacy OCR\n\n"
+        "# Parser OCR\n\n"
         "Created: 2026-05-24T00:00:00Z\n\n"
         "## Note\n\n"
         "*[Image OCR]\n"
@@ -222,7 +222,7 @@ def test_get_note_normalizes_legacy_parser_markdown(client: TestClient, tmp_path
 
     assert response.status_code == 200
     assert response.json()["text"] == (
-        "# Legacy OCR\n\n"
+        "# Parser OCR\n\n"
         "Created: 2026-05-24T00:00:00Z\n\n"
         "## Note\n\n"
         "| Left | Right |\n"
