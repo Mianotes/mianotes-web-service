@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.db.models import Base, Folder, Note, SourceFile, User
-from mianotes_web_service.services import job_runner, parsing
+from mianotes_web_service.services import job_runner, job_use_cases, parsing
 from mianotes_web_service.services.job_runner import InProcessJobRunner
 from mianotes_web_service.services.jobs import (
     append_job_log,
@@ -104,7 +104,7 @@ def test_job_runner_parses_file_and_updates_note(
     def fake_parse_document(path: Path) -> ParsedDocument:
         return ParsedDocument(text="Parsed Markdown", parser="markitdown", source_path=path)
 
-    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -149,8 +149,8 @@ def test_job_runner_parses_regular_url_with_html_fetch(
     def fake_parse_html_document(path: Path, *, url: str | None = None) -> ParsedDocument:
         return ParsedDocument(text="Parsed HTML URL", parser="markitdown", source_path=path)
 
-    monkeypatch.setattr(job_runner, "fetch_url_to_html", fake_fetch_url_to_html)
-    monkeypatch.setattr(job_runner, "parse_html_document", fake_parse_html_document)
+    monkeypatch.setattr(job_use_cases, "fetch_url_to_html", fake_fetch_url_to_html)
+    monkeypatch.setattr(job_use_cases, "parse_html_document", fake_parse_html_document)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -198,8 +198,8 @@ def test_job_runner_parses_remote_file_url_as_document(
         parsed_paths.append(path)
         return ParsedDocument(text="Parsed PDF URL", parser="markitdown", source_path=path)
 
-    monkeypatch.setattr(job_runner, "fetch_url_to_file", fake_fetch_url_to_file)
-    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    monkeypatch.setattr(job_use_cases, "fetch_url_to_file", fake_fetch_url_to_file)
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -252,8 +252,8 @@ def test_job_runner_parses_youtube_url_with_markitdown_url_converter(
             source_path=Path(url),
         )
 
-    monkeypatch.setattr(job_runner, "fetch_url_to_html", fake_fetch_url_to_html)
-    monkeypatch.setattr(job_runner, "parse_youtube_url", fake_parse_youtube_url)
+    monkeypatch.setattr(job_use_cases, "fetch_url_to_html", fake_fetch_url_to_html)
+    monkeypatch.setattr(job_use_cases, "parse_youtube_url", fake_parse_youtube_url)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -298,7 +298,7 @@ def test_job_runner_persists_partial_parser_text_updates(
         partial_snapshots.append(note_path.read_text(encoding="utf-8"))
         return ParsedDocument(text="Chunk 1\n\nChunk 2", parser="markitdown", source_path=path)
 
-    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -332,7 +332,7 @@ def test_job_runner_keeps_logs_for_failed_jobs(
     def fake_parse_document(path: Path) -> ParsedDocument:
         raise RuntimeError("parser exploded")
 
-    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -378,7 +378,7 @@ def test_job_runner_links_failed_url_notes_to_console_job(
     def fake_fetch_url_to_html(url: str, output_path: Path):
         raise RuntimeError("link parser exploded")
 
-    monkeypatch.setattr(job_runner, "fetch_url_to_html", fake_fetch_url_to_html)
+    monkeypatch.setattr(job_use_cases, "fetch_url_to_html", fake_fetch_url_to_html)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -425,7 +425,7 @@ def test_job_runner_shows_safe_failed_url_reason_in_note(
     def fake_parse_youtube_url(url: str) -> ParsedDocument:
         raise RuntimeError(job_runner.NO_YOUTUBE_SPEECH_MESSAGE)
 
-    monkeypatch.setattr(job_runner, "parse_youtube_url", fake_parse_youtube_url)
+    monkeypatch.setattr(job_use_cases, "parse_youtube_url", fake_parse_youtube_url)
     with testing_session() as session:
         user = session.query(User).one()
         job = create_job(
@@ -474,7 +474,7 @@ def test_job_runner_marks_job_failed_when_finalization_crashes(
     def fake_mark_job_succeeded(*_args, **_kwargs):
         raise RuntimeError("success marker exploded")
 
-    monkeypatch.setattr(job_runner, "parse_document", fake_parse_document)
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
     monkeypatch.setattr(job_runner, "mark_job_succeeded", fake_mark_job_succeeded)
     with testing_session() as session:
         user = session.query(User).one()
