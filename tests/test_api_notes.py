@@ -1369,7 +1369,7 @@ def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
     from mianotes_web_service.services.mia import MiaUnavailable
 
     def fake_prompt_markdown(**_kwargs):
-        raise MiaUnavailable("OpenAI API key is not configured")
+        raise MiaUnavailable("LLM key is not configured")
 
     monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
     client.post(
@@ -1397,7 +1397,7 @@ def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
     )
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "OpenAI API key is not configured"
+    assert response.json()["detail"] == "LLM key is not configured"
     comments = client.get(f"/api/notes/{note['id']}/comments")
     assert comments.status_code == 200
     assert comments.json() == []

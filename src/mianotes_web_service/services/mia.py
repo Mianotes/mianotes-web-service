@@ -49,7 +49,7 @@ def _llm_config() -> LLMConfig:
             os.environ.get("OPENAI_API_KEY"),
         )
         if not api_key:
-            raise MiaUnavailable("OpenAI API key is not configured")
+            raise MiaUnavailable("LLM key is not configured")
         model = _first_value(
             settings.llm_model,
             os.environ.get("OPENAI_MODEL"),
