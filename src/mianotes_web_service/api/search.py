@@ -13,12 +13,12 @@ from mianotes_web_service.db.models import Note, NoteStar
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
 from mianotes_web_service.services.paths import markdown_root, note_file_path, source_file_path
 from mianotes_web_service.services.search import search_markdown_files
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.workspace_context import current_data_dir, session_data_dir
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 
-def _notes_by_path(session: Session) -> dict[str, Note]:
+def _notes_by_path(session: Session, data_dir: Path | None = None) -> dict[str, Note]:
     notes = (
         session.scalars(
             select(Note).options(joinedload(Note.folder), joinedload(Note.source_files))
@@ -28,15 +28,15 @@ def _notes_by_path(session: Session) -> dict[str, Note]:
     )
     by_path: dict[str, Note] = {}
     for note in notes:
-        note_path = _resolved_note_path(note)
+        note_path = _resolved_note_path(note, data_dir)
         if note_path is not None:
             by_path[note_path] = note
     return by_path
 
 
-def _resolved_note_path(note: Note) -> str | None:
+def _resolved_note_path(note: Note, data_dir: Path | None = None) -> str | None:
     try:
-        return str(note_file_path(note).resolve())
+        return str(note_file_path(note, data_dir).resolve())
     except OSError:
         return None
 
@@ -47,8 +47,8 @@ def _is_starred_by_user(session: Session, note_id: str, user_id: str) -> bool:
     ).first() is not None
 
 
-def _file_url(request: Request, path: str | Path) -> str:
-    data_dir = current_data_dir(get_settings().data_dir).resolve()
+def _file_url(request: Request, path: str | Path, data_dir: Path | None = None) -> str:
+    data_dir = (data_dir or current_data_dir(get_settings().data_dir)).resolve()
     target = Path(path).resolve()
     try:
         public_path = target.relative_to(data_dir)
@@ -57,20 +57,30 @@ def _file_url(request: Request, path: str | Path) -> str:
     return f"/{public_path.as_posix().lstrip('/')}"
 
 
-def _source_file_list_payload(note: Note, request: Request) -> list[dict[str, object]]:
+def _source_file_list_payload(
+    note: Note,
+    request: Request,
+    data_dir: Path | None = None,
+) -> list[dict[str, object]]:
     return [
         {
             "id": source_file.id,
-            "file_path": str(source_file_path(source_file)),
+            "file_path": str(source_file_path(source_file, data_dir)),
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
-            "url": _file_url(request, source_file_path(source_file)),
+            "url": _file_url(request, source_file_path(source_file, data_dir), data_dir),
         }
         for source_file in note.source_files
     ]
 
 
-def _note_list_item(note: Note, request: Request, *, is_starred: bool) -> NoteListItem:
+def _note_list_item(
+    note: Note,
+    request: Request,
+    *,
+    is_starred: bool,
+    data_dir: Path | None = None,
+) -> NoteListItem:
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
@@ -83,8 +93,8 @@ def _note_list_item(note: Note, request: Request, *, is_starred: bool) -> NoteLi
         is_starred=is_starred,
         summary=note.summary,
         filename=note.filename,
-        note_path=str(note_file_path(note)),
-        source_files=_source_file_list_payload(note, request),
+        note_path=str(note_file_path(note, data_dir)),
+        source_files=_source_file_list_payload(note, request, data_dir),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
@@ -101,14 +111,15 @@ def search_notes(
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
 ) -> list[SearchResult]:
     try:
-        matches = search_markdown_files(markdown_root(), q, limit=limit)
+        data_dir = session_data_dir(session, get_settings().data_dir)
+        matches = search_markdown_files(markdown_root(data_dir), q, limit=limit)
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
         ) from exc
 
-    notes_by_path = _notes_by_path(session)
+    notes_by_path = _notes_by_path(session, data_dir)
     results: list[SearchResult] = []
     for match in matches:
         note = notes_by_path.get(str(match.path))
@@ -120,6 +131,7 @@ def search_notes(
                     note,
                     request,
                     is_starred=_is_starred_by_user(session, note.id, user.id),
+                    data_dir=data_dir,
                 ),
                 line_number=match.line_number,
                 column=match.column,

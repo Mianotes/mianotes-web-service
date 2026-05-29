@@ -19,7 +19,7 @@ from mianotes_web_service.services.jobs import decode_job_log, decode_job_payloa
 from mianotes_web_service.services.parsing import normalise_parsed_markdown
 from mianotes_web_service.services.paths import note_file_path, source_file_path
 from mianotes_web_service.services.storage import summarize_markdown_note
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.workspace_context import current_data_dir, session_data_dir
 
 MISSING_NOTE_FILE_DETAIL = (
     "This note still exists in the database, but its Markdown file no longer exists "
@@ -27,8 +27,8 @@ MISSING_NOTE_FILE_DETAIL = (
 )
 
 
-def file_url(request: Request, path: str | Path) -> str:
-    data_dir = current_data_dir(get_settings().data_dir).resolve()
+def file_url(request: Request, path: str | Path, data_dir: Path | None = None) -> str:
+    data_dir = (data_dir or current_data_dir(get_settings().data_dir)).resolve()
     target = Path(path).resolve()
     try:
         public_path = target.relative_to(data_dir)
@@ -77,8 +77,10 @@ def note_response(
     *,
     is_starred: bool = False,
     share_token: str | None = None,
+    session: Session | None = None,
 ) -> NoteRead:
-    note_path = note_file_path(note)
+    data_dir = session_data_dir(session, get_settings().data_dir) if session is not None else None
+    note_path = note_file_path(note, data_dir)
     try:
         text = note_path.read_text(encoding="utf-8")
     except FileNotFoundError as exc:
@@ -94,7 +96,7 @@ def note_response(
     source_files = [
         {
             "id": source_file.id,
-            "file_path": str(source_file_path(source_file)),
+            "file_path": str(source_file_path(source_file, data_dir)),
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
             "url": (
@@ -106,7 +108,7 @@ def note_response(
                     )
                 )
                 if share_token
-                else file_url(request, source_file_path(source_file))
+                else file_url(request, source_file_path(source_file, data_dir), data_dir)
             ),
         }
         for source_file in note.source_files
@@ -128,7 +130,7 @@ def note_response(
         summary=note.summary,
         shared_at=note.shared_at,
         text=text,
-        note_url=file_url(request, note_path),
+        note_url=file_url(request, note_path, data_dir),
         source_files=source_files,
         comments_count=len([comment for comment in note.comments if comment.body]),
         comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
@@ -167,23 +169,36 @@ def note_summary_needs_refresh(note: Note) -> bool:
     return bool(title and summary.startswith(f"{title} created:"))
 
 
-def source_file_list_payload(note: Note, request: Request) -> list[dict[str, object]]:
+def source_file_list_payload(
+    note: Note,
+    request: Request,
+    data_dir: Path | None = None,
+) -> list[dict[str, object]]:
     return [
         {
             "id": source_file.id,
-            "file_path": str(source_file_path(source_file)),
+            "file_path": str(source_file_path(source_file, data_dir)),
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
-            "url": file_url(request, source_file_path(source_file)),
+            "url": file_url(request, source_file_path(source_file, data_dir), data_dir),
         }
         for source_file in note.source_files
     ]
 
 
-def note_list_response(note: Note, request: Request, *, is_starred: bool = False) -> NoteListItem:
+def note_list_response(
+    note: Note,
+    request: Request,
+    *,
+    is_starred: bool = False,
+    session: Session | None = None,
+) -> NoteListItem:
+    data_dir = session_data_dir(session, get_settings().data_dir) if session is not None else None
     if note_summary_needs_refresh(note):
         try:
-            note.summary = summarize_markdown_note(note_file_path(note).read_text(encoding="utf-8"))
+            note.summary = summarize_markdown_note(
+                note_file_path(note, data_dir).read_text(encoding="utf-8")
+            )
         except OSError:
             note.summary = ""
     latest_job = latest_note_job(note)
@@ -199,8 +214,8 @@ def note_list_response(note: Note, request: Request, *, is_starred: bool = False
         is_starred=is_starred,
         summary=note.summary,
         filename=note.filename,
-        note_path=str(note_file_path(note)),
-        source_files=source_file_list_payload(note, request),
+        note_path=str(note_file_path(note, data_dir)),
+        source_files=source_file_list_payload(note, request, data_dir),
         created_at=note.created_at,
         updated_at=note.updated_at,
         comments_count=len([comment for comment in note.comments if comment.body]),
@@ -245,6 +260,7 @@ def note_ingestion_response(
         note,
         request,
         is_starred=note_is_starred(session, note.id, user.id),
+        session=session,
     )
     return NoteIngestionRead(
         **note_read.model_dump(exclude={"job_id", "job_status"}),

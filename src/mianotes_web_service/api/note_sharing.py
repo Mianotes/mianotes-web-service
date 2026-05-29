@@ -32,6 +32,7 @@ from mianotes_web_service.services.share import (
 from mianotes_web_service.services.workspace_context import (
     WorkspaceContext,
     reset_current_workspace,
+    session_data_dir,
     set_current_workspace,
 )
 
@@ -78,7 +79,7 @@ def _with_shared_note(
 def get_shared_note(token: str, request: Request) -> NoteRead:
     return _with_shared_note(
         token,
-        lambda note, _session: note_response(note, request, share_token=token),
+        lambda note, session: note_response(note, request, share_token=token, session=session),
         request=request,
     )
 
@@ -113,7 +114,7 @@ def get_shared_source_file(
         )
         if source_file is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-        target = source_file_path(source_file)
+        target = source_file_path(source_file, session_data_dir(_session, get_settings().data_dir))
         if not target.is_file():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
         return FileResponse(target)

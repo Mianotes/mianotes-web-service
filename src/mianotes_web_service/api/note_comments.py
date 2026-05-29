@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import CommentsWriteUser, NotesReadUser
 from mianotes_web_service.api.note_access import read_note_or_404
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Comment
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
@@ -18,6 +19,7 @@ from mianotes_web_service.domain.schemas import (
 from mianotes_web_service.services.mia import MiaUnavailable
 from mianotes_web_service.services.paths import note_file_path
 from mianotes_web_service.services.storage import markdown_note_body
+from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -69,7 +71,10 @@ def create_note_comment(
             raw_markdown = (
                 payload.markdown
                 if payload.markdown is not None
-                else note_file_path(note).read_text(encoding="utf-8")
+                else note_file_path(
+                    note,
+                    session_data_dir(session, get_settings().data_dir),
+                ).read_text(encoding="utf-8")
             )
             from mianotes_web_service.api import notes as notes_api
 

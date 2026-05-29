@@ -10,10 +10,12 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import NotesWriteUser
 from mianotes_web_service.api.note_access import ensure_can_change_note, read_note_or_404
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services.note_responses import file_url
 from mianotes_web_service.services.paths import note_image_directory
 from mianotes_web_service.services.storage import slugify
+from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -60,10 +62,11 @@ def upload_note_image(
             detail="Unsupported image type",
         )
 
-    directory = note_image_directory(note)
+    data_dir = session_data_dir(session, get_settings().data_dir)
+    directory = note_image_directory(note, data_dir)
     directory.mkdir(parents=True, exist_ok=True)
     stem = slugify(Path(image.filename).stem, "image")[:80]
     target = directory / f"{stem}-{secrets.token_hex(4)}{extension}"
     with target.open("wb") as output:
         shutil.copyfileobj(image.file, output)
-    return {"url": file_url(request, target)}
+    return {"url": file_url(request, target, data_dir)}

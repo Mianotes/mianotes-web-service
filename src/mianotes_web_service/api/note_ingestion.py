@@ -42,7 +42,7 @@ from mianotes_web_service.services.storage import (
     infer_title,
     summarize_text,
 )
-from mianotes_web_service.services.workspace_context import WorkspaceContext, current_data_dir
+from mianotes_web_service.services.workspace_context import WorkspaceContext, session_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -130,7 +130,7 @@ def create_note_from_text(
 
     title = payload.title or infer_title(payload.text)
     note_id = new_id()
-    storage = FilesystemStorage(current_data_dir(get_settings().data_dir))
+    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
     paths = storage.write_text_note(
         username=user.username,
         folder=folder.path,
@@ -167,6 +167,7 @@ def create_note_from_text(
         read_note_or_404(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
+        session=session,
     )
 
 
@@ -204,7 +205,7 @@ def create_note_from_file(
             status_code=422,
             detail="Title required",
         )
-    storage = FilesystemStorage(current_data_dir(get_settings().data_dir))
+    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
     paths = storage.write_uploaded_file_note(
         username=user.username,
         folder=folder.path,
@@ -285,7 +286,7 @@ def create_note_from_url(
     title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
     source_extension = url_source_extension(url) or ".html"
     note_id = new_id()
-    storage = FilesystemStorage(current_data_dir(get_settings().data_dir))
+    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
     paths = storage.write_url_note_placeholder(
         username=user.username,
         folder=folder.path,

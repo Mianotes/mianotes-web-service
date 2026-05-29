@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
@@ -21,6 +22,7 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.paths import folder_directory, markdown_root
 from mianotes_web_service.services.storage import short_id, slugify
+from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -194,6 +196,7 @@ def update_folder(
     if payload.name is not None:
         next_slug = slugify(payload.name)
         if next_slug != folder.slug:
+            data_dir = session_data_dir(session, get_settings().data_dir)
             existing = session.scalars(
                 select(Folder).where(Folder.slug == next_slug, Folder.id != folder.id)
             ).one_or_none()
@@ -202,8 +205,8 @@ def update_folder(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="A folder with this name already exists",
                 )
-            old_path = folder_directory(folder)
-            new_path = markdown_root() / next_slug
+            old_path = folder_directory(folder, data_dir)
+            new_path = markdown_root(data_dir) / next_slug
             if new_path.exists() and old_path.resolve() != new_path.resolve():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -253,11 +256,12 @@ def restore_folder(
         return folder
 
     payload = payload or FolderRestore()
+    data_dir = session_data_dir(session, get_settings().data_dir)
     restore_name = payload.name or folder.name
     restore_slug = _unique_folder_slug(session, slugify(restore_name), folder.id)
-    archived_path = folder_directory(folder)
-    restored_path = markdown_root() / restore_slug
-    previous_live_path = markdown_root() / slugify(folder.name)
+    archived_path = folder_directory(folder, data_dir)
+    restored_path = markdown_root(data_dir) / restore_slug
+    previous_live_path = markdown_root(data_dir) / slugify(folder.name)
 
     if not archived_path.exists():
         raise HTTPException(
@@ -309,10 +313,11 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
         return
 
     archived_at = datetime.now(UTC)
+    data_dir = session_data_dir(session, get_settings().data_dir)
     archive_slug = f"{folder.slug}-{short_id(folder.id)}"
     archive_path = f".archived/{archive_slug}"
-    old_path = folder_directory(folder)
-    new_path = markdown_root() / archive_path
+    old_path = folder_directory(folder, data_dir)
+    new_path = markdown_root(data_dir) / archive_path
 
     if old_path.exists():
         new_path.parent.mkdir(parents=True, exist_ok=True)

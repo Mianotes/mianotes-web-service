@@ -14,6 +14,12 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base, MiaJob, Note, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services import job_runner
+from mianotes_web_service.services.storage_settings import (
+    DEFAULT_DATABASE_FILE,
+    StorageConfig,
+    StorageLocation,
+    write_storage_config,
+)
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 
@@ -681,6 +687,93 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note_path.exists()
     assert source_path.exists()
     assert source_path.parent.exists()
+
+
+def test_create_note_from_file_uses_requested_workspace_storage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    data_dir = tmp_path / "data"
+    blog_dir = tmp_path / "blog"
+    config_path = tmp_path / "workspaces.json"
+    write_storage_config(
+        config_path,
+        StorageConfig(
+            active_location="default",
+            database_file=DEFAULT_DATABASE_FILE,
+            locations=[
+                StorageLocation(
+                    id="default",
+                    name="Main workspace",
+                    folder_path=data_dir,
+                ),
+                StorageLocation(
+                    id="blog",
+                    name="Blog",
+                    folder_path=blog_dir,
+                ),
+            ],
+        ),
+    )
+    monkeypatch.setenv("MIANOTES_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(config_path))
+    get_settings.cache_clear()
+
+    class NoopJobRunner:
+        def enqueue(self, background_tasks, job_id: str, workspace=None):
+            pass
+
+    app = create_app()
+    with TestClient(app) as workspace_client:
+        workspace_client.app.state.job_runner = NoopJobRunner()
+        join_response = workspace_client.post(
+            "/api/auth/join",
+            json={
+                "email": "workspace-upload@example.com",
+                "name": "Workspace Upload User",
+                "password": "house-password",
+                "password_confirmation": "house-password",
+            },
+        )
+        assert join_response.status_code == 201
+
+        headers = {"X-Mianotes-Workspace": "blog"}
+        folder = workspace_client.post(
+            "/api/folders",
+            json={"name": "Research"},
+            headers=headers,
+        ).json()
+        response = workspace_client.post(
+            "/api/notes/from-file",
+            data={"folder_id": folder["id"], "title": "PM intro"},
+            files={"file": ("pm-intro.txt", b"PM intro source", "text/plain")},
+            headers=headers,
+        )
+
+        assert response.status_code == 201
+        note = response.json()
+        note_filename = f"pm-intro-{note['id'][:8]}.md"
+        source_filename = f"sources/{note['id'][:8]}/original.txt"
+        blog_note_path = blog_dir / "markdown" / "research" / note_filename
+        blog_source_path = blog_dir / "markdown" / "research" / source_filename
+        default_note_path = data_dir / "markdown" / "research" / note_filename
+        default_source_path = data_dir / "markdown" / "research" / source_filename
+
+        assert blog_note_path.read_text(encoding="utf-8").startswith("# PM intro")
+        assert blog_source_path.read_bytes() == b"PM intro source"
+        assert not default_note_path.exists()
+        assert not default_source_path.exists()
+
+        detail = workspace_client.get(f"/api/notes/{note['id']}", headers=headers)
+
+        assert detail.status_code == 200
+        assert "Your file has been added to the queue" in detail.json()["text"]
+        assert detail.json()["note_url"].endswith(f"/markdown/research/{note_filename}")
+        assert detail.json()["source_files"][0]["url"].endswith(
+            f"/markdown/research/{source_filename}"
+        )
+
+    get_settings.cache_clear()
 
 
 def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: Path):

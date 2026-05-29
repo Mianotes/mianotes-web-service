@@ -23,6 +23,7 @@ from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_or_404,
 )
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import (
     Folder,
     MiaJob,
@@ -55,6 +56,7 @@ from mianotes_web_service.services.storage import (
     replace_markdown_title,
     summarize_text,
 )
+from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -94,7 +96,8 @@ def list_notes(
     needs_summary_backfill = any(note_summary_needs_refresh(note) for note in notes)
     starred_ids = starred_note_ids(session, [note.id for note in notes], user.id)
     items = [
-        note_list_response(note, request, is_starred=note.id in starred_ids) for note in notes
+        note_list_response(note, request, is_starred=note.id in starred_ids, session=session)
+        for note in notes
     ]
     if needs_summary_backfill:
         session.commit()
@@ -112,6 +115,7 @@ def get_note(
         read_note_or_404(session, note_id),
         request,
         is_starred=note_is_starred(session, note_id, user.id),
+        session=session,
     )
 
 
@@ -131,6 +135,7 @@ def update_note_tags(
         read_note_or_404(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
+        session=session,
     )
 
 
@@ -157,6 +162,7 @@ def update_note_star(
         read_note_or_404(session, note.id),
         request,
         is_starred=payload.is_starred,
+        session=session,
     )
 
 
@@ -175,10 +181,14 @@ def update_note(
         folder = session.get(Folder, payload.folder_id)
         if folder is None or folder.archived_at is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
-        move_note_to_folder(note, folder)
+        move_note_to_folder(
+            note,
+            folder,
+            data_dir=session_data_dir(session, get_settings().data_dir),
+        )
 
     next_title = payload.title or note.title
-    note_path = note_file_path(note)
+    note_path = note_file_path(note, session_data_dir(session, get_settings().data_dir))
     is_manual_content_edit = payload.text is not None or payload.title is not None
     if payload.text is not None:
         note_path.write_text(
@@ -209,6 +219,7 @@ def update_note(
         read_note_or_404(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
+        session=session,
     )
 
 

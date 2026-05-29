@@ -40,24 +40,25 @@ def move_stored_path(current_path: Path, target_path: Path) -> None:
     shutil.move(str(current_path), str(target_path))
 
 
-def move_note_to_folder(note: Note, target_folder: Folder) -> None:
+def move_note_to_folder(note: Note, target_folder: Folder, *, data_dir: Path | None = None) -> None:
     if note.folder_id == target_folder.id:
         return
 
     current_folder = note.folder
-    current_folder_dir = folder_directory(current_folder) if current_folder else None
-    target_folder_dir = folder_directory(target_folder)
-    FilesystemStorage(current_data_dir(get_settings().data_dir)).prepare_folder_directory(
-        target_folder_dir
+    workspace_data_dir = data_dir or current_data_dir(get_settings().data_dir)
+    current_folder_dir = (
+        folder_directory(current_folder, workspace_data_dir) if current_folder else None
     )
+    target_folder_dir = folder_directory(target_folder, workspace_data_dir)
+    FilesystemStorage(workspace_data_dir).prepare_folder_directory(target_folder_dir)
 
-    current_note_path = note_file_path(note)
+    current_note_path = note_file_path(note, workspace_data_dir)
     note_filename = note.filename or current_note_path.name
     target_note_path = target_folder_dir / note_filename
     source_moves: list[tuple[SourceFile, Path, Path, str]] = []
 
     for source_file in note.source_files:
-        current_source_path = source_file_path(source_file)
+        current_source_path = source_file_path(source_file, workspace_data_dir)
         source_filename = source_file.filename
         if not source_filename and current_folder_dir is not None:
             try:
@@ -75,7 +76,7 @@ def move_note_to_folder(note: Note, target_folder: Folder) -> None:
             )
         )
 
-    current_image_dir = note_image_directory(note)
+    current_image_dir = note_image_directory(note, workspace_data_dir)
     target_image_dir = target_folder_dir / "images" / note.id[:8]
 
     path_moves = [
