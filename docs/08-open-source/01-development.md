@@ -4,10 +4,13 @@ This page is for people working on the Python web service locally.
 
 ## Install system dependencies
 
+Mianotes currently supports Python 3.11, 3.12, and 3.13 for source installs.
+Python 3.14 is not supported yet because some parser dependencies do not publish compatible packages for it.
+
 macOS:
 
 ```bash
-brew install python ripgrep ffmpeg
+brew install python@3.12 ripgrep ffmpeg
 ```
 
 Linux:

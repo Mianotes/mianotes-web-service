@@ -3,7 +3,7 @@ name = "mianotes-web-service"
 version = "0.1.0"
 description = "Python API service for Mianotes."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.14"
 license = { text = "GPL-3.0-only" }
 dependencies = [
   "alembic>=1.13,<2.0",

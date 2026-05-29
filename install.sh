@@ -2,24 +2,42 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="${MIANOTES_VENV_DIR:-$ROOT_DIR/.venv}"
 INSTALL_DEV=0
 MODE="default"
 
 find_python() {
   if [[ -n "${PYTHON:-}" ]]; then
-    echo "$PYTHON"
-    return
+    if "$PYTHON" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 14)))' >/dev/null 2>&1; then
+      echo "$PYTHON"
+      return
+    fi
+    echo "PYTHON must point to Python 3.11, 3.12, or 3.13." >&2
+    exit 1
   fi
 
-  for candidate in python3 python /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+  for candidate in \
+    python3.12 \
+    python3.11 \
+    python3.13 \
+    /opt/homebrew/bin/python3.12 \
+    /opt/homebrew/bin/python3.11 \
+    /opt/homebrew/bin/python3.13 \
+    /usr/local/bin/python3.12 \
+    /usr/local/bin/python3.11 \
+    /usr/local/bin/python3.13 \
+    python3 \
+    python \
+    /usr/bin/python3
+  do
     if command -v "$candidate" >/dev/null 2>&1 \
-      && "$candidate" -c 'import sys; raise SystemExit(sys.version_info < (3, 11))' >/dev/null 2>&1; then
+      && "$candidate" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 14)))' >/dev/null 2>&1; then
       command -v "$candidate"
       return
     fi
   done
 
-  echo "Python 3.11 or newer is required. Install it with Homebrew or your package manager." >&2
+  echo "Python 3.11, 3.12, or 3.13 is required. Install it with Homebrew or your package manager." >&2
   exit 1
 }
 
@@ -57,10 +75,18 @@ done
 
 if [[ "$MODE" != "skills-only" ]]; then
   PYTHON_BIN="$(find_python)"
+  if [[ ! -d "$VENV_DIR" ]]; then
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+  fi
+  VENV_PYTHON="$VENV_DIR/bin/python"
+  if [[ ! -x "$VENV_PYTHON" ]]; then
+    echo "Could not find Python in virtual environment: $VENV_PYTHON" >&2
+    exit 1
+  fi
   if [[ "$INSTALL_DEV" -eq 1 ]]; then
-    "$PYTHON_BIN" -m pip install -e "${ROOT_DIR}[dev]"
+    "$VENV_PYTHON" -m pip install -e "${ROOT_DIR}[dev]"
   else
-    "$PYTHON_BIN" -m pip install -e "$ROOT_DIR"
+    "$VENV_PYTHON" -m pip install -e "$ROOT_DIR"
   fi
 fi
 
@@ -90,6 +116,7 @@ else
 Mianotes web service installed.
 
 Next:
+  source "$VENV_DIR/bin/activate"
   mianotes-web-service init-db
   mianotes-web-service --host 0.0.0.0 --port 8200
 NEXT
