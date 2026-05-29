@@ -13,24 +13,14 @@ The full table of contents is in [TOC.md](TOC.md).
 
 ## Fastest path
 
-```bash
-# 1. Install system tools on macOS
-brew install python ripgrep tesseract ffmpeg
+Most users should install Mianotes with a package:
 
-# 2. Add a local or OpenAI-compatible model configuration to .env
-cat > .env <<'EOF'
-MIANOTES_LLM_PROVIDER=local
-MIANOTES_LLM_MODEL=llama3.2:3b
-MIANOTES_LLM_BASE_URL=http://127.0.0.1:11434/v1
-MIANOTES_LLM_API_KEY=ollama
-MIANOTES_API_KEY=replace-with-a-long-random-secret
-EOF
+- macOS: [Installing from package](02-getting-started/01b-installation-package.md)
+- Ubuntu: [Installing from package](02-getting-started/01b-installation-package.md)
 
-# 3. Start Mianotes
-./start.sh
-```
+Developers and contributors should use [Installing from GitHub](02-getting-started/01a-installation-GitHub.md).
 
-Open the web app at `http://127.0.0.1:8200`, create the first user, then create folders and notes or connect an agent with an API token.
+Open the web app, create the first user, then create folders and notes or connect an agent with an API token.
 
 ## What Mianotes is best at
 
