@@ -773,6 +773,22 @@ def test_create_note_from_file_uses_requested_workspace_storage(
             f"/markdown/research/{source_filename}"
         )
 
+        shared = workspace_client.post(f"/api/notes/{note['id']}/share", headers=headers)
+        assert shared.status_code == 200
+        share_path = shared.json()["share_url"].removeprefix("http://testserver")
+
+        guest_detail = TestClient(workspace_client.app).get(share_path)
+        assert guest_detail.status_code == 200
+        assert guest_detail.json()["text"].startswith("# PM intro")
+        assert guest_detail.json()["note_url"].endswith(f"/markdown/research/{note_filename}")
+
+        shared_source_url = guest_detail.json()["source_files"][0]["url"]
+        shared_source = TestClient(workspace_client.app).get(
+            shared_source_url.removeprefix("http://testserver")
+        )
+        assert shared_source.status_code == 200
+        assert shared_source.content == b"PM intro source"
+
     get_settings.cache_clear()
 
 

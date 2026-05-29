@@ -62,6 +62,7 @@ def _with_shared_note(
         context_token = set_current_workspace(workspace)
         try:
             with sessionmaker_for_workspace(workspace)() as session:
+                session.info["workspace"] = workspace
                 try:
                     note = read_note_by_share_token(session, token)
                 except HTTPException as exc:
