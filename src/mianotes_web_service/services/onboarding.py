@@ -72,7 +72,11 @@ Once a note is ready, open it from the listing page.
 
 [image here]
 
-You can edit the Markdown, ask Mia questions about the note, summarise it, extract key points, humanise text, add tags, move it to another folder, share it, export it as a PDF, or publish it as part of a static site.
+You can edit the Markdown, add tags, move the note to another folder, share it, export it as a PDF, or publish it as part of a static site.
+
+[image here]
+
+When you connect an LLM later, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
 
 [image here]
 
@@ -118,9 +122,8 @@ Save this summary in Mia(workspace: Mianotes, folder: Research)
 2. Add a PDF, link, image, audio file, or video file.
 3. Open Console and watch Mia process it.
 4. Read the generated Markdown note.
-5. Ask Mia to summarise it.
-6. Edit the note and add tags.
-7. Share or publish when it is useful.
+5. Edit the note and add tags.
+6. Export it as a PDF, share it, or publish it when useful.
 
 Thank you again for trying Mianotes. We hope it feels local, practical, and calm. If it helps you turn scattered files and thoughts into something searchable and reusable, then it is doing exactly what it was made to do.
 """
