@@ -80,4 +80,4 @@ Clients should poll the job endpoint when a file or URL note is still being pars
 
 Mia is the built-in AI assistant. Mia works through backend service boundaries, not frontend-only behaviour. The backend owns permissions, persistence, parsing, and the LLM provider calls.
 
-Read next: [Installation](../02-getting-started/01-installation.md).
+Read next: [Installation](../02-getting-started/01-Installation.md).

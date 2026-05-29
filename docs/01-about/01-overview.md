@@ -51,4 +51,4 @@ The web app is the human control room. The REST API and MCP server are the agent
 
 Mia is the built-in Mianotes agent. Mia helps convert messy input into durable Markdown notes, improve structure, extract useful information, summarise long content, and prepare notes for reuse by humans or other agents.
 
-Read next: [Use cases](02-use-cases.md) or [Installation](../02-getting-started/01-installation.md).
+Read next: [Use cases](02-use-cases.md) or [Installation](../02-getting-started/01-Installation.md).

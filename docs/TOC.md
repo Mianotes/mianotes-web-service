@@ -9,9 +9,9 @@
 
 ## Getting started
 
-- [Installation](02-getting-started/01-installation.md)
-- [Installing from GitHub](02-getting-started/01a-installation-GitHub.md)
-- [Installing from package](02-getting-started/01b-installation-package.md)
+- [Installation](02-getting-started/01-Installation.md)
+- [Installing from GitHub](02-getting-started/01a-Installation-GitHub.md)
+- [Installing from package](02-getting-started/01b-Installation-package.md)
 - [First run](02-getting-started/02-first-run.md)
 - [Configuration options](02-getting-started/03-configuration.md)
 - [Ollama, OpenAI, and local models](02-getting-started/04-ollama-openai.md)

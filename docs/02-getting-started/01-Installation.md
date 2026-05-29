@@ -9,13 +9,13 @@ Use this if you want Mianotes installed into the normal system locations for you
 - macOS: `mianotes.pkg`
 - Ubuntu: `mianotes.deb`
 
-Read: [Installing from package](01b-installation-package.md).
+Read: [Installing from package](01b-Installation-package.md).
 
 ## Install from GitHub
 
 Use this if you are a developer, contributor, or agent-tool builder who wants editable source checkouts of the web service and dashboard.
 
-Read: [Installing from GitHub](01a-installation-GitHub.md).
+Read: [Installing from GitHub](01a-Installation-GitHub.md).
 
 ## Which one should I choose?
 
