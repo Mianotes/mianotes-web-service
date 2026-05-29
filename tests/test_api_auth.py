@@ -66,6 +66,24 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     admin = setup.json()["user"]
     assert admin["is_admin"] is True
 
+    folders = client.get("/api/folders")
+    assert folders.status_code == 200
+    onboarding_folder = next(
+        folder for folder in folders.json() if folder["name"] == "Mianotes"
+    )
+
+    notes = client.get("/api/notes", params={"folder_id": onboarding_folder["id"]})
+    assert notes.status_code == 200
+    onboarding_note = notes.json()[0]
+    assert onboarding_note["title"] == "Getting Started"
+    assert onboarding_note["summary"].startswith("Thank you for installing Mianotes")
+
+    note = client.get(f"/api/notes/{onboarding_note['id']}")
+    assert note.status_code == 200
+    assert "https://github.com/Mianotes/mianotes-web-service/issues" in note.json()["text"]
+    assert "mianotes@proton.me" in note.json()["text"]
+    assert "Mia(workspace: Mianotes, folder: Getting Started)" in note.json()["text"]
+
     session = client.get("/api/auth/session")
     assert session.status_code == 200
     assert session.json()["user"]["id"] == admin["id"]

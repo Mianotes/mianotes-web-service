@@ -14,7 +14,7 @@ from mianotes_web_service.api.dependencies import (
     auth_context_from_bearer_token,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import AppSetting, Folder, Note, SourceFile, User, new_id
+from mianotes_web_service.db.models import AppSetting, User
 from mianotes_web_service.domain.schemas import (
     AgentSessionRead,
     EmailCheck,
@@ -41,7 +41,8 @@ from mianotes_web_service.services.auth import (
     verify_master_password,
     verify_user_password,
 )
-from mianotes_web_service.services.storage import FilesystemStorage, make_username
+from mianotes_web_service.services.onboarding import create_onboarding_note
+from mianotes_web_service.services.storage import make_username
 from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -55,52 +56,6 @@ def _set_session_cookie(response: Response, token: str) -> None:
         httponly=True,
         samesite="lax",
     )
-
-
-def _create_onboarding_note(session: Session, user: User) -> None:
-    existing_folder = session.scalars(
-        select(Folder).where(Folder.slug == "mianotes")
-    ).one_or_none()
-    if existing_folder is not None:
-        return
-
-    folder = Folder(user_id=user.id, name="Mianotes", slug="mianotes", path="mianotes")
-    session.add(folder)
-    session.flush()
-    text = (
-        "Welcome to Mianotes. Add text, links, documents, images, and audio to turn "
-        "them into organised Markdown notes. Everyone with access to this workspace "
-        "can browse shared notes, while owners keep control of their own contributions."
-    )
-    storage = FilesystemStorage(current_data_dir(get_settings().data_dir))
-    note_id = new_id()
-    paths = storage.write_text_note(
-        username=user.username,
-        folder=folder.path,
-        title="How to use Mianotes",
-        text=text,
-        filename=note_id,
-    )
-    note = Note(
-        id=note_id,
-        user_id=user.id,
-        folder_id=folder.id,
-        title="How to use Mianotes",
-        filename=paths.note_path.name,
-        note_path=str(paths.note_path),
-    )
-    session.add(note)
-    session.flush()
-    if paths.source_path is not None:
-        session.add(
-            SourceFile(
-                note_id=note.id,
-                filename=str(paths.source_path.relative_to(paths.directory)),
-                file_path=str(paths.source_path),
-                original_filename="original.txt",
-                content_type="text/plain",
-            )
-        )
 
 
 def _instance_initialized(session: Session) -> bool:
@@ -177,7 +132,11 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
                 detail=str(exc),
             ) from exc
         session.flush()
-        _create_onboarding_note(session, user)
+        create_onboarding_note(
+            session,
+            user,
+            data_dir=current_data_dir(get_settings().data_dir),
+        )
     else:
         if get_workspace_access_mode(session) == WORKSPACE_ACCESS_MODE_ADMIN_ONLY:
             raise HTTPException(
