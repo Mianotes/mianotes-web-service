@@ -37,7 +37,10 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mianotes_web_service"]
-artifacts = ["src/mianotes_web_service/publishing/themes/**"]
+artifacts = [
+  "src/mianotes_web_service/onboarding_assets/**",
+  "src/mianotes_web_service/publishing/themes/**",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

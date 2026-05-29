@@ -1,132 +1,130 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
-from mianotes_web_service.services.storage import FilesystemStorage, summarize_text
+from mianotes_web_service.services.storage import FilesystemStorage, short_id, summarize_text
 
 ONBOARDING_FOLDER_NAME = "Mianotes"
 ONBOARDING_FOLDER_SLUG = "mianotes"
 ONBOARDING_NOTE_TITLE = "Getting Started"
+ONBOARDING_ASSETS_DIR = Path(__file__).resolve().parents[1] / "onboarding_assets"
+ONBOARDING_IMAGE_ALTS = {
+    "onboarding_settings_workspace_switcher.jpg": "Settings workspace switcher",
+    "onboarding_workspace_switcher.jpg": "Workspace switcher",
+    "onboarding_mia.jpg": "Mia note tools",
+    "onboarding_jobs.jpg": "Console job queue",
+    "onboarding_screen_editor.jpg": "Markdown note editor",
+    "onboarding_publish.jpg": "Publish notes screen",
+}
 
-ONBOARDING_NOTE_TEXT = """Thank you for installing Mianotes and giving it a place on your machine. That first login matters to us. You took the time to download, install, and trust a young open source app with your notes, files, and ideas. We built Mianotes for people who want useful local knowledge without sending everything to somebody else's cloud, and we are genuinely glad you are here.
+ONBOARDING_NOTE_TEMPLATE = """# Welcome to Mianotes
 
-Mianotes is still early, so we would love your help shaping it. If something breaks, feels confusing, or makes you think "this could be better", please tell us. You can open an issue on GitHub at https://github.com/Mianotes/mianotes-web-service/issues or email us at mianotes@proton.me. Bug reports, awkward moments, missing features, and thoughtful complaints all help make the app better.
+Thank you for installing Mianotes and giving it a place on your machine.
+
+You are the first admin, so you are setting up the space where your notes, files, links, recordings, source material, and agent output can become a local knowledge base.
+
+Mianotes was built for people who want useful project knowledge without sending everything to someone else's cloud. Your notes stay readable, and your workspace stays under your control.
+
+Mianotes is still early, so your feedback matters. If something breaks, feels confusing, or could be better, please tell us. You can open an issue on GitHub: https://github.com/Mianotes/mianotes-web-service/issues Or email us: mianotes@proton.me
+
+Bug reports, missing features, and honest complaints all help make Mianotes better.
 
 ## Workspaces
 
-A workspace is a knowledge area. Each workspace maps to a normal folder on your computer, and Mianotes stores that workspace's database inside that folder. This keeps your content easy to understand: one workspace, one folder, one local knowledge base.
+A workspace is a local knowledge area. It maps to a normal folder on your machine, and Mianotes stores that workspace's notes, sources, jobs, and index inside it.
 
-[image here]
+Only admins can add workspaces. Go to Settings, add the folder you want Mianotes to use, and Mianotes will prepare it as a local workspace.
 
-Only admins can add a new workspace. Go to Settings, add the folder you want Mianotes to use, and Mianotes will create its local `.mianotes` data there. After that, everyone can switch between available workspaces using the workspace button in the top navigation.
-
-[image here]
+{onboarding_settings_workspace_switcher}
 
 The current workspace is always visible in the app, so you know where new notes, converted files, folders, jobs, and published sites belong.
 
-## The sidebar
+{onboarding_workspace_switcher}
 
-The sidebar is your map of the current workspace.
+## Getting started
 
-[image here]
+A good first step is to create a folder for one real project. Once your folder is ready, try this:
 
-Use the plus button beside Folders to create folders for projects, subjects, clients, people, research, or anything else that helps you think. You can arrange folders by dragging and dropping them, so the important work stays close to the top.
+1. Add a PDF, link, image, audio file, video, or plain note.
+2. Open the Job Queue and watch Mia process it.
+3. Read the generated Markdown note.
+4. Edit the note and add tags.
+5. Export it as a PDF, share it, or publish it when useful.
 
-[image here]
+## What Mia does
 
-If you remove a folder by accident, Mianotes archives it instead of deleting your files. Admins and folder owners can restore archived folders, and files on disk are preserved. This is intentional: Mianotes should help organise your work, not make your data feel fragile.
+Mia helps turn messy inputs into clean Markdown notes.
 
-## Add notes and convert files
+When you connect an LLM, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
 
-The Add Note button is where most work starts.
+{onboarding_mia}
 
-[image here]
+Mianotes allows you to connect local models like Llama, Qwen, Gemma, or DeepSeek. You can also connect cloud providers such as OpenAI, Gemini, Claude, or any OpenAI-compatible API.
 
-Every signed-in user can create a note, index a link, or convert files from their computer into Markdown. Mianotes can work with documents, PDFs, spreadsheets, images, audio, video, and links. The original source file is kept as a record, and the Markdown note becomes the clean version you can read, edit, search, ask Mia about, or publish.
+## Job Queue
 
-[image here]
+File conversion requests are processed by Mia. Some jobs finish quickly. Others take longer, especially long PDFs, audio, video, OCR-heavy images, or large batches of files.
 
-When you add a file or link, Mianotes creates a draft note first. You will be taken to the note page right away, but you can only edit the final Markdown once the job has completed. Until then, Mia is reading the source and preparing the note.
+Open the Job Queue to see what is queued, what is running, what completed, and what needs attention.
 
-## Mia and the Console
+{onboarding_jobs}
 
-File conversion requests are queued by Mia.
+## Reading and editing notes
 
-[image here]
+Once a note is ready, open it from the notes list. You can read the Markdown, edit it in the rich text editor, ask Mia questions, add tags, move it to another folder, share it, export it as a PDF, or publish it as part of a static site.
 
-Some jobs finish quickly. Others take longer, especially long PDFs, audio, video, OCR-heavy images, or large batches of files. The speed depends on your computer. A laptop with 16 GB RAM will not process large files the same way as a workstation with 64 GB RAM and a faster local model. That is normal.
-
-The Console shows what Mia is doing.
-
-[image here]
-
-Use it to monitor the queue, see whether a job is running, completed, or failed, and inspect the technical details when something goes wrong. If you report an issue, the Console output is often the fastest way for us to understand what happened.
-
-## Reading, editing, and asking Mia
-
-Once a note is ready, open it from the listing page.
-
-[image here]
-
-You can edit the Markdown, add tags, move the note to another folder, share it, export it as a PDF, or publish it as part of a static site.
-
-[image here]
-
-When you connect an LLM later, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
-
-[image here]
-
-Profile and Users are intentionally simple. Your profile is where your personal details live. Users is where admins manage team members, update passwords, and decide who can administer the workspace.
-
-[image here]
+{onboarding_screen_editor}
 
 ## Sharing and publishing
 
-Mianotes can create share links for notes, export notes as PDFs, and publish a workspace or folder as a static HTML site.
+Mianotes can create share links for notes, export notes as PDFs, and publish selected notes as a static HTML site.
 
-[image here]
-
-If you configure a domain in Settings, share links become reliable for other people. If you do not have a domain yet, you can still export a note as a PDF and share it yourself.
+If you configure a domain in Settings, share links will work for other people. If you do not have a domain yet, you can still export a note as a PDF and share it yourself.
 
 Publishing is useful when you want a clean documentation site, team handbook, project archive, research hub, or public knowledge base generated from your notes.
 
-[image here]
+{onboarding_publish}
 
-## For technical admins
+## One last thing
 
-If you want Codex, Claude Code, Cursor, VS Code, scripts, or other local tools to use Mianotes, start by creating an API key in Settings.
+If Mianotes helps you standardise how you document work and collaborate, then it is doing what it was made to do.
 
-[image here]
-
-When an admin creates or rotates the API key, Mianotes adds the connection values to the service `.env` file automatically. That gives local agents and tools a stable place to discover the API URL and key.
-
-The MCP server and the API key work across your Mianotes workspaces. When asking an agent to use Mianotes, include the workspace and folder you mean, for example:
-
-```text
-Before answering, get context from Mia(workspace: Mianotes, folder: Getting Started)
-```
-
-or:
-
-```text
-Save this summary in Mia(workspace: Mianotes, folder: Research)
-```
-
-## A good first five minutes
-
-1. Create a folder for one real project.
-2. Add a PDF, link, image, audio file, or video file.
-3. Open Console and watch Mia process it.
-4. Read the generated Markdown note.
-5. Edit the note and add tags.
-6. Export it as a PDF, share it, or publish it when useful.
-
-Thank you again for trying Mianotes. We hope it feels local, practical, and calm. If it helps you turn scattered files and thoughts into something searchable and reusable, then it is doing exactly what it was made to do.
+Thank you again for trying it.
 """
+
+
+def onboarding_note_text(*, folder_path: str, note_id: str) -> str:
+    source_dir = f"sources/{short_id(note_id)}"
+    encoded_folder_path = quote(folder_path.strip("/"), safe="/")
+
+    def image_markdown(filename: str) -> str:
+        asset_path = f"/markdown/{encoded_folder_path}/{source_dir}/{quote(filename)}"
+        return f"![{ONBOARDING_IMAGE_ALTS[filename]}]({asset_path})"
+
+    return ONBOARDING_NOTE_TEMPLATE.format(
+        onboarding_settings_workspace_switcher=image_markdown(
+            "onboarding_settings_workspace_switcher.jpg"
+        ),
+        onboarding_workspace_switcher=image_markdown("onboarding_workspace_switcher.jpg"),
+        onboarding_mia=image_markdown("onboarding_mia.jpg"),
+        onboarding_jobs=image_markdown("onboarding_jobs.jpg"),
+        onboarding_screen_editor=image_markdown("onboarding_screen_editor.jpg"),
+        onboarding_publish=image_markdown("onboarding_publish.jpg"),
+    )
+
+
+def copy_onboarding_assets(destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for filename in ONBOARDING_IMAGE_ALTS:
+        source = ONBOARDING_ASSETS_DIR / filename
+        if source.is_file():
+            shutil.copy2(source, destination / filename)
 
 
 def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> None:
@@ -154,13 +152,16 @@ def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> N
 
     storage = FilesystemStorage(data_dir)
     note_id = new_id()
+    note_text = onboarding_note_text(folder_path=folder.path, note_id=note_id)
     paths = storage.write_text_note(
         username=user.username,
         folder=folder.path,
         title=ONBOARDING_NOTE_TITLE,
-        text=ONBOARDING_NOTE_TEXT,
+        text=note_text,
         filename=note_id,
     )
+    if paths.source_path is not None:
+        copy_onboarding_assets(paths.source_path.parent)
     note = Note(
         id=note_id,
         user_id=user.id,
@@ -168,7 +169,7 @@ def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> N
         title=ONBOARDING_NOTE_TITLE,
         filename=paths.note_path.name,
         note_path=str(paths.note_path),
-        summary=summarize_text(ONBOARDING_NOTE_TEXT),
+        summary=summarize_text(note_text),
     )
     session.add(note)
     session.flush()
