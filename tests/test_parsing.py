@@ -9,6 +9,7 @@ import pytest
 
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services import (
+    parser_audio,
     parser_image,
     parser_markitdown,
     parser_tools,
@@ -788,6 +789,10 @@ def test_audio_parser_retries_with_low_quality_mp3(
         "-ar",
     ]
     assert commands[0][-1].endswith("low-quality.mp3")
+
+
+def test_audio_parser_treats_mp4_as_audio():
+    assert parser_audio.is_audio(Path("recording.mp4"))
 
 
 def test_audio_parser_splits_audio_when_low_quality_mp3_fails(

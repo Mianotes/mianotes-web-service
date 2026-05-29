@@ -819,7 +819,7 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
     assert image_files[0].parent.exists()
 
 
-@pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav"])
+@pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav", "voice.mp4"])
 def test_create_note_from_file_accepts_audio_files(client: TestClient, filename: str):
     client.post(
         "/api/auth/join",
@@ -835,7 +835,13 @@ def test_create_note_from_file_accepts_audio_files(client: TestClient, filename:
     response = client.post(
         "/api/notes/from-file",
         data={"folder_id": folder["id"], "title": "Voice note"},
-        files={"file": (filename, b"audio bytes", "audio/mpeg")},
+        files={
+            "file": (
+                filename,
+                b"audio bytes",
+                "video/mp4" if filename.endswith(".mp4") else "audio/mpeg",
+            )
+        },
     )
 
     assert response.status_code == 201

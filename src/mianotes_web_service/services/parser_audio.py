@@ -10,7 +10,18 @@ from mianotes_web_service.services.parser_runtime import (
 )
 from mianotes_web_service.services.parser_tools import ffmpeg_executable
 
-AUDIO_EXTENSIONS = {".aac", ".aiff", ".flac", ".m4a", ".mp3", ".ogg", ".opus", ".wav", ".webm"}
+AUDIO_EXTENSIONS = {
+    ".aac",
+    ".aiff",
+    ".flac",
+    ".m4a",
+    ".mp3",
+    ".mp4",
+    ".ogg",
+    ".opus",
+    ".wav",
+    ".webm",
+}
 AUDIO_CHUNK_SECONDS = 300
 
 
