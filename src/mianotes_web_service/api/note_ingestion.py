@@ -20,7 +20,6 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import AuthContext, AuthContextDep, NotesWriteUser
 from mianotes_web_service.api.note_access import read_note_or_404
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
@@ -37,12 +36,13 @@ from mianotes_web_service.services.note_responses import (
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
 from mianotes_web_service.services.parser_url import url_source_extension
+from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import (
     FilesystemStorage,
     infer_title,
     summarize_text,
 )
-from mianotes_web_service.services.workspace_context import WorkspaceContext, session_data_dir
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -130,7 +130,7 @@ def create_note_from_text(
 
     title = payload.title or infer_title(payload.text)
     note_id = new_id()
-    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
+    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
     paths = storage.write_text_note(
         username=user.username,
         folder=folder.path,
@@ -205,7 +205,7 @@ def create_note_from_file(
             status_code=422,
             detail="Title required",
         )
-    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
+    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
     paths = storage.write_uploaded_file_note(
         username=user.username,
         folder=folder.path,
@@ -286,7 +286,7 @@ def create_note_from_url(
     title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
     source_extension = url_source_extension(url) or ".html"
     note_id = new_id()
-    storage = FilesystemStorage(session_data_dir(session, get_settings().data_dir))
+    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
     paths = storage.write_url_note_placeholder(
         username=user.username,
         folder=folder.path,

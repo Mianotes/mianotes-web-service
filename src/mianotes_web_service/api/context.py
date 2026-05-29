@@ -8,13 +8,11 @@ from sqlalchemy.orm import joinedload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.api.search import _is_starred_by_user, _note_list_item
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note
 from mianotes_web_service.domain.schemas import ContextResponse, ContextResult
-from mianotes_web_service.services.paths import markdown_root, note_file_path
+from mianotes_web_service.services.paths import WorkspacePaths, workspace_paths_for_session
 from mianotes_web_service.services.search import search_markdown_files
 from mianotes_web_service.services.storage import slugify
-from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/context", tags=["context"])
 
@@ -23,9 +21,9 @@ def _normalized(value: str) -> str:
     return " ".join(value.strip().lower().split())
 
 
-def _read_note_text(note: Note, data_dir) -> str | None:
+def _read_note_text(note: Note, paths: WorkspacePaths) -> str | None:
     try:
-        return note_file_path(note, data_dir).read_text(encoding="utf-8")
+        return paths.note_file_path(note).read_text(encoding="utf-8")
     except OSError:
         return None
 
@@ -50,7 +48,7 @@ def get_context(
     if not folders:
         return ContextResponse(folder=folder, title=title, limit=limit, total=0, results=[])
 
-    data_dir = session_data_dir(session, get_settings().data_dir)
+    paths = workspace_paths_for_session(session)
     folder_ids = [item.id for item in folders]
     notes = (
         session.scalars(
@@ -76,7 +74,7 @@ def get_context(
         for note in notes:
             if len(results) >= limit or note.id in seen_note_ids or not predicate(note):
                 continue
-            text = _read_note_text(note, data_dir)
+            text = _read_note_text(note, paths)
             if text is None:
                 continue
             seen_note_ids.add(note.id)
@@ -86,7 +84,7 @@ def get_context(
                         note,
                         request,
                         is_starred=_is_starred_by_user(session, note.id, user.id),
-                        data_dir=data_dir,
+                        paths=paths,
                     ),
                     text=text,
                     matched_by="title",
@@ -97,9 +95,9 @@ def get_context(
     add_title_matches(lambda note: title_query in _normalized(note.title))
 
     if len(results) < limit:
-        notes_by_path = {str(note_file_path(note, data_dir).resolve()): note for note in notes}
+        notes_by_path = {str(paths.note_file_path(note).resolve()): note for note in notes}
         try:
-            matches = search_markdown_files(markdown_root(data_dir), title, limit=limit * 10)
+            matches = search_markdown_files(paths.markdown_root, title, limit=limit * 10)
         except RuntimeError:
             matches = []
         for match in matches:
@@ -108,7 +106,7 @@ def get_context(
             note = notes_by_path.get(str(match.path))
             if note is None or note.id in seen_note_ids:
                 continue
-            text = _read_note_text(note, data_dir)
+            text = _read_note_text(note, paths)
             if text is None:
                 continue
             seen_note_ids.add(note.id)
@@ -118,7 +116,7 @@ def get_context(
                         note,
                         request,
                         is_starred=_is_starred_by_user(session, note.id, user.id),
-                        data_dir=data_dir,
+                        paths=paths,
                     ),
                     text=text,
                     matched_by="search",

@@ -23,7 +23,6 @@ from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_or_404,
 )
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import (
     Folder,
     MiaJob,
@@ -48,15 +47,12 @@ from mianotes_web_service.services.note_responses import (
     starred_note_ids,
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
-from mianotes_web_service.services.paths import (
-    note_file_path,
-)
+from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import (
     render_markdown_note,
     replace_markdown_title,
     summarize_text,
 )
-from mianotes_web_service.services.workspace_context import session_data_dir
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -181,14 +177,17 @@ def update_note(
         folder = session.get(Folder, payload.folder_id)
         if folder is None or folder.archived_at is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+        paths = workspace_paths_for_session(session)
         move_note_to_folder(
             note,
             folder,
-            data_dir=session_data_dir(session, get_settings().data_dir),
+            data_dir=paths.data_dir,
         )
+    else:
+        paths = workspace_paths_for_session(session)
 
     next_title = payload.title or note.title
-    note_path = note_file_path(note, session_data_dir(session, get_settings().data_dir))
+    note_path = paths.note_file_path(note)
     is_manual_content_edit = payload.text is not None or payload.title is not None
     if payload.text is not None:
         note_path.write_text(

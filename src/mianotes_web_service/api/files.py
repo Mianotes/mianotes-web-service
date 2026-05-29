@@ -15,13 +15,13 @@ from mianotes_web_service.api.dependencies import (
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, SourceFile
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
-from mianotes_web_service.services.paths import note_file_path, source_file_path
+from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
     DATABASE_FILENAME,
     DATABASE_SIDECAR_SUFFIXES,
     SYSTEM_DATABASE_FILENAME,
 )
-from mianotes_web_service.services.workspace_context import current_data_dir, session_data_dir
+from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(tags=["files"])
 PRIVATE_DATA_FILENAMES = {
@@ -86,7 +86,8 @@ def _published_markdown_response(file_path: str, session: Session) -> FileRespon
     if file_path.startswith("sources/") or "/sources/" in file_path:
         return _published_source_response(file_path, session)
 
-    data_dir = session_data_dir(session, get_settings().data_dir).resolve()
+    paths = workspace_paths_for_session(session)
+    data_dir = paths.data_dir.resolve()
     target = (data_dir / "markdown" / file_path).resolve()
     if data_dir not in target.parents and target != data_dir:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -95,14 +96,15 @@ def _published_markdown_response(file_path: str, session: Session) -> FileRespon
         select(Note).options(selectinload(Note.folder)).where(Note.is_published.is_(True))
     ).all()
     for note in notes:
-        if note_file_path(note, data_dir).resolve() == target:
+        if paths.note_file_path(note).resolve() == target:
             return _file_response(f"markdown/{file_path}", data_dir=data_dir)
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
 
 def _published_source_response(file_path: str, session: Session) -> FileResponse:
-    data_dir = session_data_dir(session, get_settings().data_dir).resolve()
+    paths = workspace_paths_for_session(session)
+    data_dir = paths.data_dir.resolve()
     target = (data_dir / "markdown" / file_path).resolve()
     if data_dir not in target.parents and target != data_dir:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -114,7 +116,7 @@ def _published_source_response(file_path: str, session: Session) -> FileResponse
         .where(Note.is_published.is_(True))
     ).all()
     for source_file in source_files:
-        if source_file_path(source_file, data_dir).resolve() == target:
+        if paths.source_file_path(source_file).resolve() == target:
             return _file_response(f"markdown/{file_path}", data_dir=data_dir)
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -144,7 +146,7 @@ def get_markdown_file(
     session: SessionDep,
 ) -> FileResponse:
     clean = _clean_file_path(file_path)
-    data_dir = session_data_dir(session, get_settings().data_dir)
+    data_dir = workspace_paths_for_session(session).data_dir
     if _has_authenticated_file_access(request, session):
         return _file_response(f"markdown/{clean}", data_dir=data_dir)
     return _published_markdown_response(clean, session)
@@ -152,4 +154,4 @@ def get_markdown_file(
 
 @router.get("/{file_path:path}", name="get_folder_file")
 def get_folder_file(file_path: str, session: SessionDep, user: NotesReadUser) -> FileResponse:
-    return _file_response(file_path, data_dir=session_data_dir(session, get_settings().data_dir))
+    return _file_response(file_path, data_dir=workspace_paths_for_session(session).data_dir)

@@ -23,7 +23,7 @@ from mianotes_web_service.db.workspace_routing import (
 )
 from mianotes_web_service.domain.schemas import NoteRead
 from mianotes_web_service.services.note_responses import note_response
-from mianotes_web_service.services.paths import source_file_path
+from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.share import (
     generate_share_token,
     get_share_secret,
@@ -32,7 +32,6 @@ from mianotes_web_service.services.share import (
 from mianotes_web_service.services.workspace_context import (
     WorkspaceContext,
     reset_current_workspace,
-    session_data_dir,
     set_current_workspace,
 )
 
@@ -114,7 +113,7 @@ def get_shared_source_file(
         )
         if source_file is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-        target = source_file_path(source_file, session_data_dir(_session, get_settings().data_dir))
+        target = workspace_paths_for_session(_session).source_file_path(source_file)
         if not target.is_file():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
         return FileResponse(target)
