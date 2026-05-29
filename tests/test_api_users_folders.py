@@ -13,6 +13,12 @@ from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services.storage_settings import (
+    DEFAULT_DATABASE_FILE,
+    StorageConfig,
+    StorageLocation,
+    write_storage_config,
+)
 
 
 @pytest.fixture
@@ -281,6 +287,74 @@ def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Pat
     assert second_payload["photo_url"] != payload["photo_url"]
     assert avatar_path.exists()
     assert (tmp_path / "data" / second_payload["photo_url"].removeprefix("/")).is_file()
+
+
+def test_profile_photo_serves_from_global_data_after_workspace_switch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    data_dir = tmp_path / "data"
+    blog_dir = tmp_path / "blog"
+    config_path = tmp_path / "workspaces.json"
+    write_storage_config(
+        config_path,
+        StorageConfig(
+            active_location="default",
+            database_file=DEFAULT_DATABASE_FILE,
+            locations=[
+                StorageLocation(
+                    id="default",
+                    name="Main workspace",
+                    folder_path=data_dir,
+                ),
+                StorageLocation(
+                    id="blog",
+                    name="Blog",
+                    folder_path=blog_dir,
+                ),
+            ],
+        ),
+    )
+    monkeypatch.setenv("MIANOTES_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(config_path))
+    get_settings.cache_clear()
+
+    app = create_app()
+    with TestClient(app) as workspace_client:
+        user = workspace_client.post(
+            "/api/auth/join",
+            json={
+                "email": "avatar-workspace@example.com",
+                "name": "Avatar Workspace User",
+                "password": "instance-password",
+                "password_confirmation": "instance-password",
+            },
+        ).json()["user"]
+
+        image_bytes = BytesIO()
+        Image.new("RGB", (400, 300), "#1684ff").save(image_bytes, format="PNG")
+        image_bytes.seek(0)
+
+        photo_response = workspace_client.post(
+            f"/api/users/{user['id']}/photo",
+            files={"photo": ("avatar.png", image_bytes, "image/png")},
+        )
+        assert photo_response.status_code == 200
+        photo_url = photo_response.json()["photo_url"]
+        assert (data_dir / photo_url.removeprefix("/")).is_file()
+        assert not (blog_dir / photo_url.removeprefix("/")).exists()
+
+        switched = workspace_client.patch(
+            "/api/settings/storage/active",
+            json={"location_id": "blog"},
+        )
+        assert switched.status_code == 200
+
+        loaded_photo = workspace_client.get(photo_url)
+        assert loaded_photo.status_code == 200
+        assert loaded_photo.headers["content-type"] == "image/jpeg"
+
+    get_settings.cache_clear()
 
 
 def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):

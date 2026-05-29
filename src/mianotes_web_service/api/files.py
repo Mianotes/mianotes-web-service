@@ -152,6 +152,12 @@ def get_markdown_file(
     return _published_markdown_response(clean, session)
 
 
+@router.get("/.profiles/{file_path:path}", include_in_schema=False)
+def get_profile_file(file_path: str, _user: NotesReadUser) -> FileResponse:
+    clean = _clean_file_path(file_path)
+    return _file_response(f".profiles/{clean}", data_dir=get_settings().data_dir)
+
+
 @router.get("/{file_path:path}", name="get_folder_file")
 def get_folder_file(file_path: str, session: SessionDep, user: NotesReadUser) -> FileResponse:
     return _file_response(file_path, data_dir=workspace_paths_for_session(session).data_dir)
