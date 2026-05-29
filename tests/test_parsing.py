@@ -272,6 +272,84 @@ def test_document_parser_preserves_regular_markdown_code_blocks(
     )
 
 
+def test_document_parser_escapes_mdx_unsafe_pdf_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "paper.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "Results were significant at p<0.001.\n\n"
+                    "The runner injects <tick> prompts.\n\n"
+                    "Session files live under history/<sessionId>/.\n\n"
+                    "</>\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "Results were significant at p&lt;0.001.\n\n"
+        "The runner injects &lt;tick&gt; prompts.\n\n"
+        "Session files live under history/&lt;sessionId&gt;/.\n\n"
+        "&lt;/>\n"
+    )
+
+
+def test_document_parser_preserves_html_tags_autolinks_and_code_when_escaping_mdx(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "paper.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "<span>Visible label</span>\n"
+                    "<https://example.com/paper.pdf>\n"
+                    "<team@example.com>\n\n"
+                    "```text\n"
+                    "p<0.001 and <tick> stay literal in code\n"
+                    "```\n"
+                )
+            )
+
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.text == (
+        "<span>Visible label</span>\n"
+        "<https://example.com/paper.pdf>\n"
+        "<team@example.com>\n\n"
+        "```text\n"
+        "p<0.001 and <tick> stay literal in code\n"
+        "```\n"
+    )
+
+
 def test_document_parser_adds_feedback_when_ocr_llm_is_not_configured(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

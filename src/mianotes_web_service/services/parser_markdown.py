@@ -22,6 +22,90 @@ HTML_VOID_TAG_PATTERN = re.compile(
     r"(?P<attrs>\s[^<>]*?)?\s*/?>",
     re.IGNORECASE,
 )
+HTML_TAG_NAMES = frozenset(
+    {
+        "a",
+        "abbr",
+        "address",
+        "article",
+        "aside",
+        "b",
+        "base",
+        "blockquote",
+        "br",
+        "caption",
+        "cite",
+        "code",
+        "col",
+        "colgroup",
+        "dd",
+        "del",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "em",
+        "figcaption",
+        "figure",
+        "footer",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hr",
+        "i",
+        "iframe",
+        "img",
+        "input",
+        "ins",
+        "kbd",
+        "li",
+        "link",
+        "main",
+        "mark",
+        "meta",
+        "nav",
+        "object",
+        "ol",
+        "p",
+        "param",
+        "pre",
+        "q",
+        "s",
+        "samp",
+        "section",
+        "small",
+        "source",
+        "span",
+        "strong",
+        "sub",
+        "summary",
+        "sup",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "track",
+        "tr",
+        "u",
+        "ul",
+        "var",
+    }
+)
+HTML_TAG_PATTERN = re.compile(
+    r"</?(?P<tag>[A-Za-z][A-Za-z0-9-]*)(?=[\s>/])[^<>]*?>"
+)
+AUTOLINK_PATTERN = re.compile(
+    r"<(?:[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*|"
+    r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+    r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)>"
+)
 
 
 def normalise_image_markdown(text: str) -> str | None:
@@ -82,5 +166,50 @@ def normalise_html_void_tags(text: str) -> str:
     return "".join(parts)
 
 
+def escape_mdx_unsafe_angle_brackets(text: str) -> str:
+    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            parts[index] = _escape_mdx_unsafe_angle_brackets_in_markdown(part)
+    return "".join(parts)
+
+
+def _escape_mdx_unsafe_angle_brackets_in_markdown(text: str) -> str:
+    output: list[str] = []
+    index = 0
+    while index < len(text):
+        if text[index] != "<":
+            output.append(text[index])
+            index += 1
+            continue
+
+        autolink = AUTOLINK_PATTERN.match(text, index)
+        if autolink is not None:
+            output.append(autolink.group(0))
+            index = autolink.end()
+            continue
+
+        html_tag = HTML_TAG_PATTERN.match(text, index)
+        if html_tag is not None:
+            tag = html_tag.group("tag").lower()
+            if tag in HTML_TAG_NAMES:
+                output.append(html_tag.group(0))
+            else:
+                output.append(_escape_angle_brackets(html_tag.group(0)))
+            index = html_tag.end()
+            continue
+
+        output.append("&lt;")
+        index += 1
+
+    return "".join(output)
+
+
+def _escape_angle_brackets(text: str) -> str:
+    return text.replace("<", "&lt;").replace(">", "&gt;")
+
+
 def normalise_parsed_markdown(text: str) -> str:
-    return normalise_html_void_tags(normalise_document_ocr_markdown(text))
+    return escape_mdx_unsafe_angle_brackets(
+        normalise_html_void_tags(normalise_document_ocr_markdown(text))
+    )
