@@ -31,9 +31,7 @@ You are the first admin, so you are setting up the space where your notes, files
 
 Mianotes was built for people who want useful project knowledge without sending everything to someone else's cloud. Your notes stay readable, and your workspace stays under your control.
 
-Mianotes is still early, so your feedback matters. If something breaks, feels confusing, or could be better, please tell us. You can open an issue on GitHub: https://github.com/Mianotes/mianotes-web-service/issues Or email us: mianotes@proton.me
-
-Bug reports, missing features, and honest complaints all help make Mianotes better.
+Mianotes is still early, so your feedback matters. If something breaks, feels confusing, or could be better, please tell us. Bug reports, missing features, and honest complaints all help make Mianotes better.
 
 ## Workspaces
 
@@ -59,11 +57,7 @@ A good first step is to create a folder for one real project. Once your folder i
 
 ## What Mia does
 
-Mia helps turn messy inputs into clean Markdown notes.
-
-When you connect an LLM, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
-
-{onboarding_mia}
+Mia helps turn messy inputs into clean Markdown notes. When you connect an LLM, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
 
 Mianotes allows you to connect local models like Llama, Qwen, Gemma, or DeepSeek. You can also connect cloud providers such as OpenAI, Gemini, Claude, or any OpenAI-compatible API.
 
@@ -79,8 +73,6 @@ Open the Job Queue to see what is queued, what is running, what completed, and w
 
 Once a note is ready, open it from the notes list. You can read the Markdown, edit it in the rich text editor, ask Mia questions, add tags, move it to another folder, share it, export it as a PDF, or publish it as part of a static site.
 
-{onboarding_screen_editor}
-
 ## Sharing and publishing
 
 Mianotes can create share links for notes, export notes as PDFs, and publish selected notes as a static HTML site.
@@ -91,11 +83,11 @@ Publishing is useful when you want a clean documentation site, team handbook, pr
 
 {onboarding_publish}
 
-## One last thing
+## You are ready to go
 
-If Mianotes helps you standardise how you document work and collaborate, then it is doing what it was made to do.
+Thank you again for installing Mianotes. We hope it helps you document work more consistently, and keep project knowledge in one place.
 
-Thank you again for trying it.
+The Mianotes team
 """
 
 
