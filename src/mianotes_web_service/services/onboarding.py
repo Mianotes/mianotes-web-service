@@ -25,13 +25,11 @@ ONBOARDING_IMAGE_ALTS = {
 
 ONBOARDING_NOTE_TEMPLATE = """# Welcome to Mianotes
 
-Thank you for installing Mianotes and giving it a place on your machine.
+Thank you for installing Mianotes.
 
-You are the first admin, so you are setting up the space where your notes, files, links, recordings, source material, and agent output can become a local knowledge base.
+As the admin, you are now setting up your secure local knowledge base. This is where your notes, files, links, recordings, and AI agent outputs will live, fully under your control and completely offline. 
 
-Mianotes was built for people who want useful project knowledge without sending everything to someone else's cloud. Your notes stay readable, and your workspace stays under your control.
-
-Mianotes is still early, so your feedback matters. If something breaks, feels confusing, or could be better, please tell us. Bug reports, missing features, and honest complaints all help make Mianotes better.
+Because Mianotes is in early development, your experience is incredibly important to us. If you encounter bugs, missing features, or confusing workflows, please share your feedback so we can improve: https://tally.so/r/xXvQbk
 
 ## Workspaces
 
