@@ -234,6 +234,14 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert (html_root / "site.js").is_file()
     assert (html_root / "search.js").is_file()
     assert (tmp_path / "data" / "html" / "navigation.js").is_file()
+    readme_md = (tmp_path / "data" / "html" / "README.md")
+    assert readme_md.is_file()
+    assert readme_md.read_text(encoding="utf-8") == (
+        "# Mia Docs Documentation\n"
+        "\n"
+        "- **About MCP**\n"
+        f"  - [Clients](0.1.1/{note_path})\n"
+    )
     note_html = (html_root / note_path).read_text(encoding="utf-8")
     assert note_html.find("styles.css") > -1
     assert '<meta name="generator" content="Mianotes - https://github.com/Mianotes">' in note_html
@@ -309,6 +317,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
         names = set(archive.namelist())
     assert "0.1.1-static-site/index.html" in names
     assert "0.1.1-static-site/navigation.js" in names
+    assert "0.1.1-static-site/README.md" in names
     assert f"0.1.1-static-site/0.1.1/{note_path}" in names
 
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()

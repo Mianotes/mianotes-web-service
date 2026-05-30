@@ -122,7 +122,11 @@ def download_published_site(
     archive = BytesIO()
     archive_root = f"{_archive_name(site)}-static-site"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path in (html_root / "index.html", html_root / "navigation.js"):
+        for file_path in (
+            html_root / "index.html",
+            html_root / "navigation.js",
+            html_root / "README.md",
+        ):
             if file_path.is_file():
                 zip_file.write(file_path, f"{archive_root}/{file_path.name}")
         for file_path in sorted(path for path in site_dir.rglob("*") if path.is_file()):
