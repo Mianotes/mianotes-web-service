@@ -706,6 +706,22 @@ h3,
   border-color: #f8fafc;
 }
 
+.article-footer {
+  border-color: #303746;
+}
+
+.page-link {
+  color: #dbe4f0;
+}
+
+.page-link:hover {
+  color: #ffffff;
+}
+
+.page-link .arrow {
+  color: #a5adbb;
+}
+
 .sidebar-link.active {
   color: #f8fafc;
   background: var(--active);
