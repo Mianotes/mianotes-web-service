@@ -1138,7 +1138,9 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert {tag["slug"] for tag in note["tags"]} == {"research", "summer-2026"}
     listed_tags = client.get("/api/tags")
     assert listed_tags.status_code == 200
-    assert {tag["slug"] for tag in listed_tags.json()} == {"research", "summer-2026"}
+    assert {"research", "summer-2026"}.issubset(
+        {tag["slug"] for tag in listed_tags.json()}
+    )
 
     updated = client.put(
         f"/api/notes/{note['id']}/tags",

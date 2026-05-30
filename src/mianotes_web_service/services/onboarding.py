@@ -8,11 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
+from mianotes_web_service.services.note_tags import sync_note_tags
 from mianotes_web_service.services.storage import FilesystemStorage, short_id, summarize_text
 
 ONBOARDING_FOLDER_NAME = "Mianotes"
 ONBOARDING_FOLDER_SLUG = "mianotes"
 ONBOARDING_NOTE_TITLE = "Getting Started"
+ONBOARDING_NOTE_TAGS = ["getting started", "welcome"]
 ONBOARDING_ASSETS_DIR = Path(__file__).resolve().parents[1] / "onboarding_assets"
 ONBOARDING_IMAGE_ALTS = {
     "onboarding_settings_workspace_switcher.jpg": "Settings workspace switcher",
@@ -176,6 +178,7 @@ def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> N
     )
     session.add(note)
     session.flush()
+    sync_note_tags(session, note, ONBOARDING_NOTE_TAGS)
 
     if paths.source_path is not None:
         session.add(

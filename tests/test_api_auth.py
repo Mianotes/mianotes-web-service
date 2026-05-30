@@ -77,6 +77,10 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     onboarding_note = notes.json()[0]
     assert onboarding_note["title"] == "Getting Started"
     assert "Thank you for installing Mianotes" in onboarding_note["summary"]
+    assert {tag["name"] for tag in onboarding_note["tags"]} == {
+        "getting started",
+        "welcome",
+    }
 
     note = client.get(f"/api/notes/{onboarding_note['id']}")
     assert note.status_code == 200
