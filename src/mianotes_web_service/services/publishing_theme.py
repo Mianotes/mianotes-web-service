@@ -13,8 +13,8 @@ DEFAULT_SITE_CONFIGURATION: dict[str, object] = {
     "brand": "mianotes",
     "version": "0.1.0",
     "headerLinks": [
-        {"title": "GitHub", "url": "https://github.com/Mianotes"},
-        {"title": "Contact", "url": "mailto:mianotes@proton.me"},
+        {"title": "Website", "url": "https://www.mianotes.com/"},
+        {"title": "Feedback", "url": "https://tally.so/r/xXvQbk"},
     ],
     "showPreviousVersions": True,
     "footerHtml": "Copyright © Your Name Here.",

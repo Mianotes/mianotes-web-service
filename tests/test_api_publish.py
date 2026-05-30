@@ -152,8 +152,8 @@ def test_publish_draft_returns_editable_blocks(client: TestClient):
     assert draft["tag_id"] is None
     assert draft["site_configuration"]["brand"] == "mianotes"
     assert draft["site_configuration"]["headerLinks"] == [
-        {"title": "GitHub", "url": "https://github.com/Mianotes"},
-        {"title": "Contact", "url": "mailto:mianotes@proton.me"},
+        {"title": "Website", "url": "https://www.mianotes.com/"},
+        {"title": "Feedback", "url": "https://tally.so/r/xXvQbk"},
     ]
     assert draft["site_configuration"]["showPreviousVersions"] is True
     assert draft["site_configuration"]["footerHtml"] == "Copyright © Your Name Here."
