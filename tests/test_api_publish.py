@@ -130,7 +130,7 @@ def test_publish_themes_are_listed(client: TestClient):
 
     assert response.status_code == 200
     themes = response.json()
-    assert [theme["id"] for theme in themes] == ["mialight", "miadocs", "miadark"]
+    assert [theme["id"] for theme in themes] == ["mialight", "miadocs", "opencode", "miadark"]
 
 
 def test_publish_draft_returns_editable_blocks(client: TestClient):

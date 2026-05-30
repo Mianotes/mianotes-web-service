@@ -61,15 +61,16 @@ without adding notes, **New notes** should be empty.
 
 ## Themes
 
-Mianotes ships three static publishing themes:
+Mianotes ships four static publishing themes:
 
 | Theme ID | Name | Use |
 |---|---|---|
 | `mialight` | Mialight | Default light documentation theme. |
 | `miadocs` | Miadocs | Polished article-reading theme for published notes and documentation. |
+| `opencode` | OpenCode | Geeky developer documentation theme with terminal-style code blocks. |
 | `miadark` | Miadark | Dark documentation theme. |
 
-Both themes render Markdown tables, fenced code blocks, admonitions, article
+All themes render Markdown tables, fenced code blocks, admonitions, article
 navigation, search, and an **On this page** column generated from page headings.
 
 ## Markdown rendering

@@ -27,6 +27,12 @@ Response:
     "version": "0.1.0"
   },
   {
+    "id": "opencode",
+    "name": "OpenCode",
+    "description": "A geeky developer documentation theme with terminal-style code blocks.",
+    "version": "0.1.0"
+  },
+  {
     "id": "miadark",
     "name": "Miadark",
     "description": "Dark documentation theme for Mianotes static sites.",
