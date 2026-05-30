@@ -34,15 +34,18 @@ The full table of contents is in [TOC.md](docs/TOC.md).
 
 ## Technology
 
+- FFmpeg
+- MarkItDown
+- Tesseract OCR
+- Trafilatura
+- Ollama
+- Ripgrep
 - FastAPI
 - Pydantic
 - SQLAlchemy
-- Alembic
 - SQLite
-- MarkItDown
-- Trafilatura
-- Local LLMs, or OpenAI
-- pytest
+- Alembic
+- Pytest
 - Ruff
 
 ## License
