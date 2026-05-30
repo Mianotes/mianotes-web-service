@@ -55,9 +55,7 @@ Each location points to a workspace folder that contains, or can contain, a `.mi
 
 Users, sessions, API keys, and global settings live in `data/system.db`.
 
-## `storage.example.json`
-
-The repository includes `storage.example.json` as a safe example configuration. It does not represent a real user machine and can be committed.
+## Runtime workspace config
 
 The real `workspaces.json` is created and updated by each installation. It is ignored by Git because it can contain local filesystem paths that only make sense on that computer or server.
 
