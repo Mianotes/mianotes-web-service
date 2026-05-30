@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser
-from mianotes_web_service.db.models import Folder
+from mianotes_web_service.db.models import Folder, PublishedSite
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     FolderCreate,
@@ -72,6 +72,13 @@ def _replace_path_prefix(value: str, old_roots: tuple[Path, ...], new_root: Path
             if value.startswith(old_text):
                 return str(new_root) + value[len(old_text) :]
     return value
+
+
+def _remove_stale_archived_folder(session: Session, folder: Folder) -> None:
+    for site in session.scalars(select(PublishedSite).where(PublishedSite.folder_id == folder.id)):
+        site.folder_id = None
+    session.delete(folder)
+    session.commit()
 
 
 def _folder_order_statement():
@@ -262,6 +269,7 @@ def restore_folder(
     previous_live_path = paths.markdown_root / slugify(folder.name)
 
     if not archived_path.exists():
+        _remove_stale_archived_folder(session, folder)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Archived folder no longer exists in the filesystem",

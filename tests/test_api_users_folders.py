@@ -1,6 +1,7 @@
 from collections.abc import Generator
 from io import BytesIO
 from pathlib import Path
+from shutil import rmtree
 
 import pytest
 from fastapi.testclient import TestClient
@@ -456,6 +457,52 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     restored_visible = client.get("/api/folders", params={"user_id": user["id"]})
     assert restored_visible.status_code == 200
     assert folder["id"] in [item["id"] for item in restored_visible.json()]
+
+
+def test_missing_archived_folder_is_removed_from_restore_list(
+    client: TestClient,
+    tmp_path: Path,
+):
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "stale-archive@example.com",
+            "name": "Stale Archive User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    folder = client.post("/api/folders", json={"name": "Temporary Docs"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Temporary note",
+            "text": "This file was manually removed after archiving.",
+        },
+    ).json()
+
+    archived = client.delete(f"/api/folders/{folder['id']}")
+    assert archived.status_code == 204
+
+    archived_folder = client.get(f"/api/folders/{folder['id']}").json()
+    archive_path = tmp_path / "data" / "markdown" / archived_folder["path"]
+    assert archive_path.exists()
+    rmtree(archive_path)
+
+    restored = client.post(f"/api/folders/{folder['id']}/restore", json={})
+    assert restored.status_code == 404
+    assert restored.json()["detail"] == "Archived folder no longer exists in the filesystem"
+
+    archived_folders = client.get(
+        "/api/folders",
+        params={"user_id": user["id"], "include_archived": True},
+    )
+    assert archived_folders.status_code == 200
+    assert folder["id"] not in [item["id"] for item in archived_folders.json()]
+
+    missing_note = client.get(f"/api/notes/{note['id']}")
+    assert missing_note.status_code == 404
 
 
 def test_unpinned_folders_can_be_reordered(client: TestClient):
