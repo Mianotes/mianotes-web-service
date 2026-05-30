@@ -52,7 +52,6 @@
 - [Architecture](07-system/01-architecture.md)
 - [Storage and database](07-system/02-storage-and-database.md)
 - [Security](07-system/03-security.md)
-- [Multi-workspace architecture](07-system/04-multi-workspace-architecture.md)
 - [Feature requests](07-system/05-feature-requests.md)
 
 ## Open source
