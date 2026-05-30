@@ -23,14 +23,7 @@ The service is designed for small groups: developers, researchers, students, and
 
 ## Documentation
 
-This documentation is organised for three kinds of reader:
-
-1. **People deciding whether to try Mianotes.** Start with [What is Mianotes?](docs/01-about/01-overview.md), [Use cases](docs/01-about/02-use-cases.md), and [Installation](docs/02-getting-started/01-installation.md).
-2. **Humans using the web app.** Start with [Human workflow](docs/03-for-humans/01-human-workflow.md) and [Folders, notes, and tags](docs/03-for-humans/02-folders-notes-tags.md).
-3. **People publishing documentation.** Start with [Publishing static sites](docs/03-for-humans/04-publishing.md).
-4. **AI agents and developers.** Start with [Agent overview](docs/04-for-agents/01-agent-overview.md), [API tokens](docs/04-for-agents/02-api-tokens.md), [MCP server](docs/04-for-agents/03-mcp-server.md), and [API overview](docs/06-api-reference/01-api-overview.md).
-
-The full table of contents is in [TOC.md](docs/TOC.md).
+The full table of contents is in [Mianotes/docs](https://github.com/Mianotes/docs).
 
 ## Technology
 
