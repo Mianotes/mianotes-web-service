@@ -127,10 +127,9 @@ def create_note_share(
     note_id: str,
     session: SessionDep,
     request: Request,
-    user: ShareWriteUser,
+    _user: ShareWriteUser,
 ) -> dict[str, str]:
     note = read_note_or_404(session, note_id)
-    ensure_can_change_note(note, user)
     secret = get_share_secret(session, create=True)
     if secret is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)

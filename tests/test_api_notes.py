@@ -1216,6 +1216,54 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     assert avatar_missing.status_code == 404
 
 
+def test_non_admin_user_can_share_readable_note_without_editing_it(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "share-admin@example.com",
+            "name": "Share Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    folder = client.post("/api/folders", json={"name": "Open source"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Theming and customisation",
+            "text": "Shared workspace context.",
+        },
+    ).json()
+
+    member = client.post(
+        "/api/auth/join",
+        json={
+            "email": "share-member@example.com",
+            "name": "Share Member",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    assert member["is_admin"] is False
+
+    shared = client.post(f"/api/notes/{note['id']}/share")
+    assert shared.status_code == 200
+    share_url = shared.json()["share_url"]
+
+    guest_note = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
+    assert guest_note.status_code == 200
+    assert guest_note.json()["id"] == note["id"]
+
+    disabled_by_member = client.delete(f"/api/notes/{note['id']}/share")
+    assert disabled_by_member.status_code == 403
+    assert disabled_by_member.json()["detail"] == "Only Share Admin or an admin can change this note."
+
+    client.post("/api/auth/login", json={"user_id": admin["id"], "password": "house-password"})
+    disabled_by_admin = client.delete(f"/api/notes/{note['id']}/share")
+    assert disabled_by_admin.status_code == 204
+
+
 def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
