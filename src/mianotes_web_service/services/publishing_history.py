@@ -51,6 +51,7 @@ def write_navigation_js(
     html_root: Path,
     current_site: PublishedSite,
 ) -> None:
+    prune_missing_published_sites(session=session, html_root=html_root)
     entries = site_navigation_entries(
         session.scalars(select(PublishedSite).order_by(PublishedSite.created_at.desc())).all()
     )
@@ -67,6 +68,19 @@ def write_navigation_js(
         f"const SITE_NAVIGATION = {json_for_script(payload)};\n",
         encoding="utf-8",
     )
+
+
+def prune_missing_published_sites(*, session: Session, html_root: Path) -> None:
+    resolved_html_root = html_root.resolve()
+    data_dir = resolved_html_root.parent
+    did_prune = False
+    for site in session.scalars(select(PublishedSite)).all():
+        site_dir = (data_dir / site.html_path).resolve()
+        if resolved_html_root not in site_dir.parents or not site_dir.is_dir():
+            session.delete(site)
+            did_prune = True
+    if did_prune:
+        session.commit()
 
 
 def site_navigation_entries(sites: Iterable[PublishedSite]) -> list[dict[str, str]]:

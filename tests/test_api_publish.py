@@ -2,6 +2,7 @@ import zipfile
 from collections.abc import Generator
 from io import BytesIO
 from pathlib import Path
+from shutil import rmtree
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base, Note
+from mianotes_web_service.db.models import Base, Note, PublishedSite
 from mianotes_web_service.db.session import get_session
 
 
@@ -294,6 +295,56 @@ def test_publish_site_replaces_same_version_html(client: TestClient, tmp_path: P
     assert served_html.status_code == 200
     assert served_html.headers["cache-control"] == "no-store"
     assert "Second published body." in served_html.text
+
+
+def test_publish_prunes_missing_static_versions_from_navigation_and_db(
+    client: TestClient,
+    tmp_path: Path,
+):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Docs"}).json()
+    note = _create_note(client, folder["id"], "Guide", "Published guide.")
+    note_path = f"guide-{note['id'][:8]}.html"
+    base_payload = {
+        "folder_id": folder["id"],
+        "theme": "mialight",
+        "site_configuration": {
+            "brand": "Mia Docs",
+            "version": "0.1.0",
+            "headerLinks": [],
+            "footerHtml": "",
+        },
+        "navigation": [{"title": "Docs", "items": [{"title": "Guide", "path": note_path}]}],
+        "updated_notes": [{"title": "Guide", "path": note_path}],
+    }
+
+    first_response = client.post("/api/publish", json=base_payload)
+    assert first_response.status_code == 201
+    first_version_dir = tmp_path / "data" / "html" / "0.1.0"
+    assert first_version_dir.is_dir()
+    rmtree(first_version_dir)
+
+    next_payload = {
+        **base_payload,
+        "site_configuration": {
+            **base_payload["site_configuration"],
+            "version": "0.2.0",
+        },
+    }
+    second_response = client.post("/api/publish", json=next_payload)
+    assert second_response.status_code == 201
+
+    navigation_js = (tmp_path / "data" / "html" / "navigation.js").read_text(encoding="utf-8")
+    assert "0.2.0/index.html" in navigation_js
+    assert "0.1.0/index.html" not in navigation_js
+
+    session_factory = client.app.state.testing_session
+    with session_factory() as session:
+        versions = [
+            site.version
+            for site in session.query(PublishedSite).order_by(PublishedSite.version).all()
+        ]
+    assert versions == ["0.2.0"]
 
 
 def test_publish_site_uses_navigation_as_published_note_set(client: TestClient, tmp_path: Path):
