@@ -192,6 +192,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
             "> [!TIP] Understanding the configuration\n"
             "> Use `MIANOTES_API_KEY` to connect agents.\n\n"
             ":::note\n"
+            "**Note**\n\n"
             "This documentation was generated with Codex using [Mianotes](https://www.mianotes.com/).\n"
             ":::\n\n"
             "> [!WARNING] Security consideration\n"
@@ -247,9 +248,16 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert '<div class="code-card">' in note_html
     assert '<span class="tok-key">&quot;method&quot;</span>' in note_html
     assert 'class="admonition admonition-note"' in note_html
-    assert "<strong>Note</strong>" in note_html
+    assert '<aside class="admonition admonition-note"><div class="admonition-body">' in note_html
+    assert (
+        '<div class="admonition-title"><span class="admonition-icon" aria-hidden="true"></span>'
+        "<strong>Note</strong></div>"
+    ) not in note_html
+    assert "<p><strong>Note</strong></p>" in note_html
     assert 'class="admonition admonition-tip"' in note_html
+    assert "<strong>Understanding the configuration</strong>" in note_html
     assert 'class="admonition admonition-warning"' in note_html
+    assert "<strong>Security consideration</strong>" in note_html
     assert '<aside class="page-toc" data-page-toc></aside>' in note_html
     assert (tmp_path / "data" / "markdown" / "about-mcp").is_dir()
 
