@@ -29,8 +29,6 @@ Thank you for installing Mianotes.
 
 As the admin, you are now setting up your secure local knowledge base. This is where your notes, files, links, recordings, and AI agent outputs will live, fully under your control and completely offline. 
 
-Because Mianotes is in early development, your experience is incredibly important to us. If you encounter bugs, missing features, or confusing workflows, please share your feedback so we can improve: https://tally.so/r/xXvQbk
-
 ## Workspaces
 
 A workspace is a local knowledge area. It maps to a normal folder on your machine, and Mianotes stores that workspace's notes, sources, jobs, and index inside it.
@@ -55,17 +53,17 @@ A good first step is to create a folder for one real project. Once your folder i
 
 ## What Mia does
 
-Mia helps turn messy inputs into clean Markdown notes. When you connect an LLM, Mia can also answer questions about a note, summarise it, extract key points, humanise text, and help restructure rough material.
+Mia converts documents, links, images, audio, and text into Markdown notes you can read, edit, search, and reuse.
 
-Mianotes allows you to connect local models like Llama, Qwen, Gemma, or DeepSeek. You can also connect cloud providers such as OpenAI, Gemini, Claude, or any OpenAI-compatible API.
+When you connect an LLM, Mia can also answer questions about a note, summarise long material, extract key points, improve rough text, and restructure content.
+
+Mianotes works with local models like Llama, Qwen, Gemma, or DeepSeek. You can also connect cloud providers such as OpenAI, Gemini, Claude, or any OpenAI-compatible API.
 
 ## Job Queue
 
 File conversion requests are processed by Mia. Some jobs finish quickly. Others take longer, especially long PDFs, audio, video, OCR-heavy images, or large batches of files.
 
 Open the Job Queue to see what is queued, what is running, what completed, and what needs attention.
-
-{onboarding_jobs}
 
 ## Reading and editing notes
 
@@ -79,12 +77,11 @@ If you configure a domain in Settings, share links will work for other people. I
 
 Publishing is useful when you want a clean documentation site, team handbook, project archive, research hub, or public knowledge base generated from your notes.
 
-{onboarding_publish}
+## Tell us what to improve
 
-## You are ready to go
+Because Mianotes is in early development, your experience is incredibly important to us. If you encounter bugs, missing features, or confusing workflows, please share your feedback so we can improve: https://tally.so/r/xXvQbk
 
-Thank you again for installing Mianotes. We hope it helps you document work more consistently, and keep project knowledge in one place.
-
+___
 The Mianotes team
 """
 
