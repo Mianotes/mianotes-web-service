@@ -82,13 +82,12 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     assert note.status_code == 200
     note_payload = note.json()
     note_text = note_payload["text"]
-    assert "https://github.com/Mianotes/mianotes-web-service/issues" in note_text
-    assert "mianotes@proton.me" in note_text
+    assert "https://tally.so/r/xXvQbk" in note_text
     assert "![Settings workspace switcher](/markdown/mianotes/sources/" in note_text
-    assert "![Publish notes screen](/markdown/mianotes/sources/" in note_text
+    assert "![Workspace switcher](/markdown/mianotes/sources/" in note_text
     source_dir = Path(note_payload["source_files"][0]["file_path"]).parent
     assert (source_dir / "onboarding_settings_workspace_switcher.jpg").is_file()
-    assert (source_dir / "onboarding_publish.jpg").is_file()
+    assert (source_dir / "onboarding_workspace_switcher.jpg").is_file()
 
     session = client.get("/api/auth/session")
     assert session.status_code == 200
