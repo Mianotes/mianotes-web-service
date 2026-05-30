@@ -1398,7 +1398,15 @@ pre {
   color: var(--terminal-orange);
 }
 
+.tok-key {
+  color: var(--terminal-orange);
+}
+
 .token-string {
+  color: var(--terminal-blue);
+}
+
+.tok-string {
   color: var(--terminal-blue);
 }
 
