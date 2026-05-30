@@ -243,6 +243,18 @@ def markdown_to_html(markdown: str) -> str:
                 index += 1
             blocks.append(admonition_to_html(admonition_lines))
             continue
+        if is_directive_admonition_start(stripped):
+            flush_paragraph()
+            flush_list()
+            admonition_lines = [line]
+            index += 1
+            while index < len(lines) and lines[index].strip() != ":::":
+                admonition_lines.append(lines[index])
+                index += 1
+            if index < len(lines) and lines[index].strip() == ":::":
+                index += 1
+            blocks.append(directive_admonition_to_html(admonition_lines))
+            continue
         heading = re.match(r"^(#{1,4})\s+(.+)$", stripped)
         if heading:
             flush_paragraph()
@@ -390,6 +402,16 @@ def is_admonition_start(stripped: str) -> bool:
     return bool(re.match(r"^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]", stripped, re.I))
 
 
+def is_directive_admonition_start(stripped: str) -> bool:
+    return bool(
+        re.match(
+            r"^:::\s*(NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER|INFO)\b",
+            stripped,
+            re.I,
+        )
+    )
+
+
 def admonition_to_html(lines: list[str]) -> str:
     first = lines[0].strip()
     match = re.match(
@@ -408,6 +430,41 @@ def admonition_to_html(lines: list[str]) -> str:
         f'<div class="admonition-body">{body}</div>'
         "</aside>"
     )
+
+
+def directive_admonition_to_html(lines: list[str]) -> str:
+    first = lines[0].strip()
+    match = re.match(
+        r"^:::\s*(?P<kind>NOTE|TIP|IMPORTANT|WARNING|CAUTION|DANGER|INFO)\b\s*(?P<title>.*)$",
+        first,
+        re.I,
+    )
+    kind = normalise_admonition_kind((match.group("kind") if match else "note").lower())
+    title = directive_admonition_title((match.group("title") if match else "").strip(), kind)
+    body = markdown_to_html("\n".join(lines[1:]).strip()) if len(lines) > 1 else ""
+    return (
+        f'<aside class="admonition admonition-{html.escape(kind)}">'
+        f'<div class="admonition-title"><span class="admonition-icon" aria-hidden="true"></span>'
+        f"<strong>{inline_markdown(title)}</strong></div>"
+        f'<div class="admonition-body">{body}</div>'
+        "</aside>"
+    )
+
+
+def normalise_admonition_kind(kind: str) -> str:
+    return {
+        "danger": "warning",
+        "info": "note",
+    }.get(kind, kind)
+
+
+def directive_admonition_title(raw_title: str, kind: str) -> str:
+    title = raw_title.strip()
+    if title.startswith("[") and "]" in title:
+        title = title[1:title.index("]")].strip()
+    if title.startswith("{"):
+        title = ""
+    return title or admonition_default_title(kind)
 
 
 def strip_blockquote_marker(line: str) -> str:

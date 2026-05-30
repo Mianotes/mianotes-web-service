@@ -137,6 +137,9 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
             "```\n\n"
             "> [!TIP] Understanding the configuration\n"
             "> Use `MIANOTES_API_KEY` to connect agents.\n\n"
+            ":::note\n"
+            "This documentation was generated with Codex using [Mianotes](https://www.mianotes.com/).\n"
+            ":::\n\n"
             "> [!WARNING] Security consideration\n"
             "> Keep API keys private.\n"
         ),
@@ -189,6 +192,8 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert "| Field | Type | Description |" not in note_html
     assert '<div class="code-card">' in note_html
     assert '<span class="tok-key">&quot;method&quot;</span>' in note_html
+    assert 'class="admonition admonition-note"' in note_html
+    assert "<strong>Note</strong>" in note_html
     assert 'class="admonition admonition-tip"' in note_html
     assert 'class="admonition admonition-warning"' in note_html
     assert '<aside class="page-toc" data-page-toc></aside>' in note_html
