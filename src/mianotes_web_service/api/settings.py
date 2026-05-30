@@ -13,6 +13,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.engine import create_database_engine
 from mianotes_web_service.db.init import create_workspace_database
 from mianotes_web_service.db.models import SessionToken
+from mianotes_web_service.db.workspace_routing import sessionmaker_for_workspace
 from mianotes_web_service.domain.schemas import (
     ServiceApiKeyRead,
     ShareSettingsRead,
@@ -37,11 +38,17 @@ from mianotes_web_service.services.share_settings import get_workspace_url, set_
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     add_storage_location,
+    normalise_storage_path,
     read_storage_config,
     storage_database_path,
     write_storage_config,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
+from mianotes_web_service.services.workspace_markdown_import import (
+    COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
+    has_compatible_markdown_notes,
+    import_compatible_markdown_notes,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -159,23 +166,51 @@ def update_share_settings(
 
 
 @router.post("/storage/locations", response_model=StorageSettingsRead)
-def create_storage_location(payload: StorageLocationCreate, _: AdminUser) -> StorageSettingsRead:
+def create_storage_location(payload: StorageLocationCreate, user: AdminUser) -> StorageSettingsRead:
     config = _read_storage_config()
+    folder_path = normalise_storage_path(payload.folder_path)
+    database_path = storage_database_path(folder_path, config.database_file)
+    should_prompt_for_import = (
+        payload.import_existing_markdown is None
+        and not database_path.exists()
+        and has_compatible_markdown_notes(folder_path)
+    )
+    if should_prompt_for_import:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
+        )
+
     try:
         next_config = add_storage_location(
             config,
             name=payload.name,
-            folder_path=payload.folder_path,
+            folder_path=str(folder_path),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     new_location = next_config.locations[0]
+    workspace = WorkspaceContext(
+        id=new_location.id,
+        name=new_location.name,
+        folder_path=new_location.folder_path,
+        database_file=next_config.database_file,
+    )
     new_engine = create_database_engine(
         _database_url(new_location.folder_path, next_config.database_file)
     )
     try:
         create_workspace_database(new_engine)
+        if payload.import_existing_markdown is True:
+            SessionLocal = sessionmaker_for_workspace(workspace)
+            with SessionLocal() as import_session:
+                import_compatible_markdown_notes(
+                    import_session,
+                    workspace_folder=new_location.folder_path,
+                    user_id=user.id,
+                )
+                import_session.commit()
     finally:
         new_engine.dispose()
     write_storage_config(get_settings().storage_config_path, next_config)

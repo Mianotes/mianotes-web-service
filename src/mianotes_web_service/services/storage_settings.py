@@ -48,7 +48,7 @@ def _location_id(name: str, folder_path: Path) -> str:
     return base or DEFAULT_LOCATION_ID
 
 
-def _normalise_path(path: str | Path) -> Path:
+def normalise_storage_path(path: str | Path) -> Path:
     value = Path(path).expanduser()
     if not value.is_absolute():
         value = Path.cwd() / value
@@ -64,7 +64,7 @@ def storage_database_path(folder_path: Path, database_file: str = DEFAULT_DATABA
 
 
 def system_database_path(data_dir: Path) -> Path:
-    return _normalise_path(data_dir) / SYSTEM_DATABASE_FILENAME
+    return normalise_storage_path(data_dir) / SYSTEM_DATABASE_FILENAME
 
 
 def _ensure_storage_gitignore(folder_path: Path) -> None:
@@ -81,7 +81,7 @@ def _ensure_storage_gitignore(folder_path: Path) -> None:
 
 
 def _default_config(default_data_dir: Path) -> StorageConfig:
-    folder_path = _normalise_path(default_data_dir)
+    folder_path = normalise_storage_path(default_data_dir)
     return StorageConfig(
         active_location=DEFAULT_LOCATION_ID,
         database_file=DEFAULT_DATABASE_FILE,
@@ -115,7 +115,7 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
     for item in raw_locations:
         if not item.get("folderPath"):
             continue
-        folder_path = _normalise_path(item["folderPath"])
+        folder_path = normalise_storage_path(item["folderPath"])
         name = str(item.get("name") or "Storage location")
         locations.append(
             StorageLocation(
@@ -131,7 +131,7 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
             StorageLocation(
                 id=DEFAULT_LOCATION_ID,
                 name=str(payload.get("defaultName") or "Main workspace"),
-                folder_path=_normalise_path(default_folder_path),
+                folder_path=normalise_storage_path(default_folder_path),
             ),
         )
     if not locations:
@@ -191,7 +191,7 @@ def add_storage_location(
     name: str,
     folder_path: str,
 ) -> StorageConfig:
-    normalised_path = _normalise_path(folder_path)
+    normalised_path = normalise_storage_path(folder_path)
     ensure_storage_location(normalised_path, config.database_file)
     location_id = _location_id(name, normalised_path)
     existing_ids = {location.id for location in config.locations}

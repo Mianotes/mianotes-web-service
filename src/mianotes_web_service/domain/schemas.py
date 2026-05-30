@@ -291,6 +291,7 @@ class StorageLocationRead(BaseModel):
 class StorageLocationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     folder_path: str = Field(min_length=1, max_length=1000)
+    import_existing_markdown: bool | None = None
 
 
 class StorageSettingsRead(BaseModel):
