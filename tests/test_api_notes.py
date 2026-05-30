@@ -1450,7 +1450,12 @@ def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
     )
 
     assert response.status_code == 503
-    assert response.json()["detail"] == "LLM key is not configured"
+    assert response.json()["detail"] == (
+        "Mia needs an AI provider before it can answer prompts.\n\n"
+        "Add `MIANOTES_LLM_PROVIDER`, `MIANOTES_LLM_MODEL`, and "
+        "`MIANOTES_LLM_API_KEY` to your environment, then restart Mianotes. "
+        "You can use a local model or a cloud provider."
+    )
     comments = client.get(f"/api/notes/{note['id']}/comments")
     assert comments.status_code == 200
     assert comments.json() == []
