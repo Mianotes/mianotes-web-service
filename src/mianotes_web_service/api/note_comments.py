@@ -21,12 +21,7 @@ from mianotes_web_service.services.storage import markdown_note_body
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
-MIA_PROVIDER_SETUP_MESSAGE = (
-    "Mia needs an AI provider before it can answer prompts.\n\n"
-    "Add `MIANOTES_LLM_PROVIDER`, `MIANOTES_LLM_MODEL`, and "
-    "`MIANOTES_LLM_API_KEY` to your environment, then restart Mianotes. "
-    "You can use a local model or a cloud provider."
-)
+MIA_PROVIDER_SETUP_MESSAGE = "Mia needs an AI provider before it can answer prompts."
 
 
 def _mia_prompt(body: str) -> str | None:
