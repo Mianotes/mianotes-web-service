@@ -171,6 +171,48 @@ function renderSidebar() {
       }).join("")}
     </section>
   `).join("");
+  restoreSidebarScroll(sidebar);
+}
+
+function sidebarScrollKey() {
+  return `mianotes-static-sidebar-scroll:${currentVersion() || "root"}`;
+}
+
+function restoreSidebarScroll(sidebar) {
+  try {
+    const savedScrollTop = Number.parseInt(
+      sessionStorage.getItem(sidebarScrollKey()) || "",
+      10
+    );
+    if (!Number.isFinite(savedScrollTop)) return;
+    sidebar.scrollTop = savedScrollTop;
+    requestAnimationFrame(() => {
+      sidebar.scrollTop = savedScrollTop;
+    });
+  } catch {
+    // Ignore private browsing or disabled storage.
+  }
+}
+
+function bindSidebarScroll() {
+  const sidebar = document.querySelector("[data-sidebar]");
+  if (!sidebar) return;
+  const key = sidebarScrollKey();
+
+  function saveScrollTop() {
+    try {
+      sessionStorage.setItem(key, String(sidebar.scrollTop));
+    } catch {
+      // Ignore private browsing or disabled storage.
+    }
+  }
+
+  sidebar.addEventListener("click", (event) => {
+    if (event.target.closest("a.sidebar-link")) {
+      saveScrollTop();
+    }
+  });
+  window.addEventListener("pagehide", saveScrollTop);
 }
 
 function findArticle(path) {
@@ -334,6 +376,7 @@ function bindCopyButtons() {
 
 renderHeader();
 renderSidebar();
+bindSidebarScroll();
 renderPageToc();
 renderArticleFooter();
 bindSearch();
