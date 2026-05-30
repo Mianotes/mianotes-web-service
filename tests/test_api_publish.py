@@ -12,8 +12,11 @@ from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base, Note, PublishedSite
+from mianotes_web_service.db.models import Base, Folder, Note, PublishedSite, User
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.domain.schemas import PublishRequest
+from mianotes_web_service.services.publishing import publish_site
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 
 @pytest.fixture
@@ -295,6 +298,79 @@ def test_publish_site_replaces_same_version_html(client: TestClient, tmp_path: P
     assert served_html.status_code == 200
     assert served_html.headers["cache-control"] == "no-store"
     assert "Second published body." in served_html.text
+
+
+def test_publish_site_resolves_markdown_from_session_workspace(
+    client: TestClient,
+    tmp_path: Path,
+):
+    workspace_dir = tmp_path / "portable-docs"
+    note_path = workspace_dir / "markdown" / "about" / "what-is-mianotes-c08cbf08.md"
+    note_path.parent.mkdir(parents=True)
+    note_path.write_text("# What is Mianotes?\n\nPortable workspace content.", encoding="utf-8")
+    workspace = WorkspaceContext(
+        id="docs",
+        name="Docs",
+        folder_path=workspace_dir,
+        database_file=".mianotes/mia.db",
+    )
+    session_factory = client.app.state.testing_session
+
+    with session_factory() as session:
+        session.info["workspace"] = workspace
+        user = User(
+            email="portable-publisher@example.com",
+            name="Portable Publisher",
+            username="portable-publisher",
+            password_hash="hash",
+            is_admin=True,
+        )
+        folder = Folder(user=user, name="About", slug="about", path="about")
+        note = Note(
+            user=user,
+            folder=folder,
+            title="What is Mianotes?",
+            status="ready",
+            source_type="text",
+            filename=note_path.name,
+            note_path="data/markdown/about/what-is-mianotes-c08cbf08.md",
+        )
+        session.add_all([user, folder, note])
+        session.commit()
+        note_id = note.id
+
+        published = publish_site(
+            session,
+            user,
+            PublishRequest(
+                folder_id=None,
+                theme="mialight",
+                site_configuration={
+                    "brand": "Mia Docs",
+                    "version": "0.3.0",
+                    "headerLinks": [],
+                    "footerHtml": "",
+                },
+                navigation=[
+                    {
+                        "title": "About",
+                        "items": [
+                            {
+                                "title": "What is Mianotes?",
+                                "path": f"about/what-is-mianotes-{note_id[:8]}.html",
+                            }
+                        ],
+                    }
+                ],
+                updated_notes=[{"title": "What is Mianotes?", "path": "unused.html"}],
+            ),
+        )
+
+    assert published.version == "0.3.0"
+    assert (
+        workspace_dir / "html" / "0.3.0" / "about" / f"what-is-mianotes-{note_id[:8]}.html"
+    ).is_file()
+    assert not (tmp_path / "data" / "html" / "0.3.0").exists()
 
 
 def test_publish_prunes_missing_static_versions_from_navigation_and_db(

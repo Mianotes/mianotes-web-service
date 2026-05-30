@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, PublishedSite, User
 from mianotes_web_service.domain.schemas import PublishRequest
 from mianotes_web_service.services.publishing_draft import (
@@ -56,7 +55,7 @@ from mianotes_web_service.services.publishing_theme import (
     read_publish_theme,
     write_theme_assets,
 )
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.paths import workspace_paths_for_session
 
 
 def publish_site(session: Session, user: User, payload: PublishRequest) -> PublishedSite:
@@ -75,7 +74,8 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     ]
     version = str(payload.site_configuration.get("version") or theme.version)
     next_version_slug = version_slug(version)
-    data_dir = current_data_dir(get_settings().data_dir)
+    paths = workspace_paths_for_session(session)
+    data_dir = paths.data_dir
     html_root = data_dir / "html"
     version_dir = html_root / next_version_slug
     if version_dir.exists():
@@ -87,6 +87,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
         version_dir=version_dir,
         config=payload.site_configuration,
         include_folder=include_folder,
+        paths=paths,
     )
     write_theme_assets(
         theme,

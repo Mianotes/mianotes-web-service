@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import HTTPException, status
 
 from mianotes_web_service.db.models import Note
-from mianotes_web_service.services.paths import note_file_path
+from mianotes_web_service.services.paths import WorkspacePaths, current_workspace_paths
 from mianotes_web_service.services.publishing_navigation import published_note_path
 from mianotes_web_service.services.publishing_theme import GENERATOR_META_TAG
 from mianotes_web_service.services.storage import markdown_note_body
@@ -20,11 +20,13 @@ def write_note_pages(
     version_dir: Path,
     config: dict[str, object],
     include_folder: bool,
+    paths: WorkspacePaths | None = None,
 ) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    workspace_paths = paths or current_workspace_paths()
     note_pages: list[dict[str, object]] = []
     search_index: list[dict[str, object]] = []
     for note in notes:
-        source_path = note_file_path(note)
+        source_path = workspace_paths.note_file_path(note)
         if not source_path.exists():
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

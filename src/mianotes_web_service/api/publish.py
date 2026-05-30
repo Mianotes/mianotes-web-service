@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from mianotes_web_service.api.dependencies import NotesReadUser, NotesWriteUser, SessionDep
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import PublishedSite
 from mianotes_web_service.domain.schemas import (
     PublishDraftRead,
@@ -21,7 +20,7 @@ from mianotes_web_service.services.publishing import (
     list_publish_themes,
     publish_site,
 )
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.paths import workspace_paths_for_session
 
 router = APIRouter(prefix="/publish", tags=["publish"])
 
@@ -101,7 +100,7 @@ def download_published_site(
             detail="Published site not found",
         )
 
-    data_dir = current_data_dir(get_settings().data_dir)
+    data_dir = workspace_paths_for_session(session).data_dir
     html_root = (data_dir / "html").resolve()
     site_dir = (data_dir / site.html_path).resolve()
     if html_root not in site_dir.parents or not site_dir.is_dir():
