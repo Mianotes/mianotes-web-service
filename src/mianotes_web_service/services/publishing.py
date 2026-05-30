@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import Note, PublishedSite, User
 from mianotes_web_service.domain.schemas import PublishRequest
+from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.publishing_draft import (
     PUBLISHABLE_NOTE_STATUSES as PUBLISHABLE_NOTE_STATUSES,
 )
@@ -55,7 +56,6 @@ from mianotes_web_service.services.publishing_theme import (
     read_publish_theme,
     write_theme_assets,
 )
-from mianotes_web_service.services.paths import workspace_paths_for_session
 
 
 def publish_site(session: Session, user: User, payload: PublishRequest) -> PublishedSite:

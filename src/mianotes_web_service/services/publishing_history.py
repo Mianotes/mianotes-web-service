@@ -120,9 +120,8 @@ def readme_item_lines(
         if not isinstance(title, str):
             continue
         if isinstance(path, str) and path:
-            lines.append(
-                f"{indent}- [{markdown_text(title)}]({readme_link_path(current_version_slug, path)})"
-            )
+            link_path = readme_link_path(current_version_slug, path)
+            lines.append(f"{indent}- [{markdown_text(title)}]({link_path})")
         else:
             lines.append(f"{indent}- **{markdown_text(title)}**")
         if isinstance(children, list):

@@ -1257,7 +1257,10 @@ def test_non_admin_user_can_share_readable_note_without_editing_it(client: TestC
 
     disabled_by_member = client.delete(f"/api/notes/{note['id']}/share")
     assert disabled_by_member.status_code == 403
-    assert disabled_by_member.json()["detail"] == "Only Share Admin or an admin can change this note."
+    assert (
+        disabled_by_member.json()["detail"]
+        == "Only Share Admin or an admin can change this note."
+    )
 
     client.post("/api/auth/login", json={"user_id": admin["id"], "password": "house-password"})
     disabled_by_admin = client.delete(f"/api/notes/{note['id']}/share")

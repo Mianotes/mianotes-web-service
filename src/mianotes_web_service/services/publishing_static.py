@@ -401,7 +401,13 @@ def highlight_code(code: str) -> str:
 
 
 def is_admonition_start(stripped: str) -> bool:
-    return bool(re.match(r"^>\s*\[!(NOTE|TIP|INFO|IMPORTANT|WARNING|CAUTION|DANGER)\]", stripped, re.I))
+    return bool(
+        re.match(
+            r"^>\s*\[!(NOTE|TIP|INFO|IMPORTANT|WARNING|CAUTION|DANGER)\]",
+            stripped,
+            re.I,
+        )
+    )
 
 
 def is_directive_admonition_start(stripped: str) -> bool:
