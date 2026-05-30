@@ -399,7 +399,7 @@ def highlight_code(code: str) -> str:
 
 
 def is_admonition_start(stripped: str) -> bool:
-    return bool(re.match(r"^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]", stripped, re.I))
+    return bool(re.match(r"^>\s*\[!(NOTE|TIP|INFO|IMPORTANT|WARNING|CAUTION|DANGER)\]", stripped, re.I))
 
 
 def is_directive_admonition_start(stripped: str) -> bool:
@@ -415,11 +415,11 @@ def is_directive_admonition_start(stripped: str) -> bool:
 def admonition_to_html(lines: list[str]) -> str:
     first = lines[0].strip()
     match = re.match(
-        r"^>\s*\[!(?P<kind>NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*(?P<title>.*)$",
+        r"^>\s*\[!(?P<kind>NOTE|TIP|INFO|IMPORTANT|WARNING|CAUTION|DANGER)\]\s*(?P<title>.*)$",
         first,
         re.I,
     )
-    kind = (match.group("kind") if match else "note").lower()
+    kind = normalise_admonition_kind((match.group("kind") if match else "note").lower())
     title = (match.group("title") if match else "").strip() or admonition_default_title(kind)
     body_lines = [strip_blockquote_marker(line) for line in lines[1:]]
     body = markdown_to_html("\n".join(body_lines).strip()) if body_lines else ""
@@ -453,8 +453,7 @@ def directive_admonition_to_html(lines: list[str]) -> str:
 
 def normalise_admonition_kind(kind: str) -> str:
     return {
-        "danger": "warning",
-        "info": "note",
+        "important": "info",
     }.get(kind, kind)
 
 
@@ -475,9 +474,11 @@ def admonition_default_title(kind: str) -> str:
     return {
         "note": "Note",
         "tip": "Tip",
+        "info": "Info",
         "important": "Important",
         "warning": "Warning",
         "caution": "Caution",
+        "danger": "Danger",
     }.get(kind, "Note")
 
 
