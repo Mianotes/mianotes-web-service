@@ -11,11 +11,12 @@ Treat the main web app visual design as application code. Static site publishing
 
 ## Static publishing themes
 
-Mianotes ships two static publishing themes:
+Mianotes ships three static publishing themes:
 
 | Theme ID | Name | Purpose |
 |---|---|---|
 | `mialight` | Mialight | Default light documentation theme. |
+| `miadocs` | Miadocs | Polished article-reading theme for published notes and documentation. |
 | `miadark` | Miadark | Dark documentation theme. |
 
 Theme assets live in:

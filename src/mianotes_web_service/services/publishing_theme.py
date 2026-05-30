@@ -48,7 +48,7 @@ def list_publish_themes() -> list[PublishTheme]:
                 directory=directory,
             )
         )
-    theme_order = {"mialight": 0, "miadark": 1}
+    theme_order = {"mialight": 0, "miadocs": 1, "miadark": 2}
     return sorted(themes, key=lambda theme: (theme_order.get(theme.id, 99), theme.name.lower()))
 
 

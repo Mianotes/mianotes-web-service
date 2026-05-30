@@ -21,6 +21,12 @@ Response:
     "version": "0.1.0"
   },
   {
+    "id": "miadocs",
+    "name": "Miadocs",
+    "description": "A polished article-reading theme for published notes and documentation.",
+    "version": "0.1.0"
+  },
+  {
     "id": "miadark",
     "name": "Miadark",
     "description": "Dark documentation theme for Mianotes static sites.",
