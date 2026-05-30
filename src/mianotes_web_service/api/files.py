@@ -14,6 +14,7 @@ from mianotes_web_service.api.dependencies import (
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, SourceFile
+from mianotes_web_service.db.workspace_routing import workspace_by_id
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
@@ -126,6 +127,29 @@ def _published_source_response(file_path: str, session: Session) -> FileResponse
 @router.get("/html/", include_in_schema=False)
 def get_published_html_root() -> FileResponse:
     return _file_response("html/index.html", no_store=True)
+
+
+@router.get("/html/workspaces/{workspace_id}", include_in_schema=False)
+@router.get("/html/workspaces/{workspace_id}/", include_in_schema=False)
+def get_workspace_published_html_root(workspace_id: str) -> FileResponse:
+    return _file_response(
+        "html/index.html",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
+
+
+@router.get(
+    "/html/workspaces/{workspace_id}/{file_path:path}",
+    name="get_workspace_published_html_file",
+    include_in_schema=False,
+)
+def get_workspace_published_html_file(workspace_id: str, file_path: str) -> FileResponse:
+    return _file_response(
+        f"html/{_clean_file_path(file_path)}",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
 
 
 @router.get("/html/{file_path:path}", include_in_schema=False)

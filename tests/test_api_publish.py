@@ -16,6 +16,12 @@ from mianotes_web_service.db.models import Base, Folder, Note, PublishedSite, Us
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import PublishRequest
 from mianotes_web_service.services.publishing import publish_site
+from mianotes_web_service.services.storage_settings import (
+    DEFAULT_DATABASE_FILE,
+    StorageConfig,
+    StorageLocation,
+    write_storage_config,
+)
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 
@@ -71,6 +77,50 @@ def _create_note(client: TestClient, folder_id: str, title: str, text: str) -> d
     )
     assert response.status_code == 201
     return response.json()
+
+
+def test_workspace_scoped_html_route_serves_published_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    data_dir = tmp_path / "data"
+    docs_dir = tmp_path / "docs"
+    config_path = tmp_path / "workspaces.json"
+    write_storage_config(
+        config_path,
+        StorageConfig(
+            active_location="default",
+            database_file=DEFAULT_DATABASE_FILE,
+            locations=[
+                StorageLocation(
+                    id="default",
+                    name="Main workspace",
+                    folder_path=data_dir,
+                ),
+                StorageLocation(
+                    id="docs",
+                    name="Docs",
+                    folder_path=docs_dir,
+                ),
+            ],
+        ),
+    )
+    monkeypatch.setenv("MIANOTES_DATA_DIR", str(data_dir))
+    monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(config_path))
+    get_settings.cache_clear()
+    (docs_dir / "html" / "0.2.7").mkdir(parents=True)
+    (docs_dir / "html" / "0.2.7" / "index.html").write_text(
+        "<!doctype html><title>Docs</title>",
+        encoding="utf-8",
+    )
+
+    app = create_app()
+    with TestClient(app) as workspace_client:
+        response = workspace_client.get("/html/workspaces/docs/0.2.7/index.html")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert "Docs" in response.text
 
 
 def test_publish_themes_are_listed(client: TestClient):
@@ -174,7 +224,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert published["html_path"] == "html/0.1.1"
     assert published["markdown_path"] == ""
     assert published["url_path"] == "html/0.1.1/index.html"
-    assert published["site_url"].endswith("/html/0.1.1/index.html")
+    assert published["site_url"].endswith("/html/workspaces/default/0.1.1/index.html")
     assert published["download_url"].endswith(f"/api/publish/{published['id']}/download")
 
     html_root = tmp_path / "data" / "html" / "0.1.1"
@@ -210,6 +260,9 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     published_file = client.get("/html/0.1.1/index.html")
     assert published_file.status_code == 200
     assert published_file.headers["cache-control"] == "no-store"
+    workspace_published_file = client.get("/html/workspaces/default/0.1.1/index.html")
+    assert workspace_published_file.status_code == 200
+    assert workspace_published_file.headers["cache-control"] == "no-store"
     note_file = client.get(f"/html/0.1.1/{note_path}")
     assert note_file.status_code == 200
     assert note_file.headers["cache-control"] == "no-store"
@@ -225,6 +278,10 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert public_root.status_code == 200
     public_published_file = public_client.get("/html/0.1.1/index.html")
     assert public_published_file.status_code == 200
+    public_workspace_published_file = public_client.get(
+        "/html/workspaces/default/0.1.1/index.html"
+    )
+    assert public_workspace_published_file.status_code == 200
     public_note_file = public_client.get(f"/html/0.1.1/{note_path}")
     assert public_note_file.status_code == 200
     public_markdown = public_client.get(f"/markdown/about-mcp/clients-{note['id'][:8]}.md")

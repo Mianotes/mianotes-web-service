@@ -21,6 +21,8 @@ from mianotes_web_service.services.publishing import (
     publish_site,
 )
 from mianotes_web_service.services.paths import workspace_paths_for_session
+from mianotes_web_service.services.storage_settings import DEFAULT_LOCATION_ID
+from mianotes_web_service.services.workspace_context import session_workspace
 
 router = APIRouter(prefix="/publish", tags=["publish"])
 
@@ -68,7 +70,15 @@ def publish_site_endpoint(
     user: NotesWriteUser,
 ) -> PublishRead:
     published_site = publish_site(session, user, payload)
-    site_url = str(request.url_for("get_folder_file", file_path=published_site.url_path))
+    workspace = session_workspace(session)
+    workspace_id = workspace.id if workspace is not None else DEFAULT_LOCATION_ID
+    site_url = str(
+        request.url_for(
+            "get_workspace_published_html_file",
+            workspace_id=workspace_id,
+            file_path=published_site.url_path.removeprefix("html/"),
+        )
+    )
     download_url = str(request.url_for("download_published_site", site_id=published_site.id))
     return PublishRead(
         id=published_site.id,
