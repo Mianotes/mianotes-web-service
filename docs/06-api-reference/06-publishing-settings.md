@@ -27,8 +27,8 @@ Response:
     "version": "0.1.0"
   },
   {
-    "id": "opencode",
-    "name": "OpenCode",
+    "id": "miadev",
+    "name": "Miadev",
     "description": "A geeky developer documentation theme with terminal-style code blocks.",
     "version": "0.1.0"
   },

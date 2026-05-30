@@ -38,7 +38,7 @@ ruff check .
 - Publish draft navigation includes all publishable notes for the selected scope.
 - Publish draft **New notes** only lists paths that were not in the previous publish.
 - Static sites render code blocks, tables, admonitions, search, and **On this page**.
-- `mialight`, `miadocs`, `opencode`, and `miadark` all render readable article pages.
+- `mialight`, `miadocs`, `miadev`, and `miadark` all render readable article pages.
 - Published site preview and ZIP download both work.
 
 ## Security checks

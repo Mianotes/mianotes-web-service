@@ -67,7 +67,7 @@ Mianotes ships four static publishing themes:
 |---|---|---|
 | `mialight` | Mialight | Default light documentation theme. |
 | `miadocs` | Miadocs | Polished article-reading theme for published notes and documentation. |
-| `opencode` | OpenCode | Geeky developer documentation theme with terminal-style code blocks. |
+| `miadev` | Miadev | Geeky developer documentation theme with terminal-style code blocks. |
 | `miadark` | Miadark | Dark documentation theme. |
 
 All themes render Markdown tables, fenced code blocks, admonitions, article

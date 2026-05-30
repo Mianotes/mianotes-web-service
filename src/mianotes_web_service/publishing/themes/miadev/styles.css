@@ -1133,7 +1133,7 @@ pre {
   }
 }
 
-/* OpenCode developer-docs layer.
+/* Miadev developer-docs layer.
    The shape is intentionally sharper and more technical than Miadocs:
    compact sidebars, terminal code blocks, understated monochrome surfaces,
    and a small electric accent for active states and links. */
@@ -1149,9 +1149,12 @@ pre {
   --panel: #ffffff;
   --inline-code-bg: #f1f5f9;
   --link: #2563eb;
-  --terminal-green: #a7f3d0;
-  --terminal-blue: #93c5fd;
-  --terminal-yellow: #fde68a;
+  --terminal-green: #b8f4d0;
+  --terminal-blue: #a7c7ff;
+  --terminal-yellow: #f8dca8;
+  --terminal-orange: #f2b47e;
+  --terminal-purple: #d7b8ff;
+  --terminal-gray: #c9d3df;
   --keyword: #d97706;
   --string: #1d4ed8;
   --admonition-note-bg: #ffffff;
@@ -1166,11 +1169,7 @@ pre {
 
 html,
 body {
-  background:
-    linear-gradient(rgba(17, 24, 39, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 24, 39, 0.03) 1px, transparent 1px),
-    var(--surface);
-  background-size: 34px 34px;
+  background: var(--surface);
 }
 
 body {
@@ -1265,7 +1264,7 @@ header[data-header] {
 .sidebar-link {
   min-height: 32px;
   padding: 5px 10px;
-  border-radius: 7px;
+  border-radius: 0;
   color: #4b5563;
   font-size: 13px;
 }
@@ -1314,11 +1313,7 @@ h2 {
 }
 
 h2::before {
-  content: "#";
-  color: #2563eb;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 20px;
-  font-weight: 700;
+  content: none;
 }
 
 h3 {
@@ -1393,24 +1388,24 @@ h3 {
 
 pre {
   padding: 20px 64px 24px 24px;
-  color: #cbd5e1;
+  color: var(--terminal-gray);
   background: transparent;
   font-size: 13.5px;
   line-height: 23px;
 }
 
 .token-key {
-  color: var(--terminal-blue);
+  color: var(--terminal-orange);
 }
 
 .token-string {
-  color: var(--terminal-green);
+  color: var(--terminal-blue);
 }
 
 .token-number,
 .token-boolean,
 .token-null {
-  color: var(--terminal-yellow);
+  color: var(--terminal-purple);
 }
 
 .copy-code {
