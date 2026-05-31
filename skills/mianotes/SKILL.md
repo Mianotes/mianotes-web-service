@@ -9,6 +9,19 @@ Mia is the local Mianotes knowledge service. Use Mia as the user's local project
 
 Prefer Mianotes MCP tools when available. If MCP tools are not available, use the REST API.
 
+## MCP Contract
+
+When Mianotes MCP tools are available, treat MCP as the source of truth.
+
+Hard rules:
+
+1. For `Mia(workspace: ..., folder: ..., note: ...)`, call `read_note_context` first.
+2. If `read_note_context` returns `total > 0`, use `results[0].text` as the note content and answer from that content. Do not call REST, do not inspect local files, do not search the filesystem, and do not claim Mia failed.
+3. If `read_note_context` returns `total: 0`, say Mia did not find that note. Do not hallucinate a substitute note.
+4. If an MCP tool returns an error, report the MCP error plainly. Do not diagnose the API as unreachable unless you actually checked the API health endpoint.
+5. Do not fall back to local workspace files or databases unless the user explicitly asks for filesystem recovery/debugging.
+6. Never continue searching after a successful exact MCP read unless the user asked for broader context.
+
 ## Connection
 
 - Default API URL: `http://127.0.0.1:8200`
@@ -149,11 +162,12 @@ Expected behavior:
 1. Use the MCP `read_note_context` tool when it is available.
 2. Pass the workspace name exactly as the user wrote it. Do not silently change `Docs` to `docs` unless Mia returns a workspace-not-found error and you are retrying once.
 3. Pass the folder name and note title exactly as the user wrote them.
-4. Read the returned full note text before answering.
-5. Include a short phrase or specific detail from the note when useful, so the user can see Mia was actually read.
-6. Do not claim context exists unless Mia returns it.
+4. If the tool returns one or more results, use `results[0].text` as the note content.
+5. Stop tool use after the exact note is returned, unless the user asked for broader context.
+6. Include a short phrase or specific detail from the note when useful, so the user can see Mia was actually read.
+7. Do not claim context exists unless Mia returns it.
 
-REST fallback:
+REST fallback only when MCP tools are not available:
 
 `GET /api/context?folder=<folder>&title=<title>&limit=<n>`
 
