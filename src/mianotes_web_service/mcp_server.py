@@ -243,6 +243,12 @@ def _api_token() -> str:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         detail = exc.read().decode("utf-8")
+        if exc.code == 401:
+            raise RuntimeError(
+                "Mianotes rejected the configured API key. "
+                "Create or rotate the API key in Mianotes Settings, "
+                "then restart this agent session so MCP reloads the service .env file."
+            ) from exc
         raise RuntimeError(f"Mianotes API returned {exc.code}: {detail}") from exc
     _AGENT_SESSION_TOKEN = str(payload["token"])
     return _AGENT_SESSION_TOKEN

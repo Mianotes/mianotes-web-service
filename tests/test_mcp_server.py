@@ -1,5 +1,6 @@
 import io
 import json
+from urllib.error import HTTPError
 
 from mianotes_web_service import mcp_server
 from mianotes_web_service.mcp_server import TOOL_DEFINITIONS, handle_request
@@ -315,6 +316,43 @@ def test_mcp_tool_call_reports_missing_api_key(monkeypatch):
 
     assert response is not None
     assert response["error"]["message"] == "MIANOTES_API_KEY is required"
+
+
+def test_mcp_tool_call_reports_rejected_api_key_with_recovery(monkeypatch):
+    class FakeErrorResponse:
+        def read(self):
+            return b'{"detail":"Invalid API token"}'
+
+        def close(self):
+            return None
+
+    def fake_urlopen(_request, timeout: int):
+        raise HTTPError(
+            url="http://127.0.0.1:8200/api/auth/agent-session",
+            code=401,
+            msg="Unauthorized",
+            hdrs={},
+            fp=FakeErrorResponse(),
+        )
+
+    monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 14,
+            "method": "tools/call",
+            "params": {"name": "list_notes", "arguments": {}},
+        }
+    )
+
+    assert response is not None
+    message = response["error"]["message"]
+    assert "Mianotes rejected the configured API key" in message
+    assert "Create or rotate the API key in Mianotes Settings" in message
+    assert "restart this agent session" in message
 
 
 def test_mcp_unknown_tool_returns_error():
