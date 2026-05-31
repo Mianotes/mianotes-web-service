@@ -8,7 +8,7 @@ license = { text = "GPL-3.0-only" }
 dependencies = [
   "email-validator>=2.0,<3.0",
   "fastapi>=0.115,<1.0",
-  "markitdown[all]>=0.1.5,<0.2.0",
+  "markitdown[audio-transcription]>=0.1.5,<0.2.0",
   "markitdown-ocr>=0.1.0,<0.2.0",
   "openai>=1.0,<2.0",
   "pillow>=10.0,<13.0",

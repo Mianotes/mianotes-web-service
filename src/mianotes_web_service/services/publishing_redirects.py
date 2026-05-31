@@ -7,13 +7,16 @@ from mianotes_web_service.services.publishing_theme import GENERATOR_META_TAG
 MIANOTES_MARK_SVG = (
     '<svg viewBox="0 0 25 25" aria-hidden="true" focusable="false">'
     "<defs>"
-    '<linearGradient id="mianotes-redirect-a" x1="3.2" x2="11.1" y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
+    '<linearGradient id="mianotes-redirect-a" x1="3.2" x2="11.1" '
+    'y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
     '<stop stop-color="#ff1495"/><stop offset="1" stop-color="#7b1bff"/>'
     "</linearGradient>"
-    '<linearGradient id="mianotes-redirect-b" x1="10.1" x2="18.1" y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
+    '<linearGradient id="mianotes-redirect-b" x1="10.1" x2="18.1" '
+    'y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
     '<stop stop-color="#ff42d2"/><stop offset="1" stop-color="#2239ff"/>'
     "</linearGradient>"
-    '<linearGradient id="mianotes-redirect-c" x1="17.1" x2="24.8" y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
+    '<linearGradient id="mianotes-redirect-c" x1="17.1" x2="24.8" '
+    'y1="4.8" y2="20.6" gradientUnits="userSpaceOnUse">'
     '<stop stop-color="#15c7ff"/><stop offset="1" stop-color="#0a35be"/>'
     "</linearGradient>"
     "</defs>"
@@ -36,7 +39,8 @@ REDIRECT_STYLE = """
         place-items: center;
         background: #ffffff;
         color: #4e505a;
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+          BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
       .redirect-loader {

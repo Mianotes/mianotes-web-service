@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import PublishedSite
 from mianotes_web_service.services.publishing_draft import load_json_list, load_json_object
-from mianotes_web_service.services.publishing_static import json_for_script
 from mianotes_web_service.services.publishing_redirects import redirect_document
+from mianotes_web_service.services.publishing_static import json_for_script
 from mianotes_web_service.services.publishing_theme import (
     DEFAULT_SITE_CONFIGURATION,
 )
