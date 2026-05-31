@@ -8,36 +8,39 @@ MODE="default"
 
 find_python() {
   if [[ -n "${PYTHON:-}" ]]; then
-    if "$PYTHON" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 14)))' >/dev/null 2>&1; then
+    if "$PYTHON" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 15)))' >/dev/null 2>&1; then
       echo "$PYTHON"
       return
     fi
-    echo "PYTHON must point to Python 3.11, 3.12, or 3.13." >&2
+    echo "PYTHON must point to Python 3.11, 3.12, 3.13, or 3.14." >&2
     exit 1
   fi
 
   for candidate in \
+    python3.14 \
+    python3.13 \
     python3.12 \
     python3.11 \
-    python3.13 \
+    /opt/homebrew/bin/python3.14 \
+    /opt/homebrew/bin/python3.13 \
     /opt/homebrew/bin/python3.12 \
     /opt/homebrew/bin/python3.11 \
-    /opt/homebrew/bin/python3.13 \
+    /usr/local/bin/python3.14 \
+    /usr/local/bin/python3.13 \
     /usr/local/bin/python3.12 \
     /usr/local/bin/python3.11 \
-    /usr/local/bin/python3.13 \
     python3 \
     python \
     /usr/bin/python3
   do
     if command -v "$candidate" >/dev/null 2>&1 \
-      && "$candidate" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 14)))' >/dev/null 2>&1; then
+      && "$candidate" -c 'import sys; raise SystemExit(not ((3, 11) <= sys.version_info < (3, 15)))' >/dev/null 2>&1; then
       command -v "$candidate"
       return
     fi
   done
 
-  echo "Python 3.11, 3.12, or 3.13 is required. Install it with Homebrew or your package manager." >&2
+  echo "Python 3.11, 3.12, 3.13, or 3.14 is required. Install it with Homebrew or your package manager." >&2
   exit 1
 }
 
