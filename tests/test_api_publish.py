@@ -240,6 +240,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert latest_index.is_file()
     latest_index_text = latest_index.read_text(encoding="utf-8")
     assert "../0.1.1/index.html" in latest_index_text
+    assert "http-equiv=\"refresh\"" not in latest_index_text
     assert 'const latestBase = "../0.1.1/";' in latest_index_text
     assert 'hash.startsWith("#/")' in latest_index_text
     assert "hash.slice(2)" in latest_index_text
@@ -311,6 +312,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert public_published_file.status_code == 200
     public_latest_file = public_client.get("/html/latest/")
     assert public_latest_file.status_code == 200
+    assert "http-equiv=\"refresh\"" not in public_latest_file.text
     assert 'const latestBase = "../0.1.1/";' in public_latest_file.text
     public_workspace_published_file = public_client.get(
         "/html/workspaces/default/0.1.1/index.html"
@@ -318,6 +320,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert public_workspace_published_file.status_code == 200
     public_workspace_latest_file = public_client.get("/html/workspaces/default/latest/")
     assert public_workspace_latest_file.status_code == 200
+    assert "http-equiv=\"refresh\"" not in public_workspace_latest_file.text
     assert 'const latestBase = "../0.1.1/";' in public_workspace_latest_file.text
     public_note_file = public_client.get(f"/html/0.1.1/{note_path}")
     assert public_note_file.status_code == 200
@@ -516,6 +519,7 @@ def test_publish_prunes_missing_static_versions_from_navigation_and_db(
         encoding="utf-8"
     )
     assert "../0.2.0/index.html" in latest_index
+    assert "http-equiv=\"refresh\"" not in latest_index
     assert 'const latestBase = "../0.2.0/";' in latest_index
     assert "../0.1.0/index.html" not in latest_index
 

@@ -59,7 +59,6 @@ def write_latest_index(*, html_root: Path, version_slug: str) -> None:
             '    <meta charset="utf-8">\n'
             '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"    {GENERATOR_META_TAG}\n"
-            f'    <meta http-equiv="refresh" content="0; url={latest_home}">\n'
             "    <title>Latest documentation</title>\n"
             "    <script>\n"
             f'      const latestBase = "{latest_base}";\n'
