@@ -3,13 +3,14 @@ from __future__ import annotations
 import json
 import shutil
 from datetime import UTC, datetime
+from pathlib import Path
 
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import Note, PublishedSite, User
 from mianotes_web_service.domain.schemas import PublishRequest
-from mianotes_web_service.services.paths import workspace_paths_for_session
+from mianotes_web_service.services.paths import WorkspacePaths, workspace_paths_for_session
 from mianotes_web_service.services.publishing_draft import (
     PUBLISHABLE_NOTE_STATUSES as PUBLISHABLE_NOTE_STATUSES,
 )
@@ -102,6 +103,12 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
         note_pages=note_pages,
     )
     write_root_index(html_root=html_root, version_slug=next_version_slug)
+    markdown_paths_by_html_path = markdown_paths_for_readme(
+        notes,
+        include_folder=include_folder,
+        data_dir=data_dir,
+        paths=paths,
+    )
 
     now = datetime.now(UTC)
     note_ids = [note.id for note in notes]
@@ -131,5 +138,39 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     session.add(published_site)
     session.commit()
     session.refresh(published_site)
-    write_navigation_js(session=session, html_root=html_root, current_site=published_site)
+    write_navigation_js(
+        session=session,
+        html_root=html_root,
+        current_site=published_site,
+        markdown_paths_by_html_path=markdown_paths_by_html_path,
+    )
     return published_site
+
+
+def markdown_paths_for_readme(
+    notes: list[Note],
+    *,
+    include_folder: bool,
+    data_dir: Path,
+    paths: WorkspacePaths,
+) -> dict[str, str]:
+    return {
+        published_note_path(note, include_folder=include_folder): markdown_path_for_readme(
+            paths.note_file_path(note),
+            data_dir=data_dir,
+        )
+        for note in notes
+    }
+
+
+def markdown_path_for_readme(note_path: Path, *, data_dir: Path) -> str:
+    if note_path.is_absolute():
+        try:
+            return note_path.resolve().relative_to(data_dir.resolve()).as_posix()
+        except ValueError:
+            return note_path.name
+
+    parts = note_path.parts
+    if len(parts) > 1 and parts[0] == data_dir.name:
+        return Path(*parts[1:]).as_posix()
+    return note_path.as_posix()

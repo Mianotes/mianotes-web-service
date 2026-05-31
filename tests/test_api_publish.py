@@ -240,7 +240,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
         "# Mia Docs Documentation\n"
         "\n"
         "- **About MCP**\n"
-        f"  - [Clients](0.1.1/{note_path})\n"
+        f"  - [Clients](markdown/about-mcp/clients-{note['id'][:8]}.md)\n"
     )
     note_html = (html_root / note_path).read_text(encoding="utf-8")
     assert note_html.find("styles.css") > -1
@@ -444,6 +444,9 @@ def test_publish_site_resolves_markdown_from_session_workspace(
     assert (
         workspace_dir / "html" / "0.3.0" / "about" / f"what-is-mianotes-{note_id[:8]}.html"
     ).is_file()
+    readme = (workspace_dir / "html" / "README.md").read_text(encoding="utf-8")
+    assert "markdown/about/what-is-mianotes-c08cbf08.md" in readme
+    assert "0.3.0/about/what-is-mianotes" not in readme
     assert not (tmp_path / "data" / "html" / "0.3.0").exists()
 
 

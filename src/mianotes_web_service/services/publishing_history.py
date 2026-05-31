@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from sqlalchemy import select
@@ -50,6 +50,7 @@ def write_navigation_js(
     session: Session,
     html_root: Path,
     current_site: PublishedSite,
+    markdown_paths_by_html_path: Mapping[str, str] | None = None,
 ) -> None:
     prune_missing_published_sites(session=session, html_root=html_root)
     entries = site_navigation_entries(
@@ -68,15 +69,29 @@ def write_navigation_js(
         f"const SITE_NAVIGATION = {json_for_script(payload)};\n",
         encoding="utf-8",
     )
-    write_readme_md(html_root=html_root, current_site=current_site)
+    write_readme_md(
+        html_root=html_root,
+        current_site=current_site,
+        markdown_paths_by_html_path=markdown_paths_by_html_path,
+    )
 
 
-def write_readme_md(*, html_root: Path, current_site: PublishedSite) -> None:
+def write_readme_md(
+    *,
+    html_root: Path,
+    current_site: PublishedSite,
+    markdown_paths_by_html_path: Mapping[str, str] | None = None,
+) -> None:
     brand = markdown_text(site_brand(current_site))
     navigation = load_json_list(current_site.navigation, [])
     readme = [f"# {brand} Documentation", ""]
     if navigation:
-        readme.extend(readme_navigation_lines(navigation, version_slug(current_site.version)))
+        readme.extend(
+            readme_navigation_lines(
+                navigation,
+                markdown_paths_by_html_path=markdown_paths_by_html_path or {},
+            )
+        )
     else:
         readme.append("_No notes were published._")
     readme.append("")
@@ -85,7 +100,8 @@ def write_readme_md(*, html_root: Path, current_site: PublishedSite) -> None:
 
 def readme_navigation_lines(
     navigation: Iterable[dict[str, object]],
-    current_version_slug: str,
+    *,
+    markdown_paths_by_html_path: Mapping[str, str],
 ) -> list[str]:
     lines: list[str] = []
     for group in navigation:
@@ -97,7 +113,7 @@ def readme_navigation_lines(
         lines.extend(
             readme_item_lines(
                 (item for item in items if isinstance(item, dict)),
-                current_version_slug=current_version_slug,
+                markdown_paths_by_html_path=markdown_paths_by_html_path,
                 depth=1,
             )
         )
@@ -107,7 +123,7 @@ def readme_navigation_lines(
 def readme_item_lines(
     items: Iterable[dict[str, object]],
     *,
-    current_version_slug: str,
+    markdown_paths_by_html_path: Mapping[str, str],
     depth: int,
 ) -> list[str]:
     lines: list[str] = []
@@ -120,15 +136,18 @@ def readme_item_lines(
         if not isinstance(title, str):
             continue
         if isinstance(path, str) and path:
-            link_path = readme_link_path(current_version_slug, path)
-            lines.append(f"{indent}- [{markdown_text(title)}]({link_path})")
+            link_path = readme_link_path(path, markdown_paths_by_html_path)
+            if link_path:
+                lines.append(f"{indent}- [{markdown_text(title)}]({link_path})")
+            else:
+                lines.append(f"{indent}- **{markdown_text(title)}**")
         else:
             lines.append(f"{indent}- **{markdown_text(title)}**")
         if isinstance(children, list):
             lines.extend(
                 readme_item_lines(
                     (child for child in children if isinstance(child, dict)),
-                    current_version_slug=current_version_slug,
+                    markdown_paths_by_html_path=markdown_paths_by_html_path,
                     depth=child_indent_depth,
                 )
             )
@@ -182,9 +201,17 @@ def markdown_text(value: str) -> str:
     )
 
 
-def readme_link_path(current_version_slug: str, item_path: str) -> str:
+def readme_link_path(
+    item_path: str,
+    markdown_paths_by_html_path: Mapping[str, str],
+) -> str | None:
     clean_path = item_path.strip().lstrip("/")
-    return f"{current_version_slug}/{clean_path}"
+    mapped_path = markdown_paths_by_html_path.get(clean_path)
+    if mapped_path:
+        return mapped_path
+    if clean_path.endswith(".md"):
+        return clean_path
+    return None
 
 
 def version_slug(version: str) -> str:
