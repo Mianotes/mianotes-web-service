@@ -41,8 +41,6 @@ Mianotes stores that workspace's notes, sources, jobs, and index inside it.
 Only admins can add workspaces. Go to Settings, add the folder you want Mianotes to use,
 and Mianotes will prepare it as a local workspace.
 
-{onboarding_settings_workspace_switcher}
-
 The current workspace is always visible in the app, so you know where new notes, converted
 files, folders, jobs, and published sites belong.
 
