@@ -302,10 +302,16 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert public_root.status_code == 200
     public_published_file = public_client.get("/html/0.1.1/index.html")
     assert public_published_file.status_code == 200
+    public_latest_file = public_client.get("/html/latest/")
+    assert public_latest_file.status_code == 200
+    assert 'const latestBase = "../0.1.1/";' in public_latest_file.text
     public_workspace_published_file = public_client.get(
         "/html/workspaces/default/0.1.1/index.html"
     )
     assert public_workspace_published_file.status_code == 200
+    public_workspace_latest_file = public_client.get("/html/workspaces/default/latest/")
+    assert public_workspace_latest_file.status_code == 200
+    assert 'const latestBase = "../0.1.1/";' in public_workspace_latest_file.text
     public_note_file = public_client.get(f"/html/0.1.1/{note_path}")
     assert public_note_file.status_code == 200
     public_markdown = public_client.get(f"/markdown/about-mcp/clients-{note['id'][:8]}.md")

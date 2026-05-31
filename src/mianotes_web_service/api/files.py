@@ -139,6 +139,16 @@ def get_workspace_published_html_root(workspace_id: str) -> FileResponse:
     )
 
 
+@router.get("/html/workspaces/{workspace_id}/latest", include_in_schema=False)
+@router.get("/html/workspaces/{workspace_id}/latest/", include_in_schema=False)
+def get_workspace_published_latest_root(workspace_id: str) -> FileResponse:
+    return _file_response(
+        "html/latest/index.html",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
+
+
 @router.get(
     "/html/workspaces/{workspace_id}/{file_path:path}",
     name="get_workspace_published_html_file",
@@ -150,6 +160,12 @@ def get_workspace_published_html_file(workspace_id: str, file_path: str) -> File
         no_store=True,
         data_dir=workspace_by_id(workspace_id).folder_path,
     )
+
+
+@router.get("/html/latest", include_in_schema=False)
+@router.get("/html/latest/", include_in_schema=False)
+def get_published_latest_root() -> FileResponse:
+    return _file_response("html/latest/index.html", no_store=True)
 
 
 @router.get("/html/{file_path:path}", include_in_schema=False)
