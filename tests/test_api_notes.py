@@ -181,6 +181,116 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/system.db-wal").status_code == 404
 
 
+def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "delete-note@example.com",
+            "name": "Delete Note User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Delete Notes"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Delete me",
+            "text": "This Markdown file should be deleted with the note.",
+        },
+    ).json()
+    note_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "delete-notes"
+        / f"delete-me-{note['id'][:8]}.md"
+    )
+    assert note_path.exists()
+
+    response = client.delete(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 204
+    assert not note_path.exists()
+    assert client.get(f"/api/notes/{note['id']}").status_code == 404
+
+
+def test_delete_note_succeeds_when_markdown_file_is_already_missing(
+    client: TestClient,
+    tmp_path: Path,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "missing-note@example.com",
+            "name": "Missing Note User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Missing Notes"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Already gone",
+            "text": "The file disappears before the DB row is deleted.",
+        },
+    ).json()
+    note_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "missing-notes"
+        / f"already-gone-{note['id'][:8]}.md"
+    )
+    note_path.unlink()
+
+    response = client.delete(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 204
+    assert client.get(f"/api/notes/{note['id']}").status_code == 404
+
+
+def test_delete_note_does_not_remove_paths_outside_markdown_root(
+    client: TestClient,
+    tmp_path: Path,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "outside-path@example.com",
+            "name": "Outside Path User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Outside Paths"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Outside path",
+            "text": "This note record points outside the managed Markdown tree.",
+        },
+    ).json()
+    outside_path = tmp_path / "outside-note.md"
+    outside_path.write_text("# Outside\n", encoding="utf-8")
+    with client.app.state.testing_session_factory() as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        db_note.filename = None
+        db_note.note_path = str(outside_path)
+        session.commit()
+
+    response = client.delete(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 204
+    assert outside_path.exists()
+    assert client.get(f"/api/notes/{note['id']}").status_code == 404
+
+
 def test_get_note_normalizes_parser_markdown(client: TestClient, tmp_path: Path):
     user = client.post(
         "/api/auth/join",
@@ -684,7 +794,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
-    assert note_path.exists()
+    assert not note_path.exists()
     assert source_path.exists()
     assert source_path.parent.exists()
 
@@ -831,6 +941,8 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
+    note_filename = f"diagram-note-{note['id'][:8]}.md"
+    assert not (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
     assert image_files[0].exists()
     assert image_files[0].parent.exists()
 

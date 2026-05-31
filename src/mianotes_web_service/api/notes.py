@@ -38,6 +38,7 @@ from mianotes_web_service.domain.schemas import (
     TagsUpdate,
 )
 from mianotes_web_service.services.mia import prompt_markdown
+from mianotes_web_service.services.note_deletion import delete_note_markdown_file
 from mianotes_web_service.services.note_moves import move_note_to_folder
 from mianotes_web_service.services.note_responses import (
     note_is_starred,
@@ -226,5 +227,6 @@ def update_note(
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = read_note_or_404(session, note_id)
     ensure_can_change_note(note, user)
+    delete_note_markdown_file(note, workspace_paths_for_session(session))
     session.delete(note)
     session.commit()
