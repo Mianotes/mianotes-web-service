@@ -196,7 +196,9 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
             "This documentation was generated with Codex using [Mianotes](https://www.mianotes.com/).\n"
             ":::\n\n"
             "> [!WARNING] Security consideration\n"
-            "> Keep API keys private.\n"
+            "> Keep API keys private.\n\n"
+            "1. Run MarkItDown's converter.\n"
+            "2. Try Tesseract for `.jpg` files.\n"
         ),
     )
     note_path = f"clients-{note['id'][:8]}.html"
@@ -274,6 +276,11 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert "<strong>Understanding the configuration</strong>" in note_html
     assert 'class="admonition admonition-warning"' in note_html
     assert "<strong>Security consideration</strong>" in note_html
+    assert (
+        "<ol><li>Run MarkItDown&#x27;s converter.</li>"
+        "<li>Try Tesseract for <code>.jpg</code> files.</li></ol>"
+    ) in note_html
+    assert "<p>1. Run MarkItDown" not in note_html
     assert '<aside class="page-toc" data-page-toc></aside>' in note_html
     assert (tmp_path / "data" / "markdown" / "about-mcp").is_dir()
 

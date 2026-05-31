@@ -184,6 +184,7 @@ def markdown_to_html(markdown: str) -> str:
     blocks: list[str] = []
     paragraph: list[str] = []
     list_items: list[str] = []
+    list_tag = "ul"
     in_code = False
     code_lines: list[str] = []
     code_language = ""
@@ -196,9 +197,18 @@ def markdown_to_html(markdown: str) -> str:
             paragraph.clear()
 
     def flush_list() -> None:
+        nonlocal list_tag
         if list_items:
-            blocks.append(f"<ul>{''.join(list_items)}</ul>")
+            blocks.append(f"<{list_tag}>{''.join(list_items)}</{list_tag}>")
             list_items.clear()
+        list_tag = "ul"
+
+    def append_list_item(tag: str, body: str) -> None:
+        nonlocal list_tag
+        if list_items and list_tag != tag:
+            flush_list()
+        list_tag = tag
+        list_items.append(f"<li>{inline_markdown(body)}</li>")
 
     while index < len(lines):
         line = lines[index]
@@ -268,7 +278,13 @@ def markdown_to_html(markdown: str) -> str:
         bullet = re.match(r"^[-*]\s+(.+)$", stripped)
         if bullet:
             flush_paragraph()
-            list_items.append(f"<li>{inline_markdown(bullet.group(1))}</li>")
+            append_list_item("ul", bullet.group(1))
+            index += 1
+            continue
+        ordered = re.match(r"^\d+[.)]\s+(.+)$", stripped)
+        if ordered:
+            flush_paragraph()
+            append_list_item("ol", ordered.group(1))
             index += 1
             continue
         paragraph.append(stripped)
