@@ -1135,7 +1135,7 @@ pre {
 
 /* Miadev developer-docs layer.
    The shape is intentionally sharper and more technical than Miadocs:
-   compact sidebars, clean code blocks, understated monochrome surfaces,
+   compact sidebars, dark code blocks, understated monochrome surfaces,
    and a small electric accent for active states and links. */
 :root {
   --text: #111111;
@@ -1143,8 +1143,8 @@ pre {
   --soft: #6b7280;
   --line: #e5e7eb;
   --active: #f4f4f5;
-  --code-bg: #ffffff;
-  --code-line: #e2e2e2;
+  --code-bg: #0b0f14;
+  --code-line: #1f2937;
   --surface: #fbfbfa;
   --panel: #ffffff;
   --inline-code-bg: #f1f5f9;
@@ -1155,8 +1155,8 @@ pre {
   --terminal-orange: #f2b47e;
   --terminal-purple: #d7b8ff;
   --terminal-gray: #c9d3df;
-  --keyword: #b45309;
-  --string: #1f497d;
+  --keyword: #f2b47e;
+  --string: #a7c7ff;
   --admonition-note-bg: #ffffff;
   --admonition-note-border: #d6dbe4;
   --admonition-note-text: #334155;
@@ -1385,7 +1385,7 @@ h3 {
   border: 1px solid var(--code-line);
   border-radius: 12px;
   background: var(--code-bg);
-  box-shadow: 0 2px 0 rgba(17, 24, 39, 0.04);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
   overflow: hidden;
 }
 
@@ -1401,7 +1401,11 @@ h3 {
   height: 32px;
   border: 0;
   background: transparent;
-  color: #9a9a9a;
+  color: #94a3b8;
+}
+
+.copy-button:hover {
+  color: #dbeafe;
 }
 
 .copy-button svg {
@@ -1413,7 +1417,7 @@ pre {
   margin: 0;
   padding: 24px 68px 28px 28px;
   overflow-x: auto;
-  color: #1d4072;
+  color: #c9d3df;
   background: var(--code-bg);
   font-size: 14px;
   line-height: 24px;
@@ -1438,7 +1442,7 @@ pre {
 .token-number,
 .token-boolean,
 .token-null {
-  color: #1d4072;
+  color: #d7b8ff;
 }
 
 .doc-table {
