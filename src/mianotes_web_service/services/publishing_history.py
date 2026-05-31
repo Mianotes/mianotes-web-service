@@ -49,7 +49,8 @@ def write_root_index(*, html_root: Path, version_slug: str) -> None:
 def write_latest_index(*, html_root: Path, version_slug: str) -> None:
     latest_dir = html_root / "latest"
     latest_dir.mkdir(parents=True, exist_ok=True)
-    latest_path = f"../{html.escape(version_slug)}/index.html"
+    latest_base = f"../{html.escape(version_slug)}/"
+    latest_home = f"{latest_base}index.html"
     (latest_dir / "index.html").write_text(
         (
             "<!doctype html>\n"
@@ -58,13 +59,22 @@ def write_latest_index(*, html_root: Path, version_slug: str) -> None:
             '    <meta charset="utf-8">\n'
             '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"    {GENERATOR_META_TAG}\n"
-            f'    <meta http-equiv="refresh" content="0; url={latest_path}">\n'
+            f'    <meta http-equiv="refresh" content="0; url={latest_home}">\n'
             "    <title>Latest documentation</title>\n"
             "    <script>\n"
-            f'      window.location.replace("{latest_path}");\n'
+            f'      const latestBase = "{latest_base}";\n'
+            "      const hash = window.location.hash || \"\";\n"
+            "      let latestPath = `${latestBase}index.html`;\n"
+            "      if (hash.startsWith(\"#/\")) {\n"
+            "        const requestedPath = hash.slice(2).replace(/^\\/+/, \"\");\n"
+            "        if (requestedPath) {\n"
+            "          latestPath = `${latestBase}${requestedPath}`;\n"
+            "        }\n"
+            "      }\n"
+            "      window.location.replace(latestPath);\n"
             "    </script>\n"
             "  </head>\n"
-            f'  <body><a href="{latest_path}">Latest version</a></body>\n'
+            f'  <body><a href="{latest_home}">Latest version</a></body>\n'
             "</html>\n"
         ),
         encoding="utf-8",
