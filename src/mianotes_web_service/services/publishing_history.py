@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import PublishedSite
 from mianotes_web_service.services.publishing_draft import load_json_list, load_json_object
 from mianotes_web_service.services.publishing_static import json_for_script
+from mianotes_web_service.services.publishing_redirects import redirect_document
 from mianotes_web_service.services.publishing_theme import (
     DEFAULT_SITE_CONFIGURATION,
-    GENERATOR_META_TAG,
 )
 
 
@@ -21,26 +21,14 @@ def write_root_index(*, html_root: Path, version_slug: str) -> None:
     html_root.mkdir(parents=True, exist_ok=True)
     write_latest_index(html_root=html_root, version_slug=version_slug)
     (html_root / "index.html").write_text(
-        (
-            "<!doctype html>\n"
-            '<html lang="en">\n'
-            "  <head>\n"
-            '    <meta charset="utf-8">\n'
-            '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-            f"    {GENERATOR_META_TAG}\n"
-            "    <title>mianotes documentation</title>\n"
-            '    <script src="./navigation.js"></script>\n'
-            "    <script>\n"
-            "      const latestPath = `./${SITE_NAVIGATION.latest}/index.html`;\n"
-            "      window.location.replace(latestPath);\n"
-            "    </script>\n"
-            "  </head>\n"
-            f'  <body><a id="latest-link" href="./{html.escape(version_slug)}/index.html">'
-            "Latest version</a><script>"
-            "document.getElementById('latest-link').href = latestPath;"
-            "</script>"
-            "</body>\n"
-            "</html>\n"
+        redirect_document(
+            title="mianotes documentation",
+            redirect_script=(
+                f'      const latestPath = "./{html.escape(version_slug)}/index.html";\n'
+                "      window.location.replace(latestPath);\n"
+            ),
+            fallback_href=f"./{version_slug}/index.html",
+            fallback_label="Latest version",
         ),
         encoding="utf-8",
     )
@@ -52,29 +40,22 @@ def write_latest_index(*, html_root: Path, version_slug: str) -> None:
     latest_base = f"../{html.escape(version_slug)}/"
     latest_home = f"{latest_base}index.html"
     (latest_dir / "index.html").write_text(
-        (
-            "<!doctype html>\n"
-            '<html lang="en">\n'
-            "  <head>\n"
-            '    <meta charset="utf-8">\n'
-            '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
-            f"    {GENERATOR_META_TAG}\n"
-            "    <title>Latest documentation</title>\n"
-            "    <script>\n"
-            f'      const latestBase = "{latest_base}";\n'
-            "      const hash = window.location.hash || \"\";\n"
-            "      let latestPath = `${latestBase}index.html`;\n"
-            "      if (hash.startsWith(\"#/\")) {\n"
-            "        const requestedPath = hash.slice(2).replace(/^\\/+/, \"\");\n"
-            "        if (requestedPath) {\n"
-            "          latestPath = `${latestBase}${requestedPath}`;\n"
-            "        }\n"
-            "      }\n"
-            "      window.location.replace(latestPath);\n"
-            "    </script>\n"
-            "  </head>\n"
-            f'  <body><a href="{latest_home}">Latest version</a></body>\n'
-            "</html>\n"
+        redirect_document(
+            title="Latest documentation",
+            redirect_script=(
+                f'      const latestBase = "{latest_base}";\n'
+                '      const hash = window.location.hash || "";\n'
+                "      let latestPath = `${latestBase}index.html`;\n"
+                '      if (hash.startsWith("#/")) {\n'
+                '        const requestedPath = hash.slice(2).replace(/^\\/+/, "");\n'
+                "        if (requestedPath) {\n"
+                "          latestPath = `${latestBase}${requestedPath}`;\n"
+                "        }\n"
+                "      }\n"
+                "      window.location.replace(latestPath);\n"
+            ),
+            fallback_href=latest_home,
+            fallback_label="Latest version",
         ),
         encoding="utf-8",
     )

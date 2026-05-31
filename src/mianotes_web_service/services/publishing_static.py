@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from mianotes_web_service.db.models import Note
 from mianotes_web_service.services.paths import WorkspacePaths, current_workspace_paths
 from mianotes_web_service.services.publishing_navigation import published_note_path
+from mianotes_web_service.services.publishing_redirects import redirect_document
 from mianotes_web_service.services.publishing_theme import GENERATOR_META_TAG
 from mianotes_web_service.services.storage import markdown_note_body
 
@@ -114,30 +115,31 @@ def write_version_index(
     config: dict[str, object],
     note_pages: list[dict[str, object]],
 ) -> None:
-    brand = html.escape(str(config.get("brand") or "mianotes"))
+    brand = str(config.get("brand") or "mianotes")
     first_path = str(note_pages[0]["path"]) if note_pages else ""
     if first_path:
-        body = f'<a href="./{html.escape(first_path)}">Open documentation</a>'
-        refresh = f'    <meta http-equiv="refresh" content="0; url=./{html.escape(first_path)}">\n'
+        version_index = redirect_document(
+            title=f"{brand} documentation",
+            redirect_script=(
+                f'      const documentationPath = "./{html.escape(first_path)}";\n'
+                "      window.location.replace(documentationPath);\n"
+            ),
+            fallback_href=f"./{first_path}",
+        )
     else:
-        body = "<p>No notes were published.</p>"
-        refresh = ""
-    (version_dir / "index.html").write_text(
-        (
+        version_index = (
             "<!doctype html>\n"
             '<html lang="en">\n'
             "  <head>\n"
             '    <meta charset="utf-8">\n'
             '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
             f"    {GENERATOR_META_TAG}\n"
-            f"{refresh}"
-            f"    <title>{brand} documentation</title>\n"
+            f"    <title>{html.escape(brand)} documentation</title>\n"
             "  </head>\n"
-            f"  <body>{body}</body>\n"
+            "  <body><p>No notes were published.</p></body>\n"
             "</html>\n"
-        ),
-        encoding="utf-8",
-    )
+        )
+    (version_dir / "index.html").write_text(version_index, encoding="utf-8")
 
 
 def html_shell(

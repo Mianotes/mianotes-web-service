@@ -241,6 +241,8 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     latest_index_text = latest_index.read_text(encoding="utf-8")
     assert "../0.1.1/index.html" in latest_index_text
     assert "http-equiv=\"refresh\"" not in latest_index_text
+    assert "redirect-loader" in latest_index_text
+    assert "Loading documentation..." in latest_index_text
     assert 'const latestBase = "../0.1.1/";' in latest_index_text
     assert 'hash.startsWith("#/")' in latest_index_text
     assert "hash.slice(2)" in latest_index_text
@@ -520,6 +522,8 @@ def test_publish_prunes_missing_static_versions_from_navigation_and_db(
     )
     assert "../0.2.0/index.html" in latest_index
     assert "http-equiv=\"refresh\"" not in latest_index
+    assert "redirect-loader" in latest_index
+    assert "Loading documentation..." in latest_index
     assert 'const latestBase = "../0.2.0/";' in latest_index
     assert "../0.1.0/index.html" not in latest_index
 
@@ -558,7 +562,10 @@ def test_publish_site_uses_navigation_as_published_note_set(client: TestClient, 
     assert response.json()["note_count"] == 1
     html_root = tmp_path / "data" / "html" / "0.2.0"
     index_html = (html_root / "index.html").read_text(encoding="utf-8")
-    assert f"url=./{kept_path}" in index_html
+    assert f'const documentationPath = "./{kept_path}";' in index_html
+    assert "window.location.replace(documentationPath);" in index_html
+    assert "http-equiv=\"refresh\"" not in index_html
+    assert "redirect-loader" in index_html
     assert removed_path not in index_html
     assert (html_root / kept_path).is_file()
     assert not (html_root / removed_path).exists()
