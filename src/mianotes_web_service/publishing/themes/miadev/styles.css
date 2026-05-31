@@ -1135,7 +1135,7 @@ pre {
 
 /* Miadev developer-docs layer.
    The shape is intentionally sharper and more technical than Miadocs:
-   compact sidebars, terminal code blocks, understated monochrome surfaces,
+   compact sidebars, clean code blocks, understated monochrome surfaces,
    and a small electric accent for active states and links. */
 :root {
   --text: #111111;
@@ -1143,8 +1143,8 @@ pre {
   --soft: #6b7280;
   --line: #e5e7eb;
   --active: #f4f4f5;
-  --code-bg: #0b0f14;
-  --code-line: #202936;
+  --code-bg: #ffffff;
+  --code-line: #e2e2e2;
   --surface: #fbfbfa;
   --panel: #ffffff;
   --inline-code-bg: #f1f5f9;
@@ -1155,8 +1155,8 @@ pre {
   --terminal-orange: #f2b47e;
   --terminal-purple: #d7b8ff;
   --terminal-gray: #c9d3df;
-  --keyword: #d97706;
-  --string: #1d4ed8;
+  --keyword: #b45309;
+  --string: #1f497d;
   --admonition-note-bg: #ffffff;
   --admonition-note-border: #d6dbe4;
   --admonition-note-text: #334155;
@@ -1366,68 +1366,64 @@ h3 {
 
 .code-card {
   position: relative;
-  margin: 20px 0 36px;
-  border-color: #1f2937;
-  border-radius: 10px;
-  background: #0b0f14;
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+  margin: 24px 0 56px;
+  border: 1px solid var(--code-line);
+  border-radius: 12px;
+  background: var(--code-bg);
+  box-shadow: 0 2px 0 rgba(17, 24, 39, 0.04);
+  overflow: hidden;
 }
 
 .code-card::before {
-  content: "";
-  display: block;
-  height: 36px;
-  border-bottom: 1px solid #1f2937;
-  border-radius: 10px 10px 0 0;
-  background:
-    radial-gradient(circle at 18px 18px, #ef4444 0 5px, transparent 6px),
-    radial-gradient(circle at 38px 18px, #f59e0b 0 5px, transparent 6px),
-    radial-gradient(circle at 58px 18px, #22c55e 0 5px, transparent 6px),
-    #111821;
+  content: none;
+  display: none;
+}
+
+.copy-button {
+  top: 20px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: #9a9a9a;
+}
+
+.copy-button svg {
+  width: 18px;
+  height: 18px;
 }
 
 pre {
-  padding: 20px 64px 24px 24px;
-  color: var(--terminal-gray);
-  background: transparent;
-  font-size: 13.5px;
-  line-height: 23px;
+  margin: 0;
+  padding: 24px 68px 28px 28px;
+  overflow-x: auto;
+  color: #1d4072;
+  background: var(--code-bg);
+  font-size: 14px;
+  line-height: 24px;
 }
 
 .token-key {
-  color: var(--terminal-orange);
+  color: var(--keyword);
 }
 
 .tok-key {
-  color: var(--terminal-orange);
+  color: var(--keyword);
 }
 
 .token-string {
-  color: var(--terminal-blue);
+  color: var(--string);
 }
 
 .tok-string {
-  color: var(--terminal-blue);
+  color: var(--string);
 }
 
 .token-number,
 .token-boolean,
 .token-null {
-  color: var(--terminal-purple);
-}
-
-.copy-code {
-  top: 48px;
-  right: 10px;
-  border-color: #2f3b4d;
-  border-radius: 7px;
-  color: #94a3b8;
-  background: #111821;
-}
-
-.copy-code:hover {
-  color: #e2e8f0;
-  background: #172033;
+  color: #1d4072;
 }
 
 .doc-table {
