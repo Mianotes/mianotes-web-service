@@ -19,6 +19,7 @@ from mianotes_web_service.services.publishing_theme import (
 
 def write_root_index(*, html_root: Path, version_slug: str) -> None:
     html_root.mkdir(parents=True, exist_ok=True)
+    write_latest_index(html_root=html_root, version_slug=version_slug)
     (html_root / "index.html").write_text(
         (
             "<!doctype html>\n"
@@ -39,6 +40,31 @@ def write_root_index(*, html_root: Path, version_slug: str) -> None:
             "document.getElementById('latest-link').href = latestPath;"
             "</script>"
             "</body>\n"
+            "</html>\n"
+        ),
+        encoding="utf-8",
+    )
+
+
+def write_latest_index(*, html_root: Path, version_slug: str) -> None:
+    latest_dir = html_root / "latest"
+    latest_dir.mkdir(parents=True, exist_ok=True)
+    latest_path = f"../{html.escape(version_slug)}/index.html"
+    (latest_dir / "index.html").write_text(
+        (
+            "<!doctype html>\n"
+            '<html lang="en">\n'
+            "  <head>\n"
+            '    <meta charset="utf-8">\n'
+            '    <meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            f"    {GENERATOR_META_TAG}\n"
+            f'    <meta http-equiv="refresh" content="0; url={latest_path}">\n'
+            "    <title>Latest documentation</title>\n"
+            "    <script>\n"
+            f'      window.location.replace("{latest_path}");\n'
+            "    </script>\n"
+            "  </head>\n"
+            f'  <body><a href="{latest_path}">Latest version</a></body>\n'
             "</html>\n"
         ),
         encoding="utf-8",

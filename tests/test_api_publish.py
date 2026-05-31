@@ -234,6 +234,9 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert (html_root / "site.js").is_file()
     assert (html_root / "search.js").is_file()
     assert (tmp_path / "data" / "html" / "navigation.js").is_file()
+    latest_index = tmp_path / "data" / "html" / "latest" / "index.html"
+    assert latest_index.is_file()
+    assert "../0.1.1/index.html" in latest_index.read_text(encoding="utf-8")
     readme_md = (tmp_path / "data" / "html" / "README.md")
     assert readme_md.is_file()
     assert readme_md.read_text(encoding="utf-8") == (
@@ -318,6 +321,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert "0.1.1-static-site/index.html" in names
     assert "0.1.1-static-site/navigation.js" in names
     assert "0.1.1-static-site/README.md" in names
+    assert "0.1.1-static-site/latest/index.html" in names
     assert f"0.1.1-static-site/0.1.1/{note_path}" in names
 
     next_draft = client.get("/api/publish/draft", params={"folder_id": folder["id"]}).json()
@@ -490,6 +494,11 @@ def test_publish_prunes_missing_static_versions_from_navigation_and_db(
     navigation_js = (tmp_path / "data" / "html" / "navigation.js").read_text(encoding="utf-8")
     assert "0.2.0/index.html" in navigation_js
     assert "0.1.0/index.html" not in navigation_js
+    latest_index = (tmp_path / "data" / "html" / "latest" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "../0.2.0/index.html" in latest_index
+    assert "../0.1.0/index.html" not in latest_index
 
     session_factory = client.app.state.testing_session
     with session_factory() as session:

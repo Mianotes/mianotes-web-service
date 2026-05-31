@@ -126,9 +126,13 @@ def download_published_site(
             html_root / "index.html",
             html_root / "navigation.js",
             html_root / "README.md",
+            html_root / "latest" / "index.html",
         ):
             if file_path.is_file():
-                zip_file.write(file_path, f"{archive_root}/{file_path.name}")
+                zip_file.write(
+                    file_path,
+                    f"{archive_root}/{file_path.relative_to(html_root).as_posix()}",
+                )
         for file_path in sorted(path for path in site_dir.rglob("*") if path.is_file()):
             zip_file.write(
                 file_path,
