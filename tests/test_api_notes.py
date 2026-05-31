@@ -847,7 +847,7 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         )
         assert join_response.status_code == 201
 
-        headers = {"X-Mianotes-Workspace": "blog"}
+        headers = {"X-Mianotes-Workspace": "Blog"}
         folder = workspace_client.post(
             "/api/folders",
             json={"name": "Research"},

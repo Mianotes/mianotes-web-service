@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import HTTPException, status
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -79,15 +81,36 @@ def default_workspace() -> WorkspaceContext:
     )
 
 
-def workspace_by_id(workspace_id: str) -> WorkspaceContext:
+def _normalised_workspace_reference(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+
+
+def workspace_by_reference(workspace_reference: str) -> WorkspaceContext:
     config = storage_config()
-    location = next((item for item in config.locations if item.id == workspace_id), None)
+    requested = workspace_reference.strip()
+    requested_slug = _normalised_workspace_reference(requested)
+    location = next((item for item in config.locations if item.id == requested), None)
+    if location is None:
+        location = next(
+            (
+                item
+                for item in config.locations
+                if item.id.lower() == requested.lower()
+                or item.name.lower() == requested.lower()
+                or _normalised_workspace_reference(item.name) == requested_slug
+            ),
+            None,
+        )
     if location is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found",
         )
     return workspace_for_location(location, config.database_file)
+
+
+def workspace_by_id(workspace_id: str) -> WorkspaceContext:
+    return workspace_by_reference(workspace_id)
 
 
 def workspace_database_url(workspace: WorkspaceContext) -> str:
@@ -129,7 +152,7 @@ def resolve_workspace(
     workspace_header: str | None = None,
 ) -> WorkspaceContext:
     if workspace_header:
-        return workspace_by_id(workspace_header)
+        return workspace_by_reference(workspace_header)
     session_workspace_id = workspace_id_from_session_token(session_token)
     if session_workspace_id:
         return workspace_by_id(session_workspace_id)

@@ -14,6 +14,8 @@ def test_mcp_initialize_and_tool_list():
     assert listed is not None
     tool_names = {tool["name"] for tool in listed["result"]["tools"]}
     assert "search_notes" in tool_names
+    assert "read_note_context" in tool_names
+    assert "create_note_in_folder" in tool_names
     assert "create_note_from_url" in tool_names
     assert "add_comment" in tool_names
 
@@ -157,6 +159,144 @@ def test_mcp_tool_call_sends_workspace_header(monkeypatch):
     assert seen[-1] == {
         "url": "http://127.0.0.1:8200/api/search?q=getting+started",
         "workspace": "research",
+    }
+
+
+def test_mcp_read_note_context_uses_context_endpoint(monkeypatch):
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        seen.append(
+            {
+                "url": request.full_url,
+                "workspace": request.get_header("X-mianotes-workspace"),
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        return FakeResponse(
+            {
+                "folder": "About",
+                "title": "Use Cases",
+                "total": 1,
+                "results": [{"text": "# Use cases\n\nActual note text."}],
+            }
+        )
+
+    monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/call",
+            "params": {
+                "name": "read_note_context",
+                "arguments": {
+                    "workspace": "Docs",
+                    "folder": "About",
+                    "note": "Use Cases",
+                },
+            },
+        }
+    )
+
+    assert response is not None
+    payload = json.loads(response["result"]["content"][0]["text"])
+    assert payload["results"][0]["text"] == "# Use cases\n\nActual note text."
+    assert seen[-1] == {
+        "url": (
+            "http://127.0.0.1:8200/api/context?"
+            "folder=About&title=Use+Cases&limit=5"
+        ),
+        "workspace": "Docs",
+    }
+
+
+def test_mcp_create_note_in_folder_resolves_folder_name(monkeypatch):
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        body = request.data.decode("utf-8") if request.data else None
+        seen.append(
+            {
+                "url": request.full_url,
+                "method": request.get_method(),
+                "workspace": request.get_header("X-mianotes-workspace"),
+                "body": json.loads(body) if body else None,
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        if request.full_url.endswith("/api/folders"):
+            return FakeResponse([{"id": "folder-about", "name": "About", "slug": "about"}])
+        return FakeResponse({"id": "note-1", "title": "Architecture notes"})
+
+    monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 13,
+            "method": "tools/call",
+            "params": {
+                "name": "create_note_in_folder",
+                "arguments": {
+                    "workspace": "Docs",
+                    "folder": "About",
+                    "title": "Architecture notes",
+                    "text": "Documented architecture.",
+                    "tags": ["docs"],
+                },
+            },
+        }
+    )
+
+    assert response is not None
+    assert json.loads(response["result"]["content"][0]["text"]) == {
+        "id": "note-1",
+        "title": "Architecture notes",
+    }
+    assert seen[-1] == {
+        "url": "http://127.0.0.1:8200/api/notes/from-text",
+        "method": "POST",
+        "workspace": "Docs",
+        "body": {
+            "folder_id": "folder-about",
+            "tags": ["docs"],
+            "text": "Documented architecture.",
+            "title": "Architecture notes",
+        },
     }
 
 

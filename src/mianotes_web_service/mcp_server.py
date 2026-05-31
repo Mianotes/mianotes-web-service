@@ -57,6 +57,27 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         },
     },
     {
+        "name": "read_note_context",
+        "description": (
+            "Read a Mianotes note by workspace, folder name, and note title. "
+            "Use this for requests like Mia(workspace: Docs, folder: About, note: Use Cases). "
+            "Returns the full note text when a matching note exists."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["workspace", "folder", "note"],
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name or id, for example Docs.",
+                },
+                "folder": {"type": "string"},
+                "note": {"type": "string", "description": "Note title to read."},
+                "limit": {"type": "integer", "default": 5},
+            },
+        },
+    },
+    {
         "name": "get_note",
         "description": "Get a Mianotes note by ID.",
         "inputSchema": {
@@ -76,6 +97,31 @@ TOOL_DEFINITIONS: list[JsonObject] = [
                 "text": {"type": "string"},
                 "title": {"type": "string"},
                 "tags": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    },
+    {
+        "name": "create_note_in_folder",
+        "description": (
+            "Create a Mianotes note by workspace and folder name. "
+            "Use this for save/document requests like Mia(workspace: My App, folder: Architecture)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "required": ["workspace", "folder", "text"],
+            "properties": {
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace name or id, for example Docs.",
+                },
+                "folder": {"type": "string"},
+                "text": {"type": "string"},
+                "title": {
+                    "type": "string",
+                    "description": "Useful note title. Create one from the content if omitted.",
+                },
+                "tags": {"type": "array", "items": {"type": "string"}},
+                "create_folder_if_missing": {"type": "boolean", "default": False},
             },
         },
     },
@@ -150,12 +196,16 @@ for tool in TOOL_DEFINITIONS:
         continue
     properties = schema.setdefault("properties", {})
     if isinstance(properties, dict):
-        properties["workspace"] = {
-            "type": "string",
-            "description": (
-                "Workspace id to use for this call. Omit to use the current/default workspace."
-            ),
-        }
+        properties.setdefault(
+            "workspace",
+            {
+                "type": "string",
+                "description": (
+                    "Workspace name or id to use for this call. "
+                    "Omit to use the current/default workspace."
+                ),
+            },
+        )
 
 
 def _api_url() -> str:
@@ -242,6 +292,25 @@ def _without_workspace(arguments: JsonObject) -> JsonObject:
     return {key: value for key, value in arguments.items() if key != "workspace"}
 
 
+def _normalised_name(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def _folder_slug(value: str) -> str:
+    return "-".join(part for part in _normalised_name(value).replace("_", "-").split() if part)
+
+
+def _folder_by_name(folders: list[JsonObject], folder_name: str) -> JsonObject | None:
+    wanted_name = _normalised_name(folder_name)
+    wanted_slug = _folder_slug(folder_name)
+    for folder in folders:
+        name = str(folder.get("name") or "")
+        slug = str(folder.get("slug") or "")
+        if _normalised_name(name) == wanted_name or slug.lower() == wanted_slug:
+            return folder
+    return None
+
+
 def call_tool(name: str, arguments: JsonObject) -> Any:
     workspace = _workspace_argument(arguments)
     if name == "list_folders":
@@ -269,12 +338,44 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
         )
     if name == "get_note":
         return _request("GET", f"/api/notes/{arguments['note_id']}", workspace=workspace)
+    if name == "read_note_context":
+        return _request(
+            "GET",
+            "/api/context",
+            query={
+                "folder": arguments["folder"],
+                "title": arguments["note"],
+                "limit": arguments.get("limit", 5),
+            },
+            workspace=workspace,
+        )
     if name == "create_note":
         body = {
             key: arguments[key]
             for key in ("folder_id", "text", "title", "tags")
             if key in arguments
         }
+        return _request("POST", "/api/notes/from-text", body=body, workspace=workspace)
+    if name == "create_note_in_folder":
+        folders = _request("GET", "/api/folders", workspace=workspace)
+        if not isinstance(folders, list):
+            raise RuntimeError("Mianotes API returned an unexpected folders response")
+        folder = _folder_by_name(folders, arguments["folder"])
+        if folder is None and arguments.get("create_folder_if_missing"):
+            folder = _request(
+                "POST",
+                "/api/folders",
+                body={"name": arguments["folder"]},
+                workspace=workspace,
+            )
+        if folder is None:
+            raise RuntimeError(f"Mianotes folder not found: {arguments['folder']}")
+        body = {
+            key: arguments[key]
+            for key in ("text", "title", "tags")
+            if key in arguments
+        }
+        body["folder_id"] = folder["id"]
         return _request("POST", "/api/notes/from-text", body=body, workspace=workspace)
     if name == "create_note_from_url":
         body = {

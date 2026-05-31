@@ -64,8 +64,10 @@ Use the real Mianotes MCP tool names when available:
 - `list_folders`
 - `create_folder`
 - `list_notes`
+- `read_note_context`
 - `get_note`
 - `create_note`
+- `create_note_in_folder`
 - `create_note_from_url`
 - `update_note`
 - `add_comment`
@@ -134,22 +136,22 @@ Do not invent search results or imply Mia knows something that was not returned.
 
 ## Context Shorthand
 
-When the user writes `Mia(Folder > Title)` or `Mia(Folder:Title)`, treat it as an explicit request to retrieve context from that folder and note title before continuing.
+When the user writes `Mia(workspace: ..., folder: ..., note: ...)`, treat it as an explicit request to retrieve that note before continuing.
 
 Examples:
 
-- "Here's some context: Mia(Mianotes > Settings Page)"
-- "Read the docs here Mia(Mianotes > Settings Page)"
-- "Use this before answering Mia(Work > Deployment Notes)"
-- "Add this to the plan Mia(Mianotes > Settings Page)"
-- "For context here: Mia(About:Core concepts)"
+- "Before answering, get context from Mia(workspace: Docs, folder: About, note: Use Cases)."
+- "Read Mia(workspace: Mianotes, folder: Getting Started, note: Installation) first."
+- "Use Mia(workspace: My App, folder: Architecture, note: System overview) as source context."
 
 Expected behavior:
 
-1. Parse the folder name before `>` or `:` and the title after `>` or `:`.
-2. Query Mia for matching context.
-3. Use the returned note text as context for the user's request.
-4. Do not claim context exists unless Mia returns it.
+1. Use the MCP `read_note_context` tool when it is available.
+2. Pass the workspace name exactly as the user wrote it. Do not silently change `Docs` to `docs` unless Mia returns a workspace-not-found error and you are retrying once.
+3. Pass the folder name and note title exactly as the user wrote them.
+4. Read the returned full note text before answering.
+5. Include a short phrase or specific detail from the note when useful, so the user can see Mia was actually read.
+6. Do not claim context exists unless Mia returns it.
 
 REST fallback:
 
@@ -162,6 +164,10 @@ curl -sS \
   -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
   "${MIANOTES_API_URL}/api/context?folder=Mianotes&title=Settings%20Page&limit=5"
 ```
+
+When the user writes `Mia(workspace: ..., folder: ..., query: ...)`, search that workspace and folder when possible. Use `search_notes` first, then fetch likely full notes with `get_note` before answering.
+
+When the user asks to save or document content with `Mia(workspace: ..., folder: ...)`, use the MCP `create_note_in_folder` tool when available. Create a short useful title from the content if the user did not provide one.
 
 ## Saving Notes
 
