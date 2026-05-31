@@ -1185,6 +1185,8 @@ body {
 }
 
 .topbar {
+  position: relative;
+  z-index: 1002;
   height: 76px;
   padding: 6px 42px 0;
 }
@@ -1215,7 +1217,17 @@ body {
   background: #fff;
 }
 
+.search-wrap {
+  z-index: 1003;
+}
+
+.search-panel {
+  z-index: 1004;
+}
+
 .primary-nav {
+  position: relative;
+  z-index: 1001;
   height: 58px;
   align-items: center;
   gap: 26px;
@@ -1236,6 +1248,8 @@ body {
 }
 
 header[data-header] {
+  position: relative;
+  z-index: 1000;
   min-height: 134px;
 }
 
@@ -1246,6 +1260,7 @@ header[data-header] {
 }
 
 .sidebar {
+  z-index: 10;
   height: calc(100vh - 134px);
   padding: 30px 28px 56px 24px;
   border-right: 1px solid rgba(229, 231, 235, 0.72);
