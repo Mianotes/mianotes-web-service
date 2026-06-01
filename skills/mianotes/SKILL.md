@@ -18,9 +18,11 @@ Hard rules:
 1. For `Mia(workspace: ..., folder: ..., note: ...)`, call `read_note_context` first.
 2. If `read_note_context` returns `total > 0`, use `results[0].text` as the note content and answer from that content. Do not call REST, do not inspect local files, do not search the filesystem, and do not claim Mia failed.
 3. If `read_note_context` returns `total: 0`, say Mia did not find that note. Do not hallucinate a substitute note.
-4. If an MCP tool returns an error, report the MCP error plainly. Do not diagnose the API as unreachable unless you actually checked the API health endpoint.
-5. Do not fall back to local workspace files or databases unless the user explicitly asks for filesystem recovery/debugging.
-6. Never continue searching after a successful exact MCP read unless the user asked for broader context.
+4. For `Mia(workspace: ..., folder: ...)`, read or search within that workspace folder, unless the user is clearly asking to save new content there.
+5. For `Mia(workspace: ...)`, read or search within that workspace, unless the user is clearly asking to save new content there.
+6. If an MCP tool returns an error, report the MCP error plainly. Do not diagnose the API as unreachable unless you actually checked the API health endpoint.
+7. Do not fall back to local workspace files or databases unless the user explicitly asks for filesystem recovery/debugging.
+8. Never continue searching after a successful exact MCP read unless the user asked for broader context.
 
 ## Connection
 
@@ -149,6 +151,18 @@ Do not invent search results or imply Mia knows something that was not returned.
 
 ## Context Shorthand
 
+Mia supports three context shorthand forms:
+
+```text
+Mia(workspace: ..., folder: ..., note: ...)
+Mia(workspace: ..., folder: ...)
+Mia(workspace: ...)
+```
+
+Use the most specific form the user provided. Do not invent missing folder or note names.
+
+### Exact Note Context
+
 When the user writes `Mia(workspace: ..., folder: ..., note: ...)`, treat it as an explicit request to retrieve that note before continuing.
 
 Examples:
@@ -180,6 +194,45 @@ curl -sS \
 ```
 
 When the user writes `Mia(workspace: ..., folder: ..., query: ...)`, search that workspace and folder when possible. Use `search_notes` first, then fetch likely full notes with `get_note` before answering.
+
+### Folder Context
+
+When the user writes `Mia(workspace: ..., folder: ...)` in a read/context/search request, treat it as a request to use notes from that folder.
+
+Examples:
+
+- "Before answering, get context from Mia(workspace: Docs, folder: About)."
+- "Summarise Mia(workspace: Mianotes, folder: Getting Started)."
+- "Use Mia(workspace: My App, folder: Architecture) as context."
+
+Expected behavior:
+
+1. Use MCP tools when available.
+2. Pass the workspace name exactly as the user wrote it.
+3. Resolve the folder by listing folders in that workspace and matching the folder name case-insensitively.
+4. If the user gave a search question or topic, call `search_notes` with the workspace and search terms, then fetch relevant notes with `get_note`.
+5. If the user asked for folder-wide context without a search topic, list notes in the resolved folder and fetch the relevant note texts with `get_note`.
+6. If the folder is not found, say Mia did not find that folder.
+7. Do not read local files or databases unless the user explicitly asks for filesystem recovery/debugging.
+
+### Workspace Context
+
+When the user writes `Mia(workspace: ...)` in a read/context/search request, treat it as a request to use notes from that workspace.
+
+Examples:
+
+- "Before answering, get context from Mia(workspace: Docs)."
+- "Search Mia(workspace: Mianotes) for publishing."
+- "Summarise what Mia(workspace: My App) knows about architecture."
+
+Expected behavior:
+
+1. Use MCP tools when available.
+2. Pass the workspace name exactly as the user wrote it.
+3. If the user gave a search question or topic, call `search_notes` with the workspace and search terms, then fetch relevant notes with `get_note`.
+4. If the user asked for broad workspace context without a search topic, list folders and notes in that workspace, then fetch only the notes needed to answer.
+5. If the workspace is not found or no relevant notes are returned, say that plainly.
+6. Do not silently switch to another workspace.
 
 When the user asks to save or document content with `Mia(workspace: ..., folder: ...)`, use the MCP `create_note_in_folder` tool when available. Create a short useful title from the content if the user did not provide one.
 
