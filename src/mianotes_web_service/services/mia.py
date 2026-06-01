@@ -57,7 +57,7 @@ def _llm_config() -> LLMConfig:
         )
         return LLMConfig(
             provider="openai",
-            model=model or "gpt-4o-mini",
+            model=model or "gpt-5-nano",
             api_key=api_key,
             base_url=settings.llm_base_url,
         )

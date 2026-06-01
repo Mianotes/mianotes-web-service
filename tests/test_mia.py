@@ -80,6 +80,8 @@ def test_mia_prompt_sends_user_prompt_and_note(monkeypatch, tmp_path):
     user_message = calls["completion"]["messages"][1]["content"]
     assert result.text == "## Summary\n\nUseful and tidy."
     system_message = calls["completion"]["messages"][0]["content"]
+    assert result.model == "gpt-5-nano"
+    assert calls["completion"]["model"] == "gpt-5-nano"
     assert "do not echo it" in system_message
     assert "answer in two to four sentences" in system_message
     assert "Task:\nsummarise this text" in user_message
