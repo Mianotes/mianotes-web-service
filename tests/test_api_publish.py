@@ -247,9 +247,10 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert 'hash.startsWith("#/")' in latest_index_text
     assert "hash.slice(2)" in latest_index_text
     assert "`${latestBase}${requestedPath}`" in latest_index_text
-    readme_md = (tmp_path / "data" / "html" / "README.md")
-    assert readme_md.is_file()
-    assert readme_md.read_text(encoding="utf-8") == (
+    toc_md = tmp_path / "data" / "TOC.md"
+    assert toc_md.is_file()
+    assert not (tmp_path / "data" / "html" / "README.md").exists()
+    assert toc_md.read_text(encoding="utf-8") == (
         "# Mia Docs Documentation\n"
         "\n"
         "- **About MCP**\n"
@@ -343,7 +344,7 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
         names = set(archive.namelist())
     assert "0.1.1-static-site/index.html" in names
     assert "0.1.1-static-site/navigation.js" in names
-    assert "0.1.1-static-site/README.md" in names
+    assert "0.1.1-static-site/TOC.md" in names
     assert "0.1.1-static-site/latest/index.html" in names
     assert f"0.1.1-static-site/0.1.1/{note_path}" in names
 
@@ -471,9 +472,10 @@ def test_publish_site_resolves_markdown_from_session_workspace(
     assert (
         workspace_dir / "html" / "0.3.0" / "about" / f"what-is-mianotes-{note_id[:8]}.html"
     ).is_file()
-    readme = (workspace_dir / "html" / "README.md").read_text(encoding="utf-8")
-    assert "markdown/about/what-is-mianotes-c08cbf08.md" in readme
-    assert "0.3.0/about/what-is-mianotes" not in readme
+    toc = (workspace_dir / "TOC.md").read_text(encoding="utf-8")
+    assert not (workspace_dir / "html" / "README.md").exists()
+    assert "markdown/about/what-is-mianotes-c08cbf08.md" in toc
+    assert "0.3.0/about/what-is-mianotes" not in toc
     assert not (tmp_path / "data" / "html" / "0.3.0").exists()
 
 

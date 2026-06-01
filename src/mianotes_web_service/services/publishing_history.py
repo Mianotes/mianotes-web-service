@@ -85,14 +85,14 @@ def write_navigation_js(
         f"const SITE_NAVIGATION = {json_for_script(payload)};\n",
         encoding="utf-8",
     )
-    write_readme_md(
+    write_toc_md(
         html_root=html_root,
         current_site=current_site,
         markdown_paths_by_html_path=markdown_paths_by_html_path,
     )
 
 
-def write_readme_md(
+def write_toc_md(
     *,
     html_root: Path,
     current_site: PublishedSite,
@@ -100,21 +100,22 @@ def write_readme_md(
 ) -> None:
     brand = markdown_text(site_brand(current_site))
     navigation = load_json_list(current_site.navigation, [])
-    readme = [f"# {brand} Documentation", ""]
+    toc = [f"# {brand} Documentation", ""]
     if navigation:
-        readme.extend(
-            readme_navigation_lines(
+        toc.extend(
+            toc_navigation_lines(
                 navigation,
                 markdown_paths_by_html_path=markdown_paths_by_html_path or {},
             )
         )
     else:
-        readme.append("_No notes were published._")
-    readme.append("")
-    (html_root / "README.md").write_text("\n".join(readme), encoding="utf-8")
+        toc.append("_No notes were published._")
+    toc.append("")
+    (html_root / "README.md").unlink(missing_ok=True)
+    (html_root.parent / "TOC.md").write_text("\n".join(toc), encoding="utf-8")
 
 
-def readme_navigation_lines(
+def toc_navigation_lines(
     navigation: Iterable[dict[str, object]],
     *,
     markdown_paths_by_html_path: Mapping[str, str],
@@ -127,7 +128,7 @@ def readme_navigation_lines(
             continue
         lines.append(f"- **{markdown_text(title)}**")
         lines.extend(
-            readme_item_lines(
+            toc_item_lines(
                 (item for item in items if isinstance(item, dict)),
                 markdown_paths_by_html_path=markdown_paths_by_html_path,
                 depth=1,
@@ -136,7 +137,7 @@ def readme_navigation_lines(
     return lines
 
 
-def readme_item_lines(
+def toc_item_lines(
     items: Iterable[dict[str, object]],
     *,
     markdown_paths_by_html_path: Mapping[str, str],
@@ -152,7 +153,7 @@ def readme_item_lines(
         if not isinstance(title, str):
             continue
         if isinstance(path, str) and path:
-            link_path = readme_link_path(path, markdown_paths_by_html_path)
+            link_path = toc_link_path(path, markdown_paths_by_html_path)
             if link_path:
                 lines.append(f"{indent}- [{markdown_text(title)}]({link_path})")
             else:
@@ -161,7 +162,7 @@ def readme_item_lines(
             lines.append(f"{indent}- **{markdown_text(title)}**")
         if isinstance(children, list):
             lines.extend(
-                readme_item_lines(
+                toc_item_lines(
                     (child for child in children if isinstance(child, dict)),
                     markdown_paths_by_html_path=markdown_paths_by_html_path,
                     depth=child_indent_depth,
@@ -217,7 +218,7 @@ def markdown_text(value: str) -> str:
     )
 
 
-def readme_link_path(
+def toc_link_path(
     item_path: str,
     markdown_paths_by_html_path: Mapping[str, str],
 ) -> str | None:

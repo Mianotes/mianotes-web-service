@@ -122,10 +122,12 @@ def download_published_site(
     archive = BytesIO()
     archive_root = f"{_archive_name(site)}-static-site"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        toc_path = data_dir / "TOC.md"
+        if toc_path.is_file():
+            zip_file.write(toc_path, f"{archive_root}/TOC.md")
         for file_path in (
             html_root / "index.html",
             html_root / "navigation.js",
-            html_root / "README.md",
             html_root / "latest" / "index.html",
         ):
             if file_path.is_file():

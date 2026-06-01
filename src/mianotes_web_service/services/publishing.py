@@ -103,7 +103,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
         note_pages=note_pages,
     )
     write_root_index(html_root=html_root, version_slug=next_version_slug)
-    markdown_paths_by_html_path = markdown_paths_for_readme(
+    markdown_paths_by_html_path = markdown_paths_for_toc(
         notes,
         include_folder=include_folder,
         data_dir=data_dir,
@@ -147,7 +147,7 @@ def publish_site(session: Session, user: User, payload: PublishRequest) -> Publi
     return published_site
 
 
-def markdown_paths_for_readme(
+def markdown_paths_for_toc(
     notes: list[Note],
     *,
     include_folder: bool,
@@ -155,7 +155,7 @@ def markdown_paths_for_readme(
     paths: WorkspacePaths,
 ) -> dict[str, str]:
     return {
-        published_note_path(note, include_folder=include_folder): markdown_path_for_readme(
+        published_note_path(note, include_folder=include_folder): markdown_path_for_toc(
             paths.note_file_path(note),
             data_dir=data_dir,
         )
@@ -163,7 +163,7 @@ def markdown_paths_for_readme(
     }
 
 
-def markdown_path_for_readme(note_path: Path, *, data_dir: Path) -> str:
+def markdown_path_for_toc(note_path: Path, *, data_dir: Path) -> str:
     if note_path.is_absolute():
         try:
             return note_path.resolve().relative_to(data_dir.resolve()).as_posix()
