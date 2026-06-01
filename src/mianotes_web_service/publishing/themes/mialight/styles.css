@@ -709,7 +709,7 @@ mark {
 
   .topbar {
     height: auto;
-    padding: 8px 52px 0 50px;
+    padding: 8px 22px 0;
     flex-wrap: wrap;
   }
 
@@ -723,7 +723,7 @@ mark {
 
   .primary-nav {
     height: 64px;
-    padding: 0 72px 0 50px;
+    padding: 0 22px;
     overflow-x: auto;
   }
 
@@ -734,8 +734,8 @@ mark {
   .sidebar {
     position: relative;
     height: auto;
-    max-height: 360px;
-    padding: 34px 46px 56px 26px;
+    max-height: 220px;
+    padding: 32px 22px;
     border-bottom: 1px solid var(--line);
   }
 
