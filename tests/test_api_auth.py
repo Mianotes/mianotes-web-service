@@ -89,7 +89,7 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     assert "https://tally.so/r/xXvQbk" in note_text
     assert "![Workspace switcher](/markdown/mianotes/sources/" in note_text
     source_dir = Path(note_payload["source_files"][0]["file_path"]).parent
-    assert (source_dir / "onboarding_workspace_switcher.jpg").is_file()
+    assert (source_dir / "onboarding_workspace_switcher.png").is_file()
 
     session = client.get("/api/auth/session")
     assert session.status_code == 200

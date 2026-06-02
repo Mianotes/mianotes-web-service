@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import shutil
 from pathlib import Path
 from urllib.parse import quote
@@ -16,13 +17,9 @@ ONBOARDING_FOLDER_SLUG = "mianotes"
 ONBOARDING_NOTE_TITLE = "Getting Started"
 ONBOARDING_NOTE_TAGS = ["getting started", "welcome"]
 ONBOARDING_ASSETS_DIR = Path(__file__).resolve().parents[1] / "onboarding_assets"
+ONBOARDING_PLACEHOLDER_PATTERN = re.compile(r"\{([^{}]+)\}")
 ONBOARDING_IMAGE_ALTS = {
-    "onboarding_settings_workspace_switcher.jpg": "Settings workspace switcher",
-    "onboarding_workspace_switcher.jpg": "Workspace switcher",
-    "onboarding_mia.jpg": "Mia note tools",
-    "onboarding_jobs.jpg": "Console job queue",
-    "onboarding_screen_editor.jpg": "Markdown note editor",
-    "onboarding_publish.jpg": "Publish notes screen",
+    "src/onboarding_assets/onboarding_workspace_switcher.png": "Workspace switcher",
 }
 
 ONBOARDING_NOTE_TEMPLATE = """# Welcome to Mianotes
@@ -44,7 +41,7 @@ and Mianotes will prepare it as a local workspace.
 The current workspace is always visible in the app, so you know where new notes, converted
 files, folders, jobs, and published sites belong.
 
-{onboarding_workspace_switcher}
+{src/onboarding_assets/onboarding_workspace_switcher.png}
 
 ## Getting started
 
@@ -106,25 +103,31 @@ def onboarding_note_text(*, folder_path: str, note_id: str) -> str:
     source_dir = f"sources/{short_id(note_id)}"
     encoded_folder_path = quote(folder_path.strip("/"), safe="/")
 
-    def image_markdown(filename: str) -> str:
+    def image_markdown(asset_reference: str) -> str:
+        filename = onboarding_asset_filename(asset_reference)
         asset_path = f"/markdown/{encoded_folder_path}/{source_dir}/{quote(filename)}"
-        return f"![{ONBOARDING_IMAGE_ALTS[filename]}]({asset_path})"
+        return f"![{ONBOARDING_IMAGE_ALTS[asset_reference]}]({asset_path})"
 
-    return ONBOARDING_NOTE_TEMPLATE.format(
-        onboarding_settings_workspace_switcher=image_markdown(
-            "onboarding_settings_workspace_switcher.jpg"
-        ),
-        onboarding_workspace_switcher=image_markdown("onboarding_workspace_switcher.jpg"),
-        onboarding_mia=image_markdown("onboarding_mia.jpg"),
-        onboarding_jobs=image_markdown("onboarding_jobs.jpg"),
-        onboarding_screen_editor=image_markdown("onboarding_screen_editor.jpg"),
-        onboarding_publish=image_markdown("onboarding_publish.jpg"),
+    def replace_placeholder(match: re.Match[str]) -> str:
+        asset_reference = match.group(1)
+        if asset_reference not in ONBOARDING_IMAGE_ALTS:
+            raise KeyError(f"Unknown onboarding image placeholder: {asset_reference}")
+        return image_markdown(asset_reference)
+
+    return ONBOARDING_PLACEHOLDER_PATTERN.sub(
+        replace_placeholder,
+        ONBOARDING_NOTE_TEMPLATE,
     )
+
+
+def onboarding_asset_filename(asset_reference: str) -> str:
+    return Path(asset_reference).name
 
 
 def copy_onboarding_assets(destination: Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for filename in ONBOARDING_IMAGE_ALTS:
+    for asset_reference in ONBOARDING_IMAGE_ALTS:
+        filename = onboarding_asset_filename(asset_reference)
         source = ONBOARDING_ASSETS_DIR / filename
         if source.is_file():
             shutil.copy2(source, destination / filename)
