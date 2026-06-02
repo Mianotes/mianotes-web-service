@@ -414,7 +414,7 @@ def test_publish_site_resolves_markdown_from_session_workspace(
         id="docs",
         name="Docs",
         folder_path=workspace_dir,
-        database_file=".mianotes/mia.db",
+        database_file="workspaces/docs.db",
     )
     session_factory = client.app.state.testing_session
 

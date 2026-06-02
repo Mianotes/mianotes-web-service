@@ -42,7 +42,7 @@ def test_create_database_uses_current_model_schema():
 def test_system_and_workspace_databases_have_separate_tables(tmp_path):
     system_engine = create_database_engine(f"sqlite:///{tmp_path / 'system.db'}")
     workspace_engine = create_database_engine(
-        f"sqlite:///{tmp_path / 'workspace' / '.mianotes' / 'mia.db'}"
+        f"sqlite:///{tmp_path / 'workspaces' / 'workspace.db'}"
     )
 
     create_system_database(system_engine)
@@ -68,7 +68,7 @@ def test_system_and_workspace_databases_have_separate_tables(tmp_path):
 def test_session_factory_routes_global_models_to_system_database(tmp_path):
     system_engine = create_database_engine(f"sqlite:///{tmp_path / 'system.db'}")
     workspace_engine = create_database_engine(
-        f"sqlite:///{tmp_path / 'workspace' / '.mianotes' / 'mia.db'}"
+        f"sqlite:///{tmp_path / 'workspaces' / 'workspace.db'}"
     )
     create_system_database(system_engine)
     create_workspace_database(workspace_engine)
@@ -108,7 +108,7 @@ def test_session_token_records_current_workspace(tmp_path):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file=".mianotes/mia.db",
+        database_file="workspaces/research.db",
     )
 
     with SessionLocal() as session:
@@ -133,7 +133,7 @@ def test_reset_current_workspace_tolerates_different_context(tmp_path):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file=".mianotes/mia.db",
+        database_file="workspaces/research.db",
     )
     token = copy_context().run(set_current_workspace, workspace)
 
@@ -145,9 +145,9 @@ def test_get_session_cleanup_tolerates_different_context(tmp_path, monkeypatch):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file=".mianotes/mia.db",
+        database_file="workspaces/research.db",
     )
-    engine = create_database_engine(f"sqlite:///{tmp_path / 'research' / '.mianotes' / 'mia.db'}")
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'workspaces' / 'research.db'}")
     create_workspace_database(engine)
     SessionLocal = sessionmaker(
         bind=engine,

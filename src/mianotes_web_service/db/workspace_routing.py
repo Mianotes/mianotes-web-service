@@ -13,7 +13,7 @@ from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     StorageLocation,
     read_storage_config,
-    storage_database_path,
+    workspace_database_path,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
@@ -114,7 +114,8 @@ def workspace_by_id(workspace_id: str) -> WorkspaceContext:
 
 
 def workspace_database_url(workspace: WorkspaceContext) -> str:
-    return f"sqlite:///{storage_database_path(workspace.folder_path, workspace.database_file)}"
+    settings = get_settings()
+    return f"sqlite:///{workspace_database_path(settings.data_dir, workspace.id)}"
 
 
 def workspace_engine(workspace: WorkspaceContext) -> Engine:

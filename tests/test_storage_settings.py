@@ -6,7 +6,7 @@ from mianotes_web_service.services.storage_settings import (
     StorageLocation,
     add_storage_location,
     read_storage_config,
-    storage_database_path,
+    workspace_database_path,
     write_storage_config,
 )
 
@@ -37,16 +37,11 @@ def test_add_storage_location_places_new_database_first(tmp_path: Path):
         "Archive",
     ]
     assert next_config.active_location == "main"
-    assert storage_database_path(tmp_path / "research", next_config.database_file) == (
-        tmp_path / "research" / ".mianotes" / "mia.db"
+    assert workspace_database_path(tmp_path / "data", next_config.locations[0].id) == (
+        tmp_path / "data" / "workspaces" / "research.db"
     )
-    gitignore = (tmp_path / "research" / ".gitignore").read_text(encoding="utf-8")
-    assert ".mianotes/" in gitignore
-    assert ".mianotes/mia.db" in gitignore
-    assert "system.db" in gitignore
-    assert "system.db-wal" in gitignore
-    assert "system.db-shm" in gitignore
-    assert "system.db-journal" in gitignore
+    assert not (tmp_path / "research" / ".mianotes").exists()
+    assert not (tmp_path / "research" / ".gitignore").exists()
 
 
 def test_storage_config_preserves_location_order(tmp_path: Path):

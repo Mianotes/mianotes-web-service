@@ -12,6 +12,7 @@ from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services.storage_settings import workspace_database_path
 from mianotes_web_service.services.workspace_markdown_import import (
     COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
 )
@@ -92,7 +93,7 @@ def test_create_workspace_prompts_before_importing_existing_markdown(
 
     assert response.status_code == 409
     assert response.json()["detail"] == COMPATIBLE_MARKDOWN_IMPORT_MESSAGE
-    assert not (workspace_path / ".mianotes" / "mia.db").exists()
+    assert not (workspace_path / ".mianotes").exists()
 
 
 def test_create_workspace_can_import_existing_markdown_notes(
@@ -115,7 +116,7 @@ def test_create_workspace_can_import_existing_markdown_notes(
     )
 
     assert response.status_code == 200
-    database_path = workspace_path / ".mianotes" / "mia.db"
+    database_path = workspace_database_path(tmp_path / "data", "docs")
     assert database_path.exists()
     with sqlite3.connect(database_path) as connection:
         folder = connection.execute("SELECT name, slug, path FROM folders").fetchone()
@@ -145,7 +146,9 @@ def test_create_workspace_can_ignore_existing_markdown_notes(
     )
 
     assert response.status_code == 200
-    with sqlite3.connect(workspace_path / ".mianotes" / "mia.db") as connection:
+    database_path = workspace_database_path(tmp_path / "data", "docs")
+    assert database_path.exists()
+    with sqlite3.connect(database_path) as connection:
         assert connection.execute("SELECT COUNT(*) FROM folders").fetchone()[0] == 0
         assert connection.execute("SELECT COUNT(*) FROM notes").fetchone()[0] == 0
     assert note_path.exists()

@@ -43,7 +43,7 @@ def test_seed_demo_users_only_creates_system_users_without_workspace_content(tmp
     assert result.stdout.strip() == "Seeded 0 demo users and admin admin@example.com."
 
     system_database = data_dir / "system.db"
-    workspace_database = data_dir / ".mianotes" / "mia.db"
+    workspace_database = data_dir / "workspaces" / "default.db"
     assert system_database.exists()
     assert not workspace_database.exists()
 

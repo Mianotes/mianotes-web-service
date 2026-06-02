@@ -18,7 +18,6 @@ from mianotes_web_service.db.workspace_routing import workspace_by_id
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
-    DATABASE_FILENAME,
     SQLITE_SIDECAR_SUFFIXES,
     SYSTEM_DATABASE_FILENAME,
 )
@@ -26,9 +25,7 @@ from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(tags=["files"])
 PRIVATE_DATA_FILENAMES = {
-    DATABASE_FILENAME,
     SYSTEM_DATABASE_FILENAME,
-    *(f"{DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
     *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
 }
 
@@ -43,7 +40,9 @@ def _file_response(
     target = (data_dir / file_path).resolve()
     if data_dir not in target.parents and target != data_dir:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    if target.name in PRIVATE_DATA_FILENAMES:
+    if target.name in PRIVATE_DATA_FILENAMES or target.name.endswith(
+        (".db", *(f".db{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES))
+    ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     if not target.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")

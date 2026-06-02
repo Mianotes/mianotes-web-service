@@ -40,7 +40,7 @@ from mianotes_web_service.services.storage_settings import (
     add_storage_location,
     normalise_storage_path,
     read_storage_config,
-    storage_database_path,
+    workspace_database_path,
     write_storage_config,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
@@ -53,8 +53,8 @@ from mianotes_web_service.services.workspace_markdown_import import (
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
-def _database_url(folder_path: Path, database_file: str) -> str:
-    return f"sqlite:///{storage_database_path(folder_path, database_file)}"
+def _database_url(workspace_id: str) -> str:
+    return f"sqlite:///{workspace_database_path(get_settings().data_dir, workspace_id)}"
 
 
 def _parse_datetime(value: object) -> datetime | None:
@@ -95,7 +95,7 @@ def _storage_response(
     )
     locations: list[StorageLocationRead] = []
     for location in config.locations:
-        database_path = storage_database_path(location.folder_path, config.database_file)
+        database_path = workspace_database_path(get_settings().data_dir, location.id)
         notes_count, users_count, last_updated_at = _database_stats(database_path)
         locations.append(
             StorageLocationRead(
@@ -114,7 +114,7 @@ def _storage_response(
         active_location=active_location,
         database_file=config.database_file,
         data_dir=str(active_folder_path),
-        database_path=str(storage_database_path(active_folder_path, config.database_file)),
+        database_path=str(workspace_database_path(get_settings().data_dir, active_location)),
         locations=locations,
     )
 
@@ -169,7 +169,17 @@ def update_share_settings(
 def create_storage_location(payload: StorageLocationCreate, user: AdminUser) -> StorageSettingsRead:
     config = _read_storage_config()
     folder_path = normalise_storage_path(payload.folder_path)
-    database_path = storage_database_path(folder_path, config.database_file)
+    try:
+        next_config = add_storage_location(
+            config,
+            name=payload.name,
+            folder_path=str(folder_path),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    new_location = next_config.locations[0]
+    database_path = workspace_database_path(get_settings().data_dir, new_location.id)
     should_prompt_for_import = (
         payload.import_existing_markdown is None
         and not database_path.exists()
@@ -181,25 +191,13 @@ def create_storage_location(payload: StorageLocationCreate, user: AdminUser) -> 
             detail=COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
         )
 
-    try:
-        next_config = add_storage_location(
-            config,
-            name=payload.name,
-            folder_path=str(folder_path),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    new_location = next_config.locations[0]
     workspace = WorkspaceContext(
         id=new_location.id,
         name=new_location.name,
         folder_path=new_location.folder_path,
         database_file=next_config.database_file,
     )
-    new_engine = create_database_engine(
-        _database_url(new_location.folder_path, next_config.database_file)
-    )
+    new_engine = create_database_engine(_database_url(new_location.id))
     try:
         create_workspace_database(new_engine)
         if payload.import_existing_markdown is True:

@@ -7,17 +7,10 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 DEFAULT_LOCATION_ID = "default"
-PRIVATE_STORAGE_DIR = ".mianotes"
-DATABASE_FILENAME = "mia.db"
+WORKSPACE_DATABASE_DIR = "workspaces"
 SYSTEM_DATABASE_FILENAME = "system.db"
-DEFAULT_DATABASE_FILE = f"{PRIVATE_STORAGE_DIR}/{DATABASE_FILENAME}"
+DEFAULT_DATABASE_FILE = f"{WORKSPACE_DATABASE_DIR}/{{workspace_id}}.db"
 SQLITE_SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
-GITIGNORE_ENTRIES = (
-    f"{PRIVATE_STORAGE_DIR}/",
-    f"{PRIVATE_STORAGE_DIR}/{DATABASE_FILENAME}",
-    SYSTEM_DATABASE_FILENAME,
-    *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
-)
 
 
 @dataclass(frozen=True)
@@ -55,29 +48,19 @@ def normalise_storage_path(path: str | Path) -> Path:
     return value.resolve()
 
 
-def _normalise_database_file(value: str) -> str:
-    return value
+def _normalise_workspace_id(value: str) -> str:
+    workspace_id = re.sub(r"[^a-z0-9_-]+", "-", value.strip().lower()).strip("-")
+    return workspace_id or DEFAULT_LOCATION_ID
 
 
-def storage_database_path(folder_path: Path, database_file: str = DEFAULT_DATABASE_FILE) -> Path:
-    return folder_path / _normalise_database_file(database_file)
+def workspace_database_path(data_dir: Path, workspace_id: str) -> Path:
+    return normalise_storage_path(data_dir) / WORKSPACE_DATABASE_DIR / (
+        f"{_normalise_workspace_id(workspace_id)}.db"
+    )
 
 
 def system_database_path(data_dir: Path) -> Path:
     return normalise_storage_path(data_dir) / SYSTEM_DATABASE_FILENAME
-
-
-def _ensure_storage_gitignore(folder_path: Path) -> None:
-    gitignore_path = folder_path / ".gitignore"
-    existing = gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
-    lines = existing.splitlines()
-    next_lines = list(lines)
-    for entry in GITIGNORE_ENTRIES:
-        if entry not in lines:
-            next_lines.append(entry)
-    if next_lines != lines:
-        suffix = "\n" if next_lines else ""
-        gitignore_path.write_text("\n".join(next_lines) + suffix, encoding="utf-8")
 
 
 def _default_config(default_data_dir: Path) -> StorageConfig:
@@ -102,13 +85,7 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
         return config
 
     payload = json.loads(path.read_text(encoding="utf-8"))
-    database_file = _normalise_database_file(
-        str(
-            payload.get("databaseFile")
-            or payload.get("defaultDatabase")
-            or DEFAULT_DATABASE_FILE
-        )
-    )
+    database_file = DEFAULT_DATABASE_FILE
     default_folder_path = payload.get("defaultFolderPath")
     raw_locations = payload.get("allowedStorageLocations") or []
     locations: list[StorageLocation] = []
@@ -152,7 +129,6 @@ def write_storage_config(path: Path, config: StorageConfig) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "activeLocation": config.active_location,
-        "databaseFile": config.database_file,
         "allowedStorageLocations": [
             {
                 "id": location.id,
@@ -178,8 +154,6 @@ def ensure_storage_location(folder_path: Path, database_file: str = DEFAULT_DATA
     folder_path.mkdir(parents=True, exist_ok=True)
     if not folder_path.is_dir():
         raise ValueError("Storage location must be a folder.")
-    storage_database_path(folder_path, database_file).parent.mkdir(parents=True, exist_ok=True)
-    _ensure_storage_gitignore(folder_path)
     probe = folder_path / ".mianotes-write-test"
     probe.write_text("ok", encoding="utf-8")
     probe.unlink(missing_ok=True)
