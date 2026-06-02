@@ -14,7 +14,6 @@ from mianotes_web_service.services.storage_settings import (
     StorageLocation,
     read_storage_config,
     storage_database_path,
-    system_database_path,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
@@ -31,7 +30,8 @@ def storage_config() -> StorageConfig:
 
 def system_database_url() -> str:
     settings = get_settings()
-    return f"sqlite:///{system_database_path(settings.data_dir)}"
+    assert settings.database_url is not None
+    return settings.database_url
 
 
 def system_engine() -> Engine:

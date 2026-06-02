@@ -40,60 +40,91 @@ def _first_value(*values: str | None) -> str | None:
 
 def _llm_config() -> LLMConfig:
     settings = get_settings()
-    provider = settings.llm_provider.strip().lower()
+    return _provider_config(
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+        base_url=settings.llm_base_url,
+        api_key=settings.llm_api_key,
+        openai_api_key=settings.openai_api_key,
+        openai_model=settings.openai_model,
+        default_model=LOCAL_LLM_MODEL,
+    )
 
+
+def _vlm_config() -> LLMConfig:
+    settings = get_settings()
+    return _provider_config(
+        provider=settings.vlm_provider,
+        model=settings.vlm_model or settings.llm_image_model or settings.llm_model,
+        base_url=settings.vlm_base_url or settings.llm_base_url,
+        api_key=settings.vlm_api_key or settings.llm_api_key,
+        openai_api_key=settings.openai_api_key,
+        openai_model=settings.openai_model,
+        default_model=settings.llm_image_model or settings.llm_model or LOCAL_LLM_MODEL,
+    )
+
+
+def _provider_config(
+    *,
+    provider: str,
+    model: str | None,
+    base_url: str | None,
+    api_key: str | None,
+    openai_api_key: str | None,
+    openai_model: str,
+    default_model: str,
+) -> LLMConfig:
+    provider = provider.strip().lower()
     if provider == "openai":
-        api_key = _first_value(
-            settings.llm_api_key,
-            settings.openai_api_key,
-            os.environ.get("OPENAI_API_KEY"),
-        )
-        if not api_key:
+        resolved_api_key = _first_value(api_key, openai_api_key, os.environ.get("OPENAI_API_KEY"))
+        if not resolved_api_key:
             raise MiaUnavailable("LLM key is not configured")
-        model = _first_value(
-            settings.llm_model,
+        resolved_model = _first_value(
+            model,
             os.environ.get("OPENAI_MODEL"),
-            settings.openai_model,
+            openai_model,
         )
         return LLMConfig(
             provider="openai",
-            model=model or "gpt-5-nano",
-            api_key=api_key,
-            base_url=settings.llm_base_url,
+            model=resolved_model or default_model,
+            api_key=resolved_api_key,
+            base_url=base_url,
         )
 
     if provider in {"local", "ollama"}:
         return LLMConfig(
             provider="local",
-            model=_first_value(settings.llm_model, os.environ.get("OLLAMA_MODEL"), LOCAL_LLM_MODEL)
-            or LOCAL_LLM_MODEL,
-            api_key=_first_value(settings.llm_api_key, os.environ.get("OLLAMA_API_KEY"), "ollama")
+            model=(
+                _first_value(model, os.environ.get("OLLAMA_MODEL"), default_model)
+                or default_model
+            ),
+            api_key=_first_value(api_key, os.environ.get("OLLAMA_API_KEY"), "ollama")
             or "ollama",
             base_url=_first_value(
-                settings.llm_base_url,
+                base_url,
                 os.environ.get("OLLAMA_BASE_URL"),
                 LOCAL_LLM_BASE_URL,
             ),
         )
 
     if provider in {"openai-compatible", "compatible"}:
-        if not settings.llm_base_url:
+        if not base_url:
             raise MiaUnavailable("OpenAI-compatible LLM base URL is not configured")
-        if not settings.llm_model:
+        if not model:
             raise MiaUnavailable("OpenAI-compatible LLM model is not configured")
         return LLMConfig(
             provider="openai-compatible",
-            model=settings.llm_model,
+            model=model,
             api_key=_first_value(
-                settings.llm_api_key,
+                api_key,
                 os.environ.get("OPENAI_API_KEY"),
                 "local",
             )
             or "local",
-            base_url=settings.llm_base_url,
+            base_url=base_url,
         )
 
-    raise MiaUnavailable(f"Unsupported LLM provider: {settings.llm_provider}")
+    raise MiaUnavailable(f"Unsupported LLM provider: {provider}")
 
 
 def _client_for(config: LLMConfig) -> OpenAI:
@@ -104,23 +135,22 @@ def _client_for(config: LLMConfig) -> OpenAI:
 
 
 def markitdown_llm_options() -> dict[str, object]:
-    settings = get_settings()
-    config = _llm_config()
+    config = _vlm_config()
     return _markitdown_image_options(
         client=_client_for(config),
-        model=settings.llm_image_model or config.model,
+        model=config.model,
     )
 
 
 def markitdown_openai_image_options() -> dict[str, object]:
     settings = get_settings()
-    if settings.llm_provider.strip().lower() != "openai":
+    if settings.vlm_provider.strip().lower() != "openai":
         raise MiaUnavailable("OpenAI image OCR is not configured")
 
-    config = _llm_config()
+    config = _vlm_config()
     return _markitdown_image_options(
         client=_client_for(config),
-        model=settings.llm_image_model or config.model,
+        model=config.model,
     )
 
 

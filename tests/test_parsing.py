@@ -630,6 +630,8 @@ def test_tesseract_executable_skips_broken_path_binary(
     monkeypatch.setattr(shutil, "which", lambda command: str(broken))
     monkeypatch.setattr(parser_image, "TESSERACT_CANDIDATES", (str(working),))
     monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setenv("MIANOTES_SETTINGS_PATH", str(tmp_path / "missing-settings.json"))
+    get_settings.cache_clear()
 
     assert parser_image.tesseract_executable() == str(working)
 

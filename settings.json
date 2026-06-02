@@ -1,0 +1,54 @@
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8200
+  },
+  "database": {
+    "adapter": "sqlite",
+    "url": "env.MIANOTES_DATABASE_URL"
+  },
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-5-nano",
+    "baseUrl": "",
+    "apiKey": "env.MIANOTES_LLM_API_KEY"
+  },
+  "vlm": {
+    "provider": "openai",
+    "model": "gpt-5-nano",
+    "baseUrl": "",
+    "apiKey": "env.MIANOTES_VLM_API_KEY"
+  },
+  "binaries": {
+    "ffmpeg": [
+      "ffmpeg",
+      "/opt/homebrew/bin/ffmpeg",
+      "/usr/local/bin/ffmpeg",
+      "/usr/bin/ffmpeg"
+    ],
+    "ffprobe": [
+      "ffprobe",
+      "/opt/homebrew/bin/ffprobe",
+      "/usr/local/bin/ffprobe",
+      "/usr/bin/ffprobe"
+    ],
+    "flac": [
+      "flac",
+      "/opt/homebrew/bin/flac",
+      "/usr/local/bin/flac",
+      "/usr/bin/flac"
+    ],
+    "metaflac": [
+      "metaflac",
+      "/opt/homebrew/bin/metaflac",
+      "/usr/local/bin/metaflac",
+      "/usr/bin/metaflac"
+    ],
+    "tesseract": [
+      "tesseract",
+      "/opt/homebrew/bin/tesseract",
+      "/usr/local/bin/tesseract",
+      "/usr/bin/tesseract"
+    ]
+  }
+}

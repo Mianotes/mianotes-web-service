@@ -9,6 +9,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services.parser_runtime import (
     log_parser_command,
     subprocess_response,
@@ -29,6 +30,14 @@ AUDIO_TOOL_VERSION_ARGS = {
     "metaflac": "--version",
 }
 YOUTUBE_DOWNLOADER_CANDIDATES = ("yt-dlp", "youtube-dl")
+
+
+def configured_binary_candidates(name: str, fallback: tuple[str, ...]) -> tuple[str, ...]:
+    try:
+        candidates = get_settings().binaries.get(name, [])
+    except Exception:
+        candidates = []
+    return tuple(candidates) or fallback
 
 
 def executable_version_works(path: str, *, version_arg: str = "-version") -> bool:
@@ -88,7 +97,7 @@ def prefer_working_audio_tools() -> Iterator[None]:
 
 def ffmpeg_executable() -> str | None:
     seen: set[str] = set()
-    for candidate in FFMPEG_CANDIDATES:
+    for candidate in configured_binary_candidates("ffmpeg", FFMPEG_CANDIDATES):
         if "/" in candidate:
             path_candidate = candidate if Path(candidate).exists() else None
             log_parser_command(f"check executable {candidate}", path_candidate or "not found")

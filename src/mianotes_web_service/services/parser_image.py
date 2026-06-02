@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services.parser_markdown import normalise_ocr_text
 from mianotes_web_service.services.parser_runtime import (
     log_parser_command,
@@ -16,6 +17,7 @@ from mianotes_web_service.services.parser_runtime import (
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
 OCR_MIN_CHARACTERS = 20
 TESSERACT_CANDIDATES = (
+    "tesseract",
     "/opt/homebrew/bin/tesseract",
     "/usr/local/bin/tesseract",
     "/usr/bin/tesseract",
@@ -27,22 +29,29 @@ def is_image(path: Path) -> bool:
 
 
 def tesseract_executable() -> str | None:
-    candidates: list[str] = []
-    path_candidate = shutil.which("tesseract")
-    log_parser_command("shutil.which('tesseract')", path_candidate or "not found")
-    if path_candidate:
-        candidates.append(path_candidate)
-    candidates.extend(TESSERACT_CANDIDATES)
+    try:
+        configured_candidates = tuple(get_settings().binaries.get("tesseract", []))
+    except Exception:
+        configured_candidates = ()
+    candidates = configured_candidates or TESSERACT_CANDIDATES
 
     seen: set[str] = set()
     for candidate in candidates:
-        if candidate in seen or not Path(candidate).is_file():
+        if candidate in seen:
             continue
         seen.add(candidate)
-        command = shlex.join([candidate, "--version"])
+        if "/" in candidate:
+            path_candidate = candidate if Path(candidate).is_file() else None
+            log_parser_command(f"check executable {candidate}", path_candidate or "not found")
+        else:
+            path_candidate = shutil.which(candidate)
+            log_parser_command(f"shutil.which('{candidate}')", path_candidate or "not found")
+        if not path_candidate:
+            continue
+        command = shlex.join([path_candidate, "--version"])
         try:
             completed = subprocess.run(
-                [candidate, "--version"],
+                [path_candidate, "--version"],
                 capture_output=True,
                 check=False,
                 text=True,
@@ -57,7 +66,7 @@ def tesseract_executable() -> str | None:
             status="succeeded" if completed.returncode == 0 else "failed",
         )
         if completed.returncode == 0:
-            return candidate
+            return path_candidate
     log_parser_command("find tesseract executable", "no working executable found", status="failed")
     return None
 
