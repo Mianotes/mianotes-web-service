@@ -92,6 +92,26 @@ def test_search_notes_from_markdown_and_api_token(client: TestClient):
     assert token_search.json()[0]["note"]["id"] == note["id"]
 
 
+def test_search_markdown_files_respects_limit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_DATA_DIR", str(tmp_path / "data"))
+    get_settings.cache_clear()
+    markdown_dir = tmp_path / "markdown"
+    markdown_dir.mkdir()
+    for index in range(5):
+        (markdown_dir / f"note-{index}.md").write_text(
+            f"shared query appears in note {index}\n",
+            encoding="utf-8",
+        )
+
+    matches = search_markdown_files(markdown_dir, "shared query", limit=2)
+
+    assert len(matches) == 2
+    get_settings.cache_clear()
+
+
 def test_context_returns_full_note_text_from_folder_and_title(client: TestClient):
     _join_admin(client)
     mianotes = _folder_by_name(client, "Mianotes")

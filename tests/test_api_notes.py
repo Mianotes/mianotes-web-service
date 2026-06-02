@@ -1,9 +1,11 @@
 from collections.abc import Generator
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -20,6 +22,12 @@ from mianotes_web_service.services.storage_settings import (
     write_storage_config,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
+
+
+def _png_bytes(size: tuple[int, int] = (16, 16)) -> bytes:
+    image_bytes = BytesIO()
+    Image.new("RGB", size, "#1684ff").save(image_bytes, format="PNG")
+    return image_bytes.getvalue()
 
 
 @pytest.fixture
@@ -797,6 +805,35 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert source_path.parent.exists()
 
 
+def test_create_note_from_file_rejects_oversized_upload(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_MAX_UPLOAD_BYTES", "5")
+    get_settings.cache_clear()
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "too-big-upload@example.com",
+            "name": "Too Big Upload",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Uploads"}).json()
+
+    response = client.post(
+        "/api/notes/from-file",
+        data={"folder_id": folder["id"], "title": "Oversized"},
+        files={"file": ("oversized.txt", b"123456", "text/plain")},
+    )
+
+    assert response.status_code == 413
+    assert not list((tmp_path / "data" / "markdown" / "uploads").glob("oversized-*.md"))
+    get_settings.cache_clear()
+
+
 def test_create_note_from_file_uses_requested_workspace_storage(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -921,7 +958,7 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
 
     response = client.post(
         f"/api/notes/{note['id']}/images",
-        files={"image": ("diagram.png", b"fake image bytes", "image/png")},
+        files={"image": ("diagram.png", _png_bytes(), "image/png")},
     )
 
     assert response.status_code == 201
@@ -930,7 +967,7 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
     assert image_url.endswith(".png")
     image_response = client.get(image_url)
     assert image_response.status_code == 200
-    assert image_response.content == b"fake image bytes"
+    assert image_response.content.startswith(b"\x89PNG")
 
     image_directory = tmp_path / "data" / "markdown" / "editor-images" / "images" / note["id"][:8]
     image_files = list(image_directory.glob("*.png"))
@@ -942,6 +979,74 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
     assert not (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
     assert image_files[0].exists()
     assert image_files[0].parent.exists()
+
+
+def test_upload_note_image_rejects_oversized_file(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_MAX_EDITOR_IMAGE_BYTES", "5")
+    get_settings.cache_clear()
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "editor-image-too-large@example.com",
+            "name": "Editor Image Too Large",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Editor Images"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Diagram note",
+            "text": "This note needs a diagram.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/images",
+        files={"image": ("diagram.png", _png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 413
+    get_settings.cache_clear()
+
+
+def test_upload_note_image_rejects_too_many_pixels(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_MAX_IMAGE_PIXELS", "10")
+    get_settings.cache_clear()
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "editor-image-too-many-pixels@example.com",
+            "name": "Editor Image Too Many Pixels",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Editor Images"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Diagram note",
+            "text": "This note needs a diagram.",
+        },
+    ).json()
+
+    response = client.post(
+        f"/api/notes/{note['id']}/images",
+        files={"image": ("diagram.png", _png_bytes(), "image/png")},
+    )
+
+    assert response.status_code == 413
+    get_settings.cache_clear()
 
 
 @pytest.mark.parametrize("filename", ["voice.mp3", "voice.m4a", "voice.wav", "voice.mp4"])

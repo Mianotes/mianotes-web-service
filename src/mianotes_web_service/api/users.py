@@ -24,6 +24,12 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.auth import set_user_password
 from mianotes_web_service.services.storage import make_username
+from mianotes_web_service.services.upload_limits import (
+    ImageTooLargeError,
+    UploadTooLargeError,
+    ensure_image_pixel_limit,
+    read_stream_with_limit,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -68,14 +74,32 @@ def _avatar_path(user_id: str) -> Path:
 
 
 def _save_avatar(user_id: str, upload: UploadFile) -> str:
-    if upload.content_type not in SUPPORTED_AVATAR_TYPES:
+    content_type = (upload.content_type or "").split(";", 1)[0].strip().lower()
+    if content_type not in SUPPORTED_AVATAR_TYPES:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Profile photos must be JPG or PNG images",
         )
+    settings = get_settings()
     try:
-        image = Image.open(BytesIO(upload.file.read()))
+        image_bytes = read_stream_with_limit(upload.file, max_bytes=settings.max_avatar_bytes)
+        image = Image.open(BytesIO(image_bytes))
+        ensure_image_pixel_limit(
+            image.width,
+            image.height,
+            max_pixels=settings.max_image_pixels,
+        )
         image.load()
+    except UploadTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Profile photo is too large. Maximum upload size is {exc.max_bytes} bytes.",
+        ) from exc
+    except ImageTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"Profile photo is too large. Maximum image size is {exc.max_pixels} pixels.",
+        ) from exc
     except UnidentifiedImageError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

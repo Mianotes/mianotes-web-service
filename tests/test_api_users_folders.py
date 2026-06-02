@@ -289,6 +289,62 @@ def test_user_can_upload_resized_profile_photo(client: TestClient, tmp_path: Pat
     assert (tmp_path / "data" / second_payload["photo_url"].removeprefix("/")).is_file()
 
 
+def test_profile_photo_rejects_oversized_upload(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_MAX_AVATAR_BYTES", "5")
+    get_settings.cache_clear()
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "avatar-too-large@example.com",
+            "name": "Avatar Too Large",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+
+    image_bytes = BytesIO()
+    Image.new("RGB", (16, 16), "#1684ff").save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+    response = client.post(
+        f"/api/users/{user['id']}/photo",
+        files={"photo": ("avatar.png", image_bytes, "image/png")},
+    )
+
+    assert response.status_code == 413
+    get_settings.cache_clear()
+
+
+def test_profile_photo_rejects_too_many_pixels(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_MAX_IMAGE_PIXELS", "10")
+    get_settings.cache_clear()
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": "avatar-too-many-pixels@example.com",
+            "name": "Avatar Too Many Pixels",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+
+    image_bytes = BytesIO()
+    Image.new("RGB", (16, 16), "#1684ff").save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+    response = client.post(
+        f"/api/users/{user['id']}/photo",
+        files={"photo": ("avatar.png", image_bytes, "image/png")},
+    )
+
+    assert response.status_code == 413
+    get_settings.cache_clear()
+
+
 def test_profile_photo_serves_from_global_data_after_workspace_switch(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

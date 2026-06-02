@@ -237,3 +237,25 @@ def test_open_workspace_requires_new_users_to_choose_password(client: TestClient
         json={"user_id": maria["id"], "password": "maria-password"},
     )
     assert logged_in.status_code == 200
+
+
+def test_session_cookie_can_be_marked_secure(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("MIANOTES_SESSION_COOKIE_SECURE", "true")
+    get_settings.cache_clear()
+
+    response = client.post(
+        "/api/auth/join",
+        json={
+            "email": "secure-cookie@example.com",
+            "name": "Secure Cookie",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+
+    assert response.status_code == 201
+    assert "Secure" in response.headers["set-cookie"]
+    get_settings.cache_clear()

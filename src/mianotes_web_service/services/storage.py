@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import re
-import shutil
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import BinaryIO
+
+from mianotes_web_service.services.upload_limits import (
+    UploadTooLargeError,
+    write_stream_to_path_with_limit,
+)
 
 SLUG_PATTERN = re.compile(r"[^a-z0-9]+")
 MARKDOWN_DIRNAME = "markdown"
@@ -112,6 +116,7 @@ class FilesystemStorage:
         filename: str,
         original_filename: str,
         source_stream: BinaryIO,
+        max_bytes: int,
     ) -> NotePaths:
         extension = Path(original_filename).suffix or ".bin"
         paths = self.note_paths(
@@ -128,8 +133,15 @@ class FilesystemStorage:
         )
         if paths.source_path is not None:
             paths.source_path.parent.mkdir(parents=True, exist_ok=True)
-            with paths.source_path.open("wb") as destination:
-                shutil.copyfileobj(source_stream, destination)
+            try:
+                write_stream_to_path_with_limit(
+                    source_stream,
+                    paths.source_path,
+                    max_bytes=max_bytes,
+                )
+            except UploadTooLargeError:
+                paths.note_path.unlink(missing_ok=True)
+                raise
         return paths
 
     def write_url_note_placeholder(

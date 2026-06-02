@@ -187,6 +187,13 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-5-nano"
     binaries: dict[str, list[str]] = Field(default_factory=dict)
+    session_cookie_secure: bool = False
+    max_upload_bytes: int = 100 * 1024 * 1024
+    max_editor_image_bytes: int = 10 * 1024 * 1024
+    max_avatar_bytes: int = 5 * 1024 * 1024
+    max_image_pixels: int = 50_000_000
+    search_timeout_seconds: float = 5.0
+    search_max_file_bytes: int = 2 * 1024 * 1024
 
     model_config = SettingsConfigDict(
         env_file=".env",

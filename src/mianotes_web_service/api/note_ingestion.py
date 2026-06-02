@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import AuthContext, AuthContextDep, NotesWriteUser
 from mianotes_web_service.api.note_access import read_note_or_404
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
@@ -42,6 +43,7 @@ from mianotes_web_service.services.storage import (
     infer_title,
     summarize_text,
 )
+from mianotes_web_service.services.upload_limits import UploadTooLargeError
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 router = APIRouter(prefix="/notes", tags=["notes"])
@@ -208,14 +210,21 @@ def create_note_from_file(
             detail="Title required",
         )
     storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
-    paths = storage.write_uploaded_file_note(
-        username=user.username,
-        folder=folder.path,
-        title=note_title,
-        filename=note_id,
-        original_filename=file.filename,
-        source_stream=file.file,
-    )
+    try:
+        paths = storage.write_uploaded_file_note(
+            username=user.username,
+            folder=folder.path,
+            title=note_title,
+            filename=note_id,
+            original_filename=file.filename,
+            source_stream=file.file,
+            max_bytes=get_settings().max_upload_bytes,
+        )
+    except UploadTooLargeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail=f"File is too large. Maximum upload size is {exc.max_bytes} bytes.",
+        ) from exc
 
     note = Note(
         id=note_id,
