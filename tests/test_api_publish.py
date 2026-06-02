@@ -17,7 +17,6 @@ from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import PublishRequest
 from mianotes_web_service.services.publishing import publish_site
 from mianotes_web_service.services.storage_settings import (
-    DEFAULT_DATABASE_FILE,
     StorageConfig,
     StorageLocation,
     write_storage_config,
@@ -90,7 +89,6 @@ def test_workspace_scoped_html_route_serves_published_files(
         config_path,
         StorageConfig(
             active_location="default",
-            database_file=DEFAULT_DATABASE_FILE,
             locations=[
                 StorageLocation(
                     id="default",
@@ -414,7 +412,6 @@ def test_publish_site_resolves_markdown_from_session_workspace(
         id="docs",
         name="Docs",
         folder_path=workspace_dir,
-        database_file="workspaces/docs.db",
     )
     session_factory = client.app.state.testing_session
 

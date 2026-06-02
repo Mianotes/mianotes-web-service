@@ -28,7 +28,6 @@ def create_app() -> FastAPI:
                 id=location.id,
                 name=location.name,
                 folder_path=location.folder_path,
-                database_file=config.database_file,
             )
             token = set_current_workspace(workspace)
             try:

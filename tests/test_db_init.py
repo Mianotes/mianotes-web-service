@@ -108,7 +108,6 @@ def test_session_token_records_current_workspace(tmp_path):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file="workspaces/research.db",
     )
 
     with SessionLocal() as session:
@@ -133,7 +132,6 @@ def test_reset_current_workspace_tolerates_different_context(tmp_path):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file="workspaces/research.db",
     )
     token = copy_context().run(set_current_workspace, workspace)
 
@@ -145,7 +143,6 @@ def test_get_session_cleanup_tolerates_different_context(tmp_path, monkeypatch):
         id="research",
         name="Research",
         folder_path=tmp_path / "research",
-        database_file="workspaces/research.db",
     )
     engine = create_database_engine(f"sqlite:///{tmp_path / 'workspaces' / 'research.db'}")
     create_workspace_database(engine)

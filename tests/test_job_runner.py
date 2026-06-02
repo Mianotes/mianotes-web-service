@@ -85,7 +85,6 @@ def test_job_runner_enqueue_uses_request_workspace(tmp_path: Path):
         id="blog",
         name="Blog",
         folder_path=tmp_path / "blog",
-        database_file="mia.db",
     )
 
     runner.enqueue(background_tasks, "job-id", workspace)

@@ -9,7 +9,6 @@ from tempfile import NamedTemporaryFile
 DEFAULT_LOCATION_ID = "default"
 WORKSPACE_DATABASE_DIR = "workspaces"
 SYSTEM_DATABASE_FILENAME = "system.db"
-DEFAULT_DATABASE_FILE = f"{WORKSPACE_DATABASE_DIR}/{{workspace_id}}.db"
 SQLITE_SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
 
 
@@ -23,7 +22,6 @@ class StorageLocation:
 @dataclass(frozen=True)
 class StorageConfig:
     active_location: str
-    database_file: str
     locations: list[StorageLocation]
 
     @property
@@ -67,7 +65,6 @@ def _default_config(default_data_dir: Path) -> StorageConfig:
     folder_path = normalise_storage_path(default_data_dir)
     return StorageConfig(
         active_location=DEFAULT_LOCATION_ID,
-        database_file=DEFAULT_DATABASE_FILE,
         locations=[
             StorageLocation(
                 id=DEFAULT_LOCATION_ID,
@@ -85,7 +82,6 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
         return config
 
     payload = json.loads(path.read_text(encoding="utf-8"))
-    database_file = DEFAULT_DATABASE_FILE
     default_folder_path = payload.get("defaultFolderPath")
     raw_locations = payload.get("allowedStorageLocations") or []
     locations: list[StorageLocation] = []
@@ -120,7 +116,6 @@ def read_storage_config(path: Path, *, default_data_dir: Path) -> StorageConfig:
 
     return StorageConfig(
         active_location=active_location,
-        database_file=database_file,
         locations=locations,
     )
 
@@ -150,7 +145,7 @@ def write_storage_config(path: Path, config: StorageConfig) -> None:
     temporary_path.replace(path)
 
 
-def ensure_storage_location(folder_path: Path, database_file: str = DEFAULT_DATABASE_FILE) -> None:
+def ensure_storage_location(folder_path: Path) -> None:
     folder_path.mkdir(parents=True, exist_ok=True)
     if not folder_path.is_dir():
         raise ValueError("Storage location must be a folder.")
@@ -166,7 +161,7 @@ def add_storage_location(
     folder_path: str,
 ) -> StorageConfig:
     normalised_path = normalise_storage_path(folder_path)
-    ensure_storage_location(normalised_path, config.database_file)
+    ensure_storage_location(normalised_path)
     location_id = _location_id(name, normalised_path)
     existing_ids = {location.id for location in config.locations}
     if location_id in existing_ids:
@@ -177,7 +172,6 @@ def add_storage_location(
     location = StorageLocation(id=location_id, name=name.strip(), folder_path=normalised_path)
     return StorageConfig(
         active_location=config.active_location,
-        database_file=config.database_file,
         locations=[location, *config.locations],
     )
 
@@ -190,7 +184,6 @@ def remove_storage_location(config: StorageConfig, *, location_id: str) -> Stora
         raise LookupError("Storage location not found.")
     return StorageConfig(
         active_location=config.active_location,
-        database_file=config.database_file,
         locations=locations,
     )
 
@@ -199,9 +192,8 @@ def activate_storage_location(config: StorageConfig, *, location_id: str) -> Sto
     location = next((item for item in config.locations if item.id == location_id), None)
     if location is None:
         raise LookupError("Storage location not found.")
-    ensure_storage_location(location.folder_path, config.database_file)
+    ensure_storage_location(location.folder_path)
     return StorageConfig(
         active_location=location.id,
-        database_file=config.database_file,
         locations=config.locations,
     )

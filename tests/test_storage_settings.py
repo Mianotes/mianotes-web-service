@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from mianotes_web_service.services.storage_settings import (
-    DEFAULT_DATABASE_FILE,
     StorageConfig,
     StorageLocation,
     add_storage_location,
@@ -14,7 +13,6 @@ from mianotes_web_service.services.storage_settings import (
 def _storage_config(tmp_path: Path) -> StorageConfig:
     return StorageConfig(
         active_location="main",
-        database_file=DEFAULT_DATABASE_FILE,
         locations=[
             StorageLocation(id="main", name="Main workspace", folder_path=tmp_path / "main"),
             StorageLocation(id="archive", name="Archive", folder_path=tmp_path / "archive"),

@@ -112,7 +112,6 @@ def _storage_response(
         )
     return StorageSettingsRead(
         active_location=active_location,
-        database_file=config.database_file,
         data_dir=str(active_folder_path),
         database_path=str(workspace_database_path(get_settings().data_dir, active_location)),
         locations=locations,
@@ -195,7 +194,6 @@ def create_storage_location(payload: StorageLocationCreate, user: AdminUser) -> 
         id=new_location.id,
         name=new_location.name,
         folder_path=new_location.folder_path,
-        database_file=next_config.database_file,
     )
     new_engine = create_database_engine(_database_url(new_location.id))
     try:

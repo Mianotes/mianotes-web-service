@@ -53,21 +53,17 @@ def system_sessionmaker() -> sessionmaker[Session]:
     )
 
 
-def workspace_for_location(location: StorageLocation, database_file: str) -> WorkspaceContext:
+def workspace_for_location(location: StorageLocation) -> WorkspaceContext:
     return WorkspaceContext(
         id=location.id,
         name=location.name,
         folder_path=location.folder_path,
-        database_file=database_file,
     )
 
 
 def configured_workspaces() -> list[WorkspaceContext]:
     config = storage_config()
-    return [
-        workspace_for_location(location, config.database_file)
-        for location in config.locations
-    ]
+    return [workspace_for_location(location) for location in config.locations]
 
 
 def default_workspace() -> WorkspaceContext:
@@ -76,8 +72,7 @@ def default_workspace() -> WorkspaceContext:
         next(
             (location for location in config.locations if location.id == config.active_location),
             config.locations[0],
-        ),
-        config.database_file,
+        )
     )
 
 
@@ -106,7 +101,7 @@ def workspace_by_reference(workspace_reference: str) -> WorkspaceContext:
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found",
         )
-    return workspace_for_location(location, config.database_file)
+    return workspace_for_location(location)
 
 
 def workspace_by_id(workspace_id: str) -> WorkspaceContext:

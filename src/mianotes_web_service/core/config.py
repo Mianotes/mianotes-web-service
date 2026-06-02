@@ -225,10 +225,7 @@ class Settings(BaseSettings):
                 self.storage_config_path,
                 default_data_dir=self.data_dir,
             )
-            ensure_storage_location(
-                storage_config.active_folder_path,
-                storage_config.database_file,
-            )
+            ensure_storage_location(storage_config.active_folder_path)
             self.database_url = f"sqlite:///{system_database_path(self.data_dir)}"
         return self
 

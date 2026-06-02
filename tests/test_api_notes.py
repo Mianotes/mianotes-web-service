@@ -15,7 +15,6 @@ from mianotes_web_service.db.models import Base, MiaJob, Note, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.storage_settings import (
-    DEFAULT_DATABASE_FILE,
     StorageConfig,
     StorageLocation,
     write_storage_config,
@@ -63,7 +62,6 @@ def test_enqueue_job_uses_session_workspace(tmp_path: Path):
         id="blog",
         name="Blog",
         folder_path=tmp_path / "blog",
-        database_file="mia.db",
     )
     request = SimpleNamespace(
         app=SimpleNamespace(state=SimpleNamespace(job_runner=FakeJobRunner()))
@@ -170,13 +168,13 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     )
 
     assert client.get(f"/data/meeting-notes/{note_filename}.md").status_code == 404
-    (tmp_path / "data" / "mia.db").write_text("private database", encoding="utf-8")
+    (tmp_path / "data" / "workspace.db").write_text("private database", encoding="utf-8")
     (tmp_path / "data" / "system.db").write_text("private system database", encoding="utf-8")
     (tmp_path / "data" / "system.db-wal").write_text(
         "private system database sidecar",
         encoding="utf-8",
     )
-    assert client.get("/mia.db").status_code == 404
+    assert client.get("/workspace.db").status_code == 404
     assert client.get("/system.db").status_code == 404
     assert client.get("/system.db-wal").status_code == 404
 
@@ -810,7 +808,6 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         config_path,
         StorageConfig(
             active_location="default",
-            database_file=DEFAULT_DATABASE_FILE,
             locations=[
                 StorageLocation(
                     id="default",

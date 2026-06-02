@@ -10,7 +10,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 export MIANOTES_DATA_DIR="$TEMP_ROOT/data"
-export MIANOTES_DATABASE_URL="sqlite:///$MIANOTES_DATA_DIR/mia.db"
+export MIANOTES_DATABASE_URL="sqlite:///$MIANOTES_DATA_DIR/system.db"
 export MIANOTES_STORAGE_CONFIG_PATH="$TEMP_ROOT/storage.json"
 
 mkdir -p "$MIANOTES_DATA_DIR"

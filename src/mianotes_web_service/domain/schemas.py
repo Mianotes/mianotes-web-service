@@ -296,7 +296,6 @@ class StorageLocationCreate(BaseModel):
 
 class StorageSettingsRead(BaseModel):
     active_location: str
-    database_file: str
     data_dir: str
     database_path: str
     locations: list[StorageLocationRead]

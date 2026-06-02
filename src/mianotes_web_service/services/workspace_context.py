@@ -13,7 +13,6 @@ class WorkspaceContext:
     id: str
     name: str
     folder_path: Path
-    database_file: str
 
 
 _current_workspace: ContextVar[WorkspaceContext | None] = ContextVar(

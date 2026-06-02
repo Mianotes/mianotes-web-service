@@ -15,7 +15,6 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services.storage_settings import (
-    DEFAULT_DATABASE_FILE,
     StorageConfig,
     StorageLocation,
     write_storage_config,
@@ -301,7 +300,6 @@ def test_profile_photo_serves_from_global_data_after_workspace_switch(
         config_path,
         StorageConfig(
             active_location="default",
-            database_file=DEFAULT_DATABASE_FILE,
             locations=[
                 StorageLocation(
                     id="default",

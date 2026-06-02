@@ -44,6 +44,5 @@ def create_all_configured_workspace_databases() -> None:
                 id=location.id,
                 name=location.name,
                 folder_path=location.folder_path,
-                database_file=config.database_file,
             )
         create_workspace_database(workspace_engine(workspace))
