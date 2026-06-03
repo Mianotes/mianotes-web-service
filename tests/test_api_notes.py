@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,14 +7,18 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.api.note_ingestion import _enqueue_job
+from mianotes_web_service.api.note_access import (
+    read_note_for_change,
+    read_note_for_response,
+)
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base, MiaJob, Note, User
+from mianotes_web_service.db.models import Base, Comment, MiaJob, Note, SourceFile, Tag, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.storage_settings import (
@@ -65,6 +70,84 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
     get_settings.cache_clear()
 
 
+@contextmanager
+def _record_sql(engine):
+    statements: list[str] = []
+
+    def capture_sql(conn, cursor, statement, parameters, context, executemany):
+        statements.append(" ".join(statement.lower().split()))
+
+    event.listen(engine, "before_cursor_execute", capture_sql)
+    try:
+        yield statements
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_sql)
+
+
+def _create_note_with_related_rows(client: TestClient, *, email_prefix: str = "loader") -> dict:
+    user = client.post(
+        "/api/auth/join",
+        json={
+            "email": f"{email_prefix}@example.com",
+            "name": "Loader User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    ).json()["user"]
+    folder = client.post("/api/folders", json={"name": "Loader Notes"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Loader Graph",
+            "text": "This note has related rows for loader tests.",
+            "tags": ["initial"],
+        },
+    ).json()
+
+    session_factory = client.app.state.testing_session_factory
+    with session_factory() as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        first_tag = session.query(Tag).filter_by(slug="initial").one()
+        second_tag = Tag(name="Performance", slug="performance")
+        db_note.tags = [first_tag, second_tag]
+        session.add_all(
+            [
+                Comment(note_id=note["id"], user_id=user["id"], body="First comment"),
+                Comment(note_id=note["id"], user_id=user["id"], body="Second comment"),
+                SourceFile(
+                    note_id=note["id"],
+                    filename="original.txt",
+                    file_path="/tmp/original.txt",
+                    original_filename="original.txt",
+                    content_type="text/plain",
+                ),
+                SourceFile(
+                    note_id=note["id"],
+                    filename="extra.txt",
+                    file_path="/tmp/extra.txt",
+                    original_filename="extra.txt",
+                    content_type="text/plain",
+                ),
+                MiaJob(
+                    user_id=user["id"],
+                    note_id=note["id"],
+                    job_type="parse_file",
+                    status="queued",
+                ),
+                MiaJob(
+                    user_id=user["id"],
+                    note_id=note["id"],
+                    job_type="parse_file",
+                    status="succeeded",
+                ),
+            ]
+        )
+        session.commit()
+    return note
+
+
 def test_enqueue_job_uses_session_workspace(tmp_path: Path):
     calls = []
 
@@ -86,6 +169,62 @@ def test_enqueue_job_uses_session_workspace(tmp_path: Path):
     _enqueue_job(request, background_tasks, "job-id", session)
 
     assert calls == [(background_tasks, "job-id", workspace)]
+
+
+def test_note_response_loader_uses_separate_collection_queries(client: TestClient):
+    note = _create_note_with_related_rows(client)
+    session_factory = client.app.state.testing_session_factory
+    with session_factory() as session:
+        engine = session.get_bind()
+
+    with _record_sql(engine) as statements:
+        with session_factory() as session:
+            loaded_note = read_note_for_response(session, note["id"])
+            assert loaded_note.user.name == "Loader User"
+            assert loaded_note.folder.name == "Loader Notes"
+            assert len(loaded_note.source_files) == 3
+            assert len(loaded_note.comments) == 2
+            assert {tag.slug for tag in loaded_note.tags} == {"initial", "performance"}
+            assert len(loaded_note.jobs) == 2
+
+    main_note_selects = [
+        statement
+        for statement in statements
+        if " from notes " in statement and "where notes.id =" in statement
+    ]
+    assert len(main_note_selects) == 1
+    main_note_select = main_note_selects[0]
+    for collection_table in ("source_files", "comments", "note_tags", "mia_jobs"):
+        assert collection_table not in main_note_select
+    assert any(" from source_files " in statement for statement in statements)
+    assert any(" from comments " in statement for statement in statements)
+    assert any(" join note_tags " in statement for statement in statements)
+    assert any(" from mia_jobs " in statement for statement in statements)
+
+
+def test_note_change_loader_does_not_load_child_collections(client: TestClient):
+    note = _create_note_with_related_rows(client, email_prefix="change-loader")
+    session_factory = client.app.state.testing_session_factory
+    with session_factory() as session:
+        engine = session.get_bind()
+
+    with _record_sql(engine) as statements:
+        with session_factory() as session:
+            loaded_note = read_note_for_change(session, note["id"])
+            assert loaded_note.user.name == "Loader User"
+            assert loaded_note.folder.name == "Loader Notes"
+
+    main_note_selects = [
+        statement
+        for statement in statements
+        if " from notes " in statement and "where notes.id =" in statement
+    ]
+    assert len(main_note_selects) == 1
+    for statement in statements:
+        assert "source_files" not in statement
+        assert "comments" not in statement
+        assert "note_tags" not in statement
+        assert "mia_jobs" not in statement
 
 
 def test_create_note_from_text_writes_files_and_db_records(client: TestClient, tmp_path: Path):

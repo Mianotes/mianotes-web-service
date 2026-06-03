@@ -23,7 +23,11 @@ from mianotes_web_service.api.dependencies import (
 )
 from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
-    read_note_or_404,
+    read_note_for_change,
+    read_note_for_delete,
+    read_note_for_response,
+    read_note_for_tag_change,
+    read_note_reference,
 )
 from mianotes_web_service.db.models import (
     Comment,
@@ -252,7 +256,7 @@ def get_note(
     user: NotesReadUser,
 ) -> NoteRead:
     return note_response(
-        read_note_or_404(session, note_id),
+        read_note_for_response(session, note_id),
         request,
         is_starred=note_is_starred(session, note_id, user.id),
         session=session,
@@ -267,12 +271,12 @@ def update_note_tags(
     request: Request,
     user: TagsWriteUser,
 ) -> NoteRead:
-    note = read_note_or_404(session, note_id)
+    note = read_note_for_tag_change(session, note_id)
     ensure_can_change_note(note, user)
     sync_note_tags(session, note, payload.tags)
     session.commit()
     return note_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
         session=session,
@@ -287,7 +291,7 @@ def update_note_star(
     request: Request,
     user: NotesWriteUser,
 ) -> NoteRead:
-    note = read_note_or_404(session, note_id)
+    note = read_note_reference(session, note_id)
     existing_star = session.scalars(
         select(NoteStar).where(NoteStar.note_id == note.id, NoteStar.user_id == user.id)
     ).one_or_none()
@@ -299,7 +303,7 @@ def update_note_star(
         )
     session.commit()
     return note_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         request,
         is_starred=payload.is_starred,
         session=session,
@@ -314,7 +318,11 @@ def update_note(
     request: Request,
     user: NotesWriteUser,
 ) -> NoteRead:
-    note = read_note_or_404(session, note_id)
+    note = (
+        read_note_for_tag_change(session, note_id)
+        if payload.tags is not None
+        else read_note_for_change(session, note_id)
+    )
     ensure_can_change_note(note, user)
 
     if payload.folder_id is not None:
@@ -359,7 +367,7 @@ def update_note(
         sync_note_tags(session, note, payload.tags)
     session.commit()
     return note_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
         session=session,
@@ -368,7 +376,7 @@ def update_note(
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
-    note = read_note_or_404(session, note_id)
+    note = read_note_for_delete(session, note_id)
     ensure_can_change_note(note, user)
     delete_note_markdown_file(note, workspace_paths_for_session(session))
     session.delete(note)

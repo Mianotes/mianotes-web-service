@@ -19,7 +19,7 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import AuthContext, AuthContextDep, NotesWriteUser
-from mianotes_web_service.api.note_access import read_note_or_404
+from mianotes_web_service.api.note_access import read_note_for_response
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
 from mianotes_web_service.db.session import get_session
@@ -169,7 +169,7 @@ def create_note_from_text(
     sync_note_tags(session, note, payload.tags)
     session.commit()
     return note_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         request,
         is_starred=note_is_starred(session, note.id, user.id),
         session=session,
@@ -272,7 +272,7 @@ def create_note_from_file(
     session.refresh(job)
     _enqueue_job(request, background_tasks, job.id, session)
     return note_ingestion_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         job,
         request,
         user,
@@ -357,7 +357,7 @@ def create_note_from_url(
     session.refresh(job)
     _enqueue_job(request, background_tasks, job.id, session)
     return note_ingestion_response(
-        read_note_or_404(session, note.id),
+        read_note_for_response(session, note.id),
         job,
         request,
         user,

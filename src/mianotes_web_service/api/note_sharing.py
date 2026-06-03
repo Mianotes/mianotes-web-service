@@ -12,8 +12,11 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.api.dependencies import ShareWriteUser
 from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
-    read_note_by_share_token,
-    read_note_or_404,
+    read_note_for_change,
+    read_note_reference,
+    read_shared_note_for_avatar,
+    read_shared_note_for_response,
+    read_shared_note_for_source_file,
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.session import get_session
@@ -76,7 +79,7 @@ def _shared_workspace_session(
 )
 def get_shared_note(workspace_id: str, token: str, request: Request) -> NoteRead:
     with _shared_workspace_session(workspace_id, request) as session:
-        note = read_note_by_share_token(session, token)
+        note = read_shared_note_for_response(session, token)
         return note_response(note, request, share_token=token, session=session)
 
 
@@ -91,7 +94,7 @@ def get_legacy_shared_note(token: str, request: Request) -> NoteRead:
 @router.get("/shared/workspaces/{workspace_id}/{token}/avatar", name="get_shared_avatar")
 def get_shared_avatar(workspace_id: str, token: str, request: Request) -> FileResponse:
     with _shared_workspace_session(workspace_id, request) as session:
-        note = read_note_by_share_token(session, token)
+        note = read_shared_note_for_avatar(session, token)
         if note.user is None or not note.user.avatar_path:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
@@ -115,7 +118,7 @@ def get_shared_source_file(
     request: Request,
 ) -> FileResponse:
     with _shared_workspace_session(workspace_id, request) as session:
-        note = read_note_by_share_token(session, token)
+        note = read_shared_note_for_source_file(session, token)
         source_file = next(
             (candidate for candidate in note.source_files if candidate.id == source_file_id),
             None,
@@ -135,7 +138,7 @@ def create_note_share(
     request: Request,
     _user: ShareWriteUser,
 ) -> dict[str, str]:
-    note = read_note_or_404(session, note_id)
+    note = read_note_reference(session, note_id)
     secret = get_share_secret(session, create=True)
     if secret is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -158,7 +161,7 @@ def create_note_share(
 
 @router.delete("/{note_id}/share", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note_share(note_id: str, session: SessionDep, user: ShareWriteUser) -> None:
-    note = read_note_or_404(session, note_id)
+    note = read_note_for_change(session, note_id)
     ensure_can_change_note(note, user)
     note.share_token_hash = None
     note.shared_at = None

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import CommentsWriteUser, NotesReadUser
-from mianotes_web_service.api.note_access import read_note_or_404
+from mianotes_web_service.api.note_access import read_note_for_comments, read_note_reference
 from mianotes_web_service.db.models import Comment
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
@@ -43,7 +43,7 @@ def get_note_comments(
     session: SessionDep,
     user: NotesReadUser,
 ) -> list[CommentRead]:
-    note = read_note_or_404(session, note_id)
+    note = read_note_for_comments(session, note_id)
     return [
         CommentRead.model_validate(comment)
         for comment in sorted(note.comments, key=lambda item: item.created_at)
@@ -63,7 +63,7 @@ def create_note_comment(
     session: SessionDep,
     user: CommentsWriteUser,
 ) -> Comment | MiaPromptRead:
-    note = read_note_or_404(session, note_id)
+    note = read_note_reference(session, note_id)
     prompt = _mia_prompt(payload.body)
     if prompt is not None:
         try:
@@ -113,7 +113,7 @@ def update_note_comment(
     session: SessionDep,
     user: CommentsWriteUser,
 ) -> Comment:
-    read_note_or_404(session, note_id)
+    read_note_reference(session, note_id)
     comment = session.get(Comment, comment_id)
     if comment is None or comment.note_id != note_id or not comment.body:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
@@ -135,7 +135,7 @@ def delete_note_comment(
     session: SessionDep,
     user: CommentsWriteUser,
 ) -> None:
-    read_note_or_404(session, note_id)
+    read_note_reference(session, note_id)
     comment = session.get(Comment, comment_id)
     if comment is None or comment.note_id != note_id or not comment.body:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")

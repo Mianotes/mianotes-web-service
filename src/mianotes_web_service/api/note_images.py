@@ -10,7 +10,7 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import NotesWriteUser
-from mianotes_web_service.api.note_access import ensure_can_change_note, read_note_or_404
+from mianotes_web_service.api.note_access import ensure_can_change_note, read_note_for_change
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services.note_responses import file_url
@@ -48,7 +48,7 @@ def upload_note_image(
     user: NotesWriteUser,
     image: Annotated[UploadFile, File()],
 ) -> dict[str, str]:
-    note = read_note_or_404(session, note_id)
+    note = read_note_for_change(session, note_id)
     ensure_can_change_note(note, user)
     if not image.filename:
         raise HTTPException(
