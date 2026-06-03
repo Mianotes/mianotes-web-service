@@ -50,6 +50,12 @@ from mianotes_web_service.services.parser_markdown import (
 from mianotes_web_service.services.parser_markitdown import (
     convert_with_markitdown as _convert_with_markitdown,
 )
+from mianotes_web_service.services.parser_pdf import (
+    is_pdf as _is_pdf,
+)
+from mianotes_web_service.services.parser_pdf import (
+    tesseract_pdf_ocr as _tesseract_pdf_ocr,
+)
 from mianotes_web_service.services.parser_runtime import (
     emit_parser_text_update as _emit_parser_text_update,
 )
@@ -167,9 +173,17 @@ class MarkItDownParser:
                 **markitdown_llm_options(),
             )
         except MiaUnavailable:
-            return DOCUMENT_UNREADABLE_MESSAGE
+            text = ""
         text = normalise_parsed_markdown(text)
-        return text if text.strip() else DOCUMENT_UNREADABLE_MESSAGE
+        if text.strip():
+            return text
+
+        if _is_pdf(path):
+            pdf_text = _tesseract_pdf_ocr(path)
+            if pdf_text:
+                return pdf_text
+
+        return DOCUMENT_UNREADABLE_MESSAGE
 
     def _parse_audio(self, path: Path) -> ParsedDocument:
         with _prefer_working_audio_tools():

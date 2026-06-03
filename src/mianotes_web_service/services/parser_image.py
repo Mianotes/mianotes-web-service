@@ -129,8 +129,8 @@ def preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | Non
     return output_path
 
 
-def tesseract_ocr(path: Path) -> str | None:
-    executable = tesseract_executable()
+def tesseract_ocr(path: Path, *, executable: str | None = None) -> str | None:
+    executable = executable or tesseract_executable()
     if executable is None:
         return None
 

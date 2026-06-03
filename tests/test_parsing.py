@@ -12,6 +12,7 @@ from mianotes_web_service.services import (
     parser_audio,
     parser_image,
     parser_markitdown,
+    parser_pdf,
     parser_tools,
     parser_url,
     parsing,
@@ -199,6 +200,97 @@ def test_document_parser_removes_unfenced_ocr_markers_and_self_closes_breaks(
         "| --- | --- |\n"
         "| Strategy<br />Vision | Delivery<br />Timeline |"
     )
+
+
+def test_document_parser_uses_local_tesseract_for_blank_pdf(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+    rendered_pages: list[Path] = []
+    tesseract = tmp_path / "tesseract"
+    tesseract.write_text("fake executable", encoding="utf-8")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, _path: str):
+            return SimpleNamespace(text_content="")
+
+    def fake_render_pdf_pages(_source_path: Path, output_dir: Path) -> list[Path]:
+        first_page = output_dir / "page-0001.png"
+        second_page = output_dir / "page-0002.png"
+        first_page.write_bytes(b"page one")
+        second_page.write_bytes(b"page two")
+        rendered_pages.extend([first_page, second_page])
+        return [first_page, second_page]
+
+    def fake_run(args, **_kwargs):
+        if args[-1] == "--version":
+            return SimpleNamespace(returncode=0, stdout="tesseract 5.5.0", stderr="")
+        page_name = Path(args[1]).name
+        return SimpleNamespace(returncode=0, stdout=f"Text from {page_name}", stderr="")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("LLM is not configured")),
+    )
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(shutil, "which", lambda command: str(tesseract))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_pdf, "render_pdf_pages_for_ocr", fake_render_pdf_pages)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+ocr"
+    assert parsed.text == (
+        "## Document OCR\n\n"
+        "## Page 1\n\n"
+        "Text from page-0001.png\n\n"
+        "## Page 2\n\n"
+        "Text from page-0002.png"
+    )
+    assert len(rendered_pages) == 2
+
+
+def test_document_parser_reports_unreadable_when_pdf_ocr_has_no_text(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, _path: str):
+            return SimpleNamespace(text_content="")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("LLM is not configured")),
+    )
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(parser_pdf, "tesseract_pdf_ocr", lambda _path: None)
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+ocr"
+    assert parsed.text == DOCUMENT_UNREADABLE_MESSAGE
 
 
 def test_document_parser_self_closes_html_void_tags(
