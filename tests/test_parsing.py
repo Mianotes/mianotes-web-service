@@ -1028,20 +1028,33 @@ def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.M
     requests = []
 
     class FakeResponse:
+        headers = {}
+
         def __enter__(self):
             return self
 
         def __exit__(self, *_args):
             return None
 
-        def read(self):
+        def geturl(self):
+            return "https://example.com"
+
+        def read(self, _size: int = -1):
+            if getattr(self, "_read", False):
+                return b""
+            self._read = True
             return b"<html><body>ok</body></html>"
 
-    def fake_urlopen(request, timeout: int):
+    def fake_open_url(request, *, timeout: int):
         requests.append((request, timeout))
         return FakeResponse()
 
-    monkeypatch.setattr(parser_url, "urlopen", fake_urlopen)
+    monkeypatch.setattr(
+        parser_url,
+        "_resolve_host_addresses",
+        lambda _hostname: [parser_url.ipaddress.ip_address("93.184.216.34")],
+    )
+    monkeypatch.setattr(parser_url, "_open_url", fake_open_url)
     output_path = tmp_path / "page.html"
 
     fetched_path = fetch_url_to_html("https://example.com", output_path)
@@ -1050,6 +1063,73 @@ def test_fetch_url_uses_browser_user_agent(tmp_path: Path, monkeypatch: pytest.M
     assert output_path.read_text(encoding="utf-8") == "<html><body>ok</body></html>"
     assert requests[0][0].get_header("User-agent") == DEFAULT_BROWSER_USER_AGENT
     assert requests[0][1] == 30
+
+
+def test_fetch_url_rejects_private_hosts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def fake_open_url(*_args, **_kwargs):
+        raise AssertionError("private hosts should be rejected before fetching")
+
+    monkeypatch.setattr(parser_url, "_open_url", fake_open_url)
+
+    with pytest.raises(ParserError, match="URL host is not allowed"):
+        fetch_url_to_html("http://127.0.0.1/admin", tmp_path / "page.html")
+
+
+def test_fetch_url_enforces_max_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    class FakeResponse:
+        headers = {}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def geturl(self):
+            return "https://example.com"
+
+        def read(self, _size: int = -1):
+            if getattr(self, "_read", False):
+                return b""
+            self._read = True
+            return b"too large"
+
+    monkeypatch.setattr(
+        parser_url,
+        "_resolve_host_addresses",
+        lambda _hostname: [parser_url.ipaddress.ip_address("93.184.216.34")],
+    )
+    monkeypatch.setattr(parser_url, "_open_url", lambda *_args, **_kwargs: FakeResponse())
+    output_path = tmp_path / "page.html"
+
+    with pytest.raises(ParserError, match="URL response is too large"):
+        fetch_url_to_html("https://example.com", output_path, max_bytes=3)
+
+    assert not output_path.exists()
+
+
+def test_fetch_url_rejects_private_redirects(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    def fake_resolve(hostname: str):
+        if hostname == "example.com":
+            return [parser_url.ipaddress.ip_address("93.184.216.34")]
+        if hostname == "127.0.0.1":
+            return [parser_url.ipaddress.ip_address("127.0.0.1")]
+        raise AssertionError(hostname)
+
+    def fake_open_url(_request, *, timeout: int):
+        raise parser_url.HTTPError(
+            "https://example.com",
+            302,
+            "Found",
+            {"Location": "http://127.0.0.1/admin"},
+            None,
+        )
+
+    monkeypatch.setattr(parser_url, "_resolve_host_addresses", fake_resolve)
+    monkeypatch.setattr(parser_url, "_open_url", fake_open_url)
+
+    with pytest.raises(ParserError, match="URL host is not allowed"):
+        fetch_url_to_html("https://example.com", tmp_path / "page.html")
 
 
 def test_parse_url_fetches_html_then_converts_local_file(

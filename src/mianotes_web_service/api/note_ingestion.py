@@ -36,7 +36,8 @@ from mianotes_web_service.services.note_responses import (
     note_response,
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
-from mianotes_web_service.services.parser_url import url_source_extension
+from mianotes_web_service.services.parser_types import ParserError
+from mianotes_web_service.services.parser_url import url_source_extension, validate_fetch_url
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import (
     FilesystemStorage,
@@ -293,6 +294,13 @@ def create_note_from_url(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
 
     url = str(payload.url)
+    try:
+        validate_fetch_url(url)
+    except ParserError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
     parsed_url = urlparse(url)
     title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
     source_extension = url_source_extension(url) or ".html"

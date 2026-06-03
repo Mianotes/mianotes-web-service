@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Header, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Header, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from mianotes_web_service.api.dependencies import (
     auth_context_from_bearer_token,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import AppSetting, User
+from mianotes_web_service.db.models import AppSetting, SessionToken, User
 from mianotes_web_service.domain.schemas import (
     AgentSessionRead,
     EmailCheck,
@@ -272,5 +272,19 @@ def create_agent_session(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(response: Response) -> None:
-    response.delete_cookie(SESSION_COOKIE_NAME)
+def logout(
+    response: Response,
+    session: SessionDep,
+    session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
+) -> None:
+    if session_token:
+        token = session.get(SessionToken, session_token)
+        if token is not None:
+            session.delete(token)
+            session.commit()
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        secure=get_settings().session_cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )

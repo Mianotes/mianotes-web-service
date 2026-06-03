@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import importlib
+import ipaddress
 import re
+import socket
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.services.parser_runtime import log_parser_command
 from mianotes_web_service.services.parser_types import ParserError
 
@@ -42,6 +45,21 @@ REMOTE_FILE_EXTENSIONS = {
     ".txt",
     ".wav",
 }
+REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 5
+READ_CHUNK_BYTES = 1024 * 1024
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, *_args, **_kwargs):  # type: ignore[override]
+        return None
+
+
+_URL_OPENER = build_opener(NoRedirectHandler)
+
+
+def _open_url(request: Request, *, timeout: int):
+    return _URL_OPENER.open(request, timeout=timeout)
 
 
 def trafilatura_module():
@@ -109,29 +127,114 @@ def url_source_extension(url: str) -> str | None:
     return None
 
 
+def _resolve_host_addresses(hostname: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    try:
+        return [ipaddress.ip_address(hostname)]
+    except ValueError:
+        pass
+
+    try:
+        results = socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise ParserError(f"Could not resolve URL host: {hostname}") from exc
+
+    addresses: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
+    for result in results:
+        address = result[4][0]
+        try:
+            parsed_address = ipaddress.ip_address(address)
+        except ValueError:
+            continue
+        if parsed_address not in addresses:
+            addresses.append(parsed_address)
+    if not addresses:
+        raise ParserError(f"Could not resolve URL host: {hostname}")
+    return addresses
+
+
+def validate_fetch_url(url: str) -> None:
+    try:
+        parsed = urlparse(url)
+    except ValueError as exc:
+        raise ParserError("URL is not valid.") from exc
+    if parsed.scheme not in {"http", "https"}:
+        raise ParserError("Only HTTP and HTTPS URLs can be imported.")
+    if not parsed.hostname:
+        raise ParserError("URL host is required.")
+
+    addresses = _resolve_host_addresses(parsed.hostname)
+    if any(not address.is_global for address in addresses):
+        raise ParserError("URL host is not allowed.")
+
+
+def _response_content_length(response) -> int | None:
+    value = response.headers.get("Content-Length") if hasattr(response, "headers") else None
+    if not value:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
 def fetch_url_to_file(
     url: str,
     output_path: Path,
     *,
     user_agent: str = DEFAULT_BROWSER_USER_AGENT,
     timeout: int = 30,
+    max_bytes: int | None = None,
 ) -> Path:
-    request = Request(url, headers={"User-Agent": user_agent})
-    command = f"GET {url}"
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            content = response.read()
-    except (HTTPError, URLError, TimeoutError) as exc:
-        log_parser_command(command, str(exc), status="failed")
-        raise ParserError(f"Could not fetch URL: {exc}") from exc
+    if max_bytes is None:
+        max_bytes = get_settings().max_url_fetch_bytes
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(content)
-    log_parser_command(
-        command,
-        f"saved {len(content)} bytes to {output_path.name}",
-        status="succeeded",
-    )
-    return output_path
+    current_url = url
+    command = f"GET {current_url}"
+    try:
+        for _redirect_count in range(MAX_REDIRECTS + 1):
+            validate_fetch_url(current_url)
+            command = f"GET {current_url}"
+            request = Request(current_url, headers={"User-Agent": user_agent})
+            try:
+                with _open_url(request, timeout=timeout) as response:
+                    response_url = getattr(response, "geturl", lambda: current_url)()
+                    validate_fetch_url(response_url)
+                    content_length = _response_content_length(response)
+                    if content_length is not None and content_length > max_bytes:
+                        raise ParserError("URL response is too large.")
+
+                    total_bytes = 0
+                    with output_path.open("wb") as output:
+                        while True:
+                            chunk = response.read(READ_CHUNK_BYTES)
+                            if not chunk:
+                                break
+                            total_bytes += len(chunk)
+                            if total_bytes > max_bytes:
+                                raise ParserError("URL response is too large.")
+                            output.write(chunk)
+
+                    log_parser_command(
+                        command,
+                        f"saved {total_bytes} bytes to {output_path.name}",
+                        status="succeeded",
+                    )
+                    return output_path
+            except HTTPError as exc:
+                if exc.code not in REDIRECT_STATUS_CODES:
+                    raise
+                location = exc.headers.get("Location")
+                if not location:
+                    raise ParserError("URL redirect is missing a destination.") from exc
+                current_url = urljoin(current_url, location)
+        raise ParserError("URL has too many redirects.")
+    except (HTTPError, URLError, TimeoutError, ParserError) as exc:
+        output_path.unlink(missing_ok=True)
+        log_parser_command(command, str(exc), status="failed")
+        if isinstance(exc, ParserError):
+            raise
+        raise ParserError(f"Could not fetch URL: {exc}") from exc
 
 
 def fetch_url_to_html(
@@ -140,12 +243,14 @@ def fetch_url_to_html(
     *,
     user_agent: str = DEFAULT_BROWSER_USER_AGENT,
     timeout: int = 30,
+    max_bytes: int | None = None,
 ) -> Path:
     return fetch_url_to_file(
         url,
         output_path,
         user_agent=user_agent,
         timeout=timeout,
+        max_bytes=max_bytes,
     )
 
 

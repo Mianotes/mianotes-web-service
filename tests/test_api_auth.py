@@ -11,6 +11,7 @@ from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
+from mianotes_web_service.services.auth import SESSION_COOKIE_NAME
 
 
 @pytest.fixture
@@ -144,6 +145,29 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     )
     assert logged_in.status_code == 200
     assert logged_in.json()["user"]["id"] == admin["id"]
+
+
+def test_logout_revokes_server_side_session_token(client: TestClient):
+    setup = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    assert setup.status_code == 201
+    copied_cookie = client.cookies.get(SESSION_COOKIE_NAME)
+    assert copied_cookie is not None
+
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 204
+
+    client.cookies.set(SESSION_COOKIE_NAME, copied_cookie)
+    revoked_session = client.get("/api/auth/session")
+
+    assert revoked_session.status_code == 401
 
 
 def test_admin_only_workspace_blocks_new_accounts(client: TestClient):

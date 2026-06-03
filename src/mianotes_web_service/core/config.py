@@ -192,6 +192,7 @@ class Settings(BaseSettings):
     max_editor_image_bytes: int = 10 * 1024 * 1024
     max_avatar_bytes: int = 5 * 1024 * 1024
     max_image_pixels: int = 50_000_000
+    max_url_fetch_bytes: int = 50 * 1024 * 1024
     search_timeout_seconds: float = 5.0
     search_max_file_bytes: int = 2 * 1024 * 1024
 
