@@ -15,6 +15,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base, Folder, Note, PublishedSite, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import PublishRequest
+from mianotes_web_service.services.published_downloads import stream_file_and_remove
 from mianotes_web_service.services.publishing import publish_site
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
@@ -72,6 +73,39 @@ def _create_note(client: TestClient, folder_id: str, title: str, text: str) -> d
             "title": title,
             "text": text,
             "tags": ["Docs"],
+        },
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+def _publish_single_note_site(
+    client: TestClient,
+    *,
+    folder_name: str = "Published Downloads",
+    version: str = "0.8.0",
+) -> dict:
+    folder = client.post("/api/folders", json={"name": folder_name}).json()
+    note = _create_note(
+        client,
+        folder["id"],
+        "Downloadable",
+        "This note belongs in the published ZIP.",
+    )
+    note_path = f"downloadable-{note['id'][:8]}.html"
+    response = client.post(
+        "/api/publish",
+        json={
+            "folder_id": folder["id"],
+            "theme": "mialight",
+            "site_configuration": {"version": version, "headerLinks": []},
+            "navigation": [
+                {
+                    "title": folder_name,
+                    "items": [{"title": "Downloadable", "path": note_path}],
+                }
+            ],
+            "updated_notes": [{"title": "Downloadable", "path": note_path}],
         },
     )
     assert response.status_code == 201
@@ -363,6 +397,46 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert next_draft["site_configuration"]["showPreviousVersions"] is True
     assert next_draft["navigation"] == payload["navigation"]
     assert next_draft["updated_notes"] == []
+
+
+def test_published_site_download_respects_file_count_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _join(client)
+    published = _publish_single_note_site(client, version="0.8.1")
+    monkeypatch.setenv("MIANOTES_MAX_PUBLISHED_SITE_DOWNLOAD_FILES", "1")
+    get_settings.cache_clear()
+
+    response = client.get(published["download_url"])
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Published site is too large to download as a ZIP."
+
+
+def test_published_site_download_respects_byte_limit(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _join(client)
+    published = _publish_single_note_site(client, version="0.8.2")
+    monkeypatch.setenv("MIANOTES_MAX_PUBLISHED_SITE_DOWNLOAD_BYTES", "10")
+    get_settings.cache_clear()
+
+    response = client.get(published["download_url"])
+
+    assert response.status_code == 413
+    assert response.json()["detail"] == "Published site is too large to download as a ZIP."
+
+
+def test_stream_file_and_remove_deletes_temporary_archive(tmp_path: Path):
+    archive_path = tmp_path / "archive.zip"
+    archive_path.write_bytes(b"abcdef")
+
+    chunks = list(stream_file_and_remove(archive_path, chunk_size=2))
+
+    assert chunks == [b"ab", b"cd", b"ef"]
+    assert not archive_path.exists()
 
 
 def test_public_markdown_file_access_uses_direct_published_lookups(client: TestClient):

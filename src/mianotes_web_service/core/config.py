@@ -195,6 +195,8 @@ class Settings(BaseSettings):
     max_url_fetch_bytes: int = 50 * 1024 * 1024
     search_timeout_seconds: float = 5.0
     search_max_file_bytes: int = 2 * 1024 * 1024
+    max_published_site_download_bytes: int = 250 * 1024 * 1024
+    max_published_site_download_files: int = 5000
 
     model_config = SettingsConfigDict(
         env_file=".env",
