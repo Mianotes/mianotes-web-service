@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+from sqlalchemy.engine import Engine
+from sqlalchemy.sql.schema import Table
+
 from .models import (
     ApiToken,
     AppSetting,
+    Base,
     Folder,
     MiaJob,
     Note,
@@ -14,6 +20,11 @@ from .models import (
     Tag,
     User,
 )
+
+
+def create_tables(target_engine: Engine, tables: Sequence[Table]) -> None:
+    Base.metadata.create_all(bind=target_engine, tables=tables)
+
 
 SYSTEM_TABLES = (
     User.__table__,

@@ -94,6 +94,8 @@ class Note(Base, TimestampMixin):
             "is_published",
             "filename",
         ),
+        Index("ix_notes_folder_title", "folder_id", "title"),
+        Index("ix_notes_folder_updated_at", "folder_id", "updated_at"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)

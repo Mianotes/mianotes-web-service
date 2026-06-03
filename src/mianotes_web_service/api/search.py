@@ -4,14 +4,12 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import selectinload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
+from mianotes_web_service.services.note_path_lookup import notes_by_matched_path
 from mianotes_web_service.services.note_responses import starred_note_ids
 from mianotes_web_service.services.paths import (
     WorkspacePaths,
@@ -23,59 +21,6 @@ from mianotes_web_service.services.search import search_markdown_files
 from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-
-def _candidate_note_path_values(match_path: Path, paths: WorkspacePaths) -> set[str]:
-    resolved_path = match_path.resolve()
-    values = {str(match_path), str(resolved_path)}
-    try:
-        values.add(str(resolved_path.relative_to(paths.data_dir.resolve())))
-    except ValueError:
-        pass
-    try:
-        values.add(str(resolved_path.relative_to(paths.markdown_root.resolve())))
-    except ValueError:
-        pass
-    return values
-
-
-def _notes_by_matched_path(
-    session: Session,
-    matched_paths: list[Path],
-    paths: WorkspacePaths,
-) -> dict[str, Note]:
-    if not matched_paths:
-        return {}
-    note_path_values = {
-        value
-        for matched_path in matched_paths
-        for value in _candidate_note_path_values(matched_path, paths)
-    }
-    notes = session.scalars(
-        select(Note)
-        .options(
-            selectinload(Note.folder),
-            selectinload(Note.source_files),
-            selectinload(Note.tags),
-        )
-        .where(Note.note_path.in_(note_path_values))
-    )
-    by_path: dict[str, Note] = {}
-    for note in notes:
-        for note_path in _resolved_note_paths(note, paths):
-            by_path[note_path] = note
-    return by_path
-
-
-def _resolved_note_paths(note: Note, paths: WorkspacePaths | None = None) -> set[str]:
-    values = {note.note_path}
-    try:
-        path = paths.note_file_path(note) if paths is not None else note_file_path(note)
-        values.add(str(path))
-        values.add(str(path.resolve()))
-    except OSError:
-        pass
-    return values
 
 
 def _file_url(request: Request, path: str | Path, data_dir: Path | None = None) -> str:
@@ -160,7 +105,7 @@ def search_notes(
             detail=str(exc),
         ) from exc
 
-    notes_by_path = _notes_by_matched_path(
+    notes_by_path = notes_by_matched_path(
         session,
         [match.path for match in matches],
         paths,

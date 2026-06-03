@@ -4,11 +4,7 @@ from sqlalchemy.engine import Engine
 
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
-from .migrations import (
-    run_all_migrations,
-    run_system_migrations,
-    run_workspace_migrations,
-)
+from .schema import SYSTEM_TABLES, WORKSPACE_TABLES, create_tables
 from .workspace_routing import (
     default_workspace,
     storage_config,
@@ -18,17 +14,17 @@ from .workspace_routing import (
 
 
 def create_system_database(target_engine: Engine | None = None) -> None:
-    run_system_migrations(target_engine or system_engine())
+    create_tables(target_engine or system_engine(), SYSTEM_TABLES)
 
 
 def create_workspace_database(target_engine: Engine | None = None) -> None:
     engine = target_engine or workspace_engine(default_workspace())
-    run_workspace_migrations(engine)
+    create_tables(engine, WORKSPACE_TABLES)
 
 
 def create_database(target_engine: Engine | None = None) -> None:
     if target_engine is not None:
-        run_all_migrations(target_engine)
+        create_tables(target_engine, (*SYSTEM_TABLES, *WORKSPACE_TABLES))
         return
     create_system_database()
     create_all_configured_workspace_databases()

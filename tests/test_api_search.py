@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
+from mianotes_web_service.api import context as context_api
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
@@ -148,9 +149,76 @@ def test_context_returns_full_note_text_from_folder_and_title(client: TestClient
     assert "Settings page context" in payload["results"][0]["text"]
 
 
+def test_context_title_lookup_reads_only_matching_notes(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _join_admin(client)
+    folder = _folder_by_name(client, "Mianotes")
+    target = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Architecture Plan",
+            "text": "The target architecture context.",
+        },
+    ).json()
+    for index in range(12):
+        client.post(
+            "/api/notes/from-text",
+            json={
+                "folder_id": folder["id"],
+                "title": f"Unrelated Note {index}",
+                "text": "This note should not be read for title context.",
+            },
+        )
+
+    original_read_note_text = context_api._read_note_text
+    read_note_ids: list[str] = []
+
+    def track_read(note, paths, *, max_chars):
+        read_note_ids.append(note.id)
+        return original_read_note_text(note, paths, max_chars=max_chars)
+
+    monkeypatch.setattr(context_api, "_read_note_text", track_read)
+
+    response = client.get(
+        "/api/context",
+        params={"folder": "Mianotes", "title": "Architecture Plan", "limit": 5},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["note"]["id"] == target["id"]
+    assert read_note_ids == [target["id"]]
+
+
+def test_context_response_caps_large_note_text(client: TestClient):
+    _join_admin(client)
+    folder = _folder_by_name(client, "Mianotes")
+    large_text = "A" * (context_api.TITLE_CONTEXT_TEXT_CHARS + 10_000)
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Large Context",
+            "text": large_text,
+        },
+    )
+
+    response = client.get(
+        "/api/context",
+        params={"folder": "Mianotes", "title": "Large Context", "limit": 5},
+    )
+
+    assert response.status_code == 200
+    text = response.json()["results"][0]["text"]
+    assert len(text) == context_api.TITLE_CONTEXT_TEXT_CHARS
+
+
 def test_context_works_with_api_token_and_search_fallback(client: TestClient):
     _join_admin(client)
     folder = _folder_by_name(client, "Mianotes")
+    other = client.post("/api/folders", json={"name": "Work"}).json()
     note = client.post(
         "/api/notes/from-text",
         json={
@@ -159,6 +227,14 @@ def test_context_works_with_api_token_and_search_fallback(client: TestClient):
             "text": "The settings page should include profile controls and model preferences.",
         },
     ).json()
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": other["id"],
+            "title": "Settings in another folder",
+            "text": "The settings page should include profile controls but this is Work.",
+        },
+    )
     token = client.post(
         "/api/tokens",
         json={"name": "Context agent", "scopes": ["notes:read"]},
