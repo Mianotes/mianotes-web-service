@@ -6,7 +6,7 @@ from shutil import rmtree
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -76,6 +76,18 @@ def _create_note(client: TestClient, folder_id: str, title: str, text: str) -> d
     )
     assert response.status_code == 201
     return response.json()
+
+
+def _capture_selects(session_factory):
+    engine = session_factory.kw["bind"]
+    statements: list[str] = []
+
+    def capture(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(" ".join(statement.lower().split()))
+
+    event.listen(engine, "before_cursor_execute", capture)
+    return statements, lambda: event.remove(engine, "before_cursor_execute", capture)
 
 
 def test_workspace_scoped_html_route_serves_published_files(
@@ -351,6 +363,56 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert next_draft["site_configuration"]["showPreviousVersions"] is True
     assert next_draft["navigation"] == payload["navigation"]
     assert next_draft["updated_notes"] == []
+
+
+def test_public_markdown_file_access_uses_direct_published_lookups(client: TestClient):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Public Markdown"}).json()
+    note = _create_note(client, folder["id"], "Published Asset", "Published asset body.")
+    note_filename = f"published-asset-{note['id'][:8]}.md"
+    payload = {
+        "folder_id": folder["id"],
+        "theme": "mialight",
+        "site_configuration": {"version": "0.4.0", "headerLinks": []},
+        "navigation": [
+            {
+                "title": "Public Markdown",
+                "items": [
+                    {
+                        "title": "Published Asset",
+                        "path": f"published-asset-{note['id'][:8]}.html",
+                    }
+                ],
+            }
+        ],
+        "updated_notes": [{"title": "Published Asset", "path": "published-asset.html"}],
+    }
+    assert client.post("/api/publish", json=payload).status_code == 201
+
+    public_client = TestClient(client.app)
+    statements, stop_capture = _capture_selects(client.app.state.testing_session)
+    try:
+        markdown_response = public_client.get(f"/markdown/public-markdown/{note_filename}")
+        source_response = public_client.get(
+            f"/markdown/public-markdown/sources/{note['id'][:8]}/original.txt"
+        )
+    finally:
+        stop_capture()
+
+    assert markdown_response.status_code == 200
+    assert source_response.status_code == 200
+    assert len(statements) == 2
+    markdown_sql, source_sql = statements
+    assert "from notes" in markdown_sql
+    assert "join folders" in markdown_sql
+    assert "notes.is_published" in markdown_sql
+    assert "notes.filename" in markdown_sql
+    assert "folders.path" in markdown_sql
+    assert "from source_files" in source_sql
+    assert "join notes" in source_sql
+    assert "join folders" in source_sql
+    assert "source_files.filename" in source_sql
+    assert "folders.path" in source_sql
 
 
 def test_publish_site_replaces_same_version_html(client: TestClient, tmp_path: Path):

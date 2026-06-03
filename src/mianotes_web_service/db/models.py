@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -66,7 +66,10 @@ class User(Base, TimestampMixin):
 
 class Folder(Base, TimestampMixin):
     __tablename__ = "folders"
-    __table_args__ = (UniqueConstraint("slug", name="uq_folders_slug"),)
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_folders_slug"),
+        Index("ix_folders_path", "path"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
@@ -84,6 +87,14 @@ class Folder(Base, TimestampMixin):
 
 class Note(Base, TimestampMixin):
     __tablename__ = "notes"
+    __table_args__ = (
+        Index(
+            "ix_notes_folder_published_filename",
+            "folder_id",
+            "is_published",
+            "filename",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
@@ -145,6 +156,7 @@ class PublishedSite(Base, TimestampMixin):
 
 class SourceFile(Base):
     __tablename__ = "source_files"
+    __table_args__ = (Index("ix_source_files_note_filename", "note_id", "filename"),)
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     note_id: Mapped[str] = mapped_column(ForeignKey("notes.id"), index=True, nullable=False)

@@ -11,6 +11,9 @@ from .schema import SYSTEM_TABLES, WORKSPACE_TABLES
 
 def run_table_migrations(target_engine: Engine, tables: Sequence[Table]) -> None:
     Base.metadata.create_all(bind=target_engine, tables=tables)
+    for table in tables:
+        for index in table.indexes:
+            index.create(bind=target_engine, checkfirst=True)
 
 
 def run_system_migrations(target_engine: Engine) -> None:

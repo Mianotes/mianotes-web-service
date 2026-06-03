@@ -43,6 +43,7 @@ from mianotes_web_service.services.auth import (
 )
 from mianotes_web_service.services.onboarding import create_onboarding_note
 from mianotes_web_service.services.storage import make_username
+from mianotes_web_service.services.user_limits import enforce_user_capacity
 from mianotes_web_service.services.workspace_context import current_data_dir
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -156,6 +157,7 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Passwords do not match",
             )
+        enforce_user_capacity(session, get_settings())
 
         user = User(
             email=email,

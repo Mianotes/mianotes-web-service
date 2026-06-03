@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import (
     NotesReadUser,
@@ -13,7 +13,7 @@ from mianotes_web_service.api.dependencies import (
     auth_context_from_bearer_token,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Note, SourceFile
+from mianotes_web_service.db.models import Folder, Note, SourceFile
 from mianotes_web_service.db.workspace_routing import workspace_by_id
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import workspace_paths_for_session
@@ -57,6 +57,27 @@ def _clean_file_path(file_path: str) -> str:
     return clean
 
 
+def _markdown_target(file_path: str, data_dir: Path) -> Path:
+    target = (data_dir / "markdown" / file_path).resolve()
+    if data_dir not in target.parents and target != data_dir:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return target
+
+
+def _folder_file_parts(file_path: str) -> tuple[str, str]:
+    folder_path, separator, filename = file_path.rpartition("/")
+    if not separator or not folder_path or not filename:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return folder_path, filename
+
+
+def _source_file_parts(file_path: str) -> tuple[str, str]:
+    folder_path, separator, source_path = file_path.partition("/sources/")
+    if not separator or not folder_path or not source_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return folder_path, f"sources/{source_path}"
+
+
 def _read_bearer_token(authorization: str | None) -> str | None:
     if authorization is None:
         return None
@@ -88,16 +109,21 @@ def _published_markdown_response(file_path: str, session: Session) -> FileRespon
 
     paths = workspace_paths_for_session(session)
     data_dir = paths.data_dir.resolve()
-    target = (data_dir / "markdown" / file_path).resolve()
-    if data_dir not in target.parents and target != data_dir:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    _markdown_target(file_path, data_dir)
 
-    notes = session.scalars(
-        select(Note).options(selectinload(Note.folder)).where(Note.is_published.is_(True))
-    ).all()
-    for note in notes:
-        if paths.note_file_path(note).resolve() == target:
-            return _file_response(f"markdown/{file_path}", data_dir=data_dir)
+    folder_path, filename = _folder_file_parts(file_path)
+    note_id = session.scalars(
+        select(Note.id)
+        .join(Note.folder)
+        .where(
+            Note.is_published.is_(True),
+            Note.filename == filename,
+            Folder.path == folder_path,
+        )
+        .limit(1)
+    ).first()
+    if note_id is not None:
+        return _file_response(f"markdown/{file_path}", data_dir=data_dir)
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
@@ -105,19 +131,22 @@ def _published_markdown_response(file_path: str, session: Session) -> FileRespon
 def _published_source_response(file_path: str, session: Session) -> FileResponse:
     paths = workspace_paths_for_session(session)
     data_dir = paths.data_dir.resolve()
-    target = (data_dir / "markdown" / file_path).resolve()
-    if data_dir not in target.parents and target != data_dir:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    _markdown_target(file_path, data_dir)
 
-    source_files = session.scalars(
-        select(SourceFile)
+    folder_path, source_filename = _source_file_parts(file_path)
+    source_file_id = session.scalars(
+        select(SourceFile.id)
         .join(SourceFile.note)
-        .options(selectinload(SourceFile.note).selectinload(Note.folder))
-        .where(Note.is_published.is_(True))
-    ).all()
-    for source_file in source_files:
-        if paths.source_file_path(source_file).resolve() == target:
-            return _file_response(f"markdown/{file_path}", data_dir=data_dir)
+        .join(Note.folder)
+        .where(
+            Note.is_published.is_(True),
+            SourceFile.filename == source_filename,
+            Folder.path == folder_path,
+        )
+        .limit(1)
+    ).first()
+    if source_file_id is not None:
+        return _file_response(f"markdown/{file_path}", data_dir=data_dir)
 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 

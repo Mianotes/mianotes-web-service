@@ -13,12 +13,13 @@ from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, UsersReadUser
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import User
+from mianotes_web_service.db.models import Folder, Note, Tag, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     UserAdminUpdate,
     UserCreate,
     UserPasswordUpdate,
+    UserProfileSummaryRead,
     UserRead,
     UserUpdate,
 )
@@ -30,6 +31,7 @@ from mianotes_web_service.services.upload_limits import (
     ensure_image_pixel_limit,
     read_stream_with_limit,
 )
+from mianotes_web_service.services.user_limits import enforce_user_capacity
 
 router = APIRouter(prefix="/users", tags=["users"])
 SessionDep = Annotated[Session, Depends(get_session)]
@@ -67,6 +69,54 @@ def _ensure_can_remove_admin(session: Session, current_user: User, target_user: 
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This workspace needs at least one admin.",
         )
+
+
+def _active_note_scope():
+    return Note.folder_id == Folder.id, Folder.archived_at.is_(None)
+
+
+def _profile_summary_map(session: Session) -> dict[str, UserProfileSummaryRead]:
+    note_join, active_folder_clause = _active_note_scope()
+    notes_by_user = {
+        user_id: int(count)
+        for user_id, count in session.execute(
+            select(Note.user_id, func.count(func.distinct(Note.id)))
+            .join(Folder, note_join)
+            .where(active_folder_clause)
+            .group_by(Note.user_id)
+        )
+    }
+    folders_by_user = {
+        user_id: int(count)
+        for user_id, count in session.execute(
+            select(Note.user_id, func.count(func.distinct(Note.folder_id)))
+            .join(Folder, note_join)
+            .where(active_folder_clause)
+            .group_by(Note.user_id)
+        )
+    }
+    tag_rows = session.execute(
+        select(Note.user_id, Tag)
+        .join(Folder, note_join)
+        .join(Note.tags)
+        .where(active_folder_clause)
+        .order_by(Note.user_id.asc(), Tag.name.asc())
+    )
+    tags_by_user: dict[str, dict[str, Tag]] = {}
+    for user_id, tag in tag_rows:
+        tags_by_user.setdefault(user_id, {})[tag.id] = tag
+
+    user_ids = set(notes_by_user) | set(folders_by_user) | set(tags_by_user)
+    return {
+        user_id: UserProfileSummaryRead(
+            user_id=user_id,
+            notes_count=notes_by_user.get(user_id, 0),
+            folders_count=folders_by_user.get(user_id, 0),
+            tags_count=len(tags_by_user.get(user_id, {})),
+            tags=list(tags_by_user.get(user_id, {}).values()),
+        )
+        for user_id in user_ids
+    }
 
 
 def _avatar_path(user_id: str) -> Path:
@@ -125,6 +175,13 @@ def _save_avatar(user_id: str, upload: UploadFile) -> str:
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(payload: UserCreate, session: SessionDep, user: AdminUser) -> User:
     email = str(payload.email).lower()
+    existing_user = session.scalars(select(User).where(User.email == email)).one_or_none()
+    if existing_user is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists",
+        )
+    enforce_user_capacity(session, get_settings())
     created_user = User(
         email=email,
         name=payload.name,
@@ -148,6 +205,22 @@ def create_user(payload: UserCreate, session: SessionDep, user: AdminUser) -> Us
 @router.get("", response_model=list[UserRead])
 def list_users(session: SessionDep, user: UsersReadUser) -> list[User]:
     return list(session.scalars(select(User).order_by(User.created_at.desc())))
+
+
+@router.get("/profile-summaries", response_model=list[UserProfileSummaryRead])
+def list_user_profile_summaries(
+    session: SessionDep,
+    user: UsersReadUser,
+) -> list[UserProfileSummaryRead]:
+    summaries = _profile_summary_map(session)
+    users = session.scalars(select(User.id).order_by(User.created_at.desc()))
+    return [
+        summaries.get(
+            user_id,
+            UserProfileSummaryRead(user_id=user_id),
+        )
+        for user_id in users
+    ]
 
 
 @router.get("/{user_id}", response_model=UserRead)

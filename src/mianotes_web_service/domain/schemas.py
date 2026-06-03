@@ -119,6 +119,14 @@ class TagRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserProfileSummaryRead(BaseModel):
+    user_id: str
+    notes_count: int = 0
+    tags_count: int = 0
+    folders_count: int = 0
+    tags: list[TagRead] = Field(default_factory=list)
+
+
 class TagsUpdate(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 

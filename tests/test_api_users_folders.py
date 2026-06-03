@@ -102,6 +102,80 @@ def test_user_crud(client: TestClient):
     assert missing.status_code == 404
 
 
+def test_user_profile_summaries_use_workspace_aggregates(client: TestClient):
+    admin = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    ).json()["user"]
+    admin_folder = client.post("/api/folders", json={"name": "Admin Docs"}).json()
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": admin_folder["id"],
+            "title": "Admin Note",
+            "text": "Admin research",
+            "tags": ["Research", "Planning"],
+        },
+    )
+    client.post("/api/auth/logout")
+    client.cookies.clear()
+    member_response = client.post(
+        "/api/auth/join",
+        json={
+            "email": "member@example.com",
+            "name": "Member",
+            "password": "instance-password",
+            "password_confirmation": "instance-password",
+        },
+    )
+    assert member_response.status_code == 201
+    member = member_response.json()["user"]
+    member_folder = client.post("/api/folders", json={"name": "Member Docs"}).json()
+    archived_folder = client.post("/api/folders", json={"name": "Archived Docs"}).json()
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": member_folder["id"],
+            "title": "Member Note",
+            "text": "Member research",
+            "tags": ["Research"],
+        },
+    )
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": archived_folder["id"],
+            "title": "Archived Member Note",
+            "text": "Hidden from active profile stats",
+            "tags": ["Archived"],
+        },
+    )
+    assert client.delete(f"/api/folders/{archived_folder['id']}").status_code == 204
+
+    response = client.get("/api/users/profile-summaries")
+
+    assert response.status_code == 200
+    summaries = {item["user_id"]: item for item in response.json()}
+    assert summaries[admin["id"]]["notes_count"] == 2
+    assert summaries[admin["id"]]["folders_count"] == 2
+    assert summaries[admin["id"]]["tags_count"] == 4
+    assert {tag["slug"] for tag in summaries[admin["id"]]["tags"]} == {
+        "getting-started",
+        "planning",
+        "research",
+        "welcome",
+    }
+    assert summaries[member["id"]]["notes_count"] == 1
+    assert summaries[member["id"]]["folders_count"] == 1
+    assert summaries[member["id"]]["tags_count"] == 1
+    assert [tag["slug"] for tag in summaries[member["id"]]["tags"]] == ["research"]
+
+
 def test_user_can_update_own_profile_but_not_others(client: TestClient):
     admin = client.post(
         "/api/auth/join",

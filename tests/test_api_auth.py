@@ -12,6 +12,7 @@ from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME
+from mianotes_web_service.services.user_limits import SQLITE_MAX_USERS_MESSAGE
 
 
 @pytest.fixture
@@ -283,3 +284,41 @@ def test_session_cookie_can_be_marked_secure(
     assert response.status_code == 201
     assert "Secure" in response.headers["set-cookie"]
     get_settings.cache_clear()
+
+
+def test_sqlite_installation_blocks_join_after_fifteen_users(client: TestClient):
+    setup = client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+            "workspace_access_mode": "open",
+        },
+    )
+    assert setup.status_code == 201
+
+    for index in range(1, 15):
+        joined = client.post(
+            "/api/auth/join",
+            json={
+                "email": f"user-{index}@example.com",
+                "name": f"User {index}",
+                "password": "member-password",
+                "password_confirmation": "member-password",
+            },
+        )
+        assert joined.status_code == 201
+
+    blocked = client.post(
+        "/api/auth/join",
+        json={
+            "email": "user-15@example.com",
+            "name": "User 15",
+            "password": "member-password",
+            "password_confirmation": "member-password",
+        },
+    )
+    assert blocked.status_code == 403
+    assert blocked.json()["detail"] == SQLITE_MAX_USERS_MESSAGE
