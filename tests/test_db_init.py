@@ -32,6 +32,11 @@ def test_create_database_uses_current_model_schema():
     columns = {column["name"] for column in inspect(engine).get_columns("mia_jobs")}
     assert "log_json" in columns
     indexes = {index["name"] for index in inspect(engine).get_indexes("notes")}
+    assert "ix_notes_created_id" in indexes
+    assert "ix_notes_folder_created_id" in indexes
+    assert "ix_notes_user_created_id" in indexes
+    assert "ix_notes_folder_filename" in indexes
+    assert "ix_notes_published_filename" in indexes
     assert "ix_notes_folder_title" in indexes
     assert "ix_notes_folder_updated_at" in indexes
 

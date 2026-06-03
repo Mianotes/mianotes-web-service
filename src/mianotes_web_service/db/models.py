@@ -88,12 +88,17 @@ class Folder(Base, TimestampMixin):
 class Note(Base, TimestampMixin):
     __tablename__ = "notes"
     __table_args__ = (
+        Index("ix_notes_created_id", "created_at", "id"),
+        Index("ix_notes_folder_created_id", "folder_id", "created_at", "id"),
+        Index("ix_notes_user_created_id", "user_id", "created_at", "id"),
         Index(
             "ix_notes_folder_published_filename",
             "folder_id",
             "is_published",
             "filename",
         ),
+        Index("ix_notes_folder_filename", "folder_id", "filename"),
+        Index("ix_notes_published_filename", "is_published", "filename"),
         Index("ix_notes_folder_title", "folder_id", "title"),
         Index("ix_notes_folder_updated_at", "folder_id", "updated_at"),
     )
@@ -133,6 +138,10 @@ class Note(Base, TimestampMixin):
 
 class PublishedSite(Base, TimestampMixin):
     __tablename__ = "published_sites"
+    __table_args__ = (
+        Index("ix_published_sites_scope_created_id", "folder_id", "tag_id", "created_at", "id"),
+        Index("ix_published_sites_created_id", "created_at", "id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
@@ -182,6 +191,7 @@ class Tag(Base, TimestampMixin):
 
 class NoteTag(Base):
     __tablename__ = "note_tags"
+    __table_args__ = (Index("ix_note_tags_tag_note", "tag_id", "note_id"),)
 
     note_id: Mapped[str] = mapped_column(
         ForeignKey("notes.id"),
@@ -249,9 +259,10 @@ class ApiToken(Base, TimestampMixin):
 class MiaJob(Base, TimestampMixin):
     __tablename__ = "mia_jobs"
     __table_args__ = (
-        Index("ix_mia_jobs_status_finished_created", "status", "finished_at", "created_at"),
-        Index("ix_mia_jobs_user_status_created", "user_id", "status", "created_at"),
-        Index("ix_mia_jobs_note_status_created", "note_id", "status", "created_at"),
+        Index("ix_mia_jobs_status_finished_created", "status", "finished_at", "created_at", "id"),
+        Index("ix_mia_jobs_user_status_created", "user_id", "status", "created_at", "id"),
+        Index("ix_mia_jobs_note_status_created", "note_id", "status", "created_at", "id"),
+        Index("ix_mia_jobs_note_created_id", "note_id", "created_at", "id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
