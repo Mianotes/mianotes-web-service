@@ -328,7 +328,7 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/system.db-wal").status_code == 404
 
 
-def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClient):
+def test_list_notes_uses_cursor_pagination_without_default_counts(client: TestClient):
     client.post(
         "/api/auth/join",
         json={
@@ -354,11 +354,11 @@ def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClie
 
     assert first_page.status_code == 200
     first_payload = first_page.json()
-    assert first_payload["total"] == 3
+    assert first_payload["total"] is None
     assert first_payload["limit"] == 2
     assert first_payload["next_cursor"]
     assert len(first_payload["items"]) == 2
-    assert first_payload["counts"]["folders"][folder["id"]] == 3
+    assert first_payload["counts"] is None
 
     second_page = client.get(
         "/api/notes",
@@ -367,11 +367,86 @@ def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClie
 
     assert second_page.status_code == 200
     second_payload = second_page.json()
-    assert second_payload["total"] == 3
+    assert second_payload["total"] is None
     assert second_payload["next_cursor"] is None
     assert len(second_payload["items"]) == 1
     returned_ids = {item["id"] for item in first_payload["items"] + second_payload["items"]}
     assert returned_ids == {note["id"] for note in notes}
+
+
+def test_list_notes_can_include_total_and_counts_when_requested(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "pagination-meta@example.com",
+            "name": "Pagination Meta User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Pagination Meta"}).json()
+    for index in range(3):
+        client.post(
+            "/api/notes/from-text",
+            json={
+                "folder_id": folder["id"],
+                "title": f"Paged meta note {index}",
+                "text": f"Body for note {index}",
+            },
+        )
+
+    response = client.get(
+        "/api/notes",
+        params={
+            "folder_id": folder["id"],
+            "limit": 2,
+            "include_total": "true",
+            "include_counts": "true",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] == 3
+    assert payload["counts"]["folders"][folder["id"]] == 3
+
+
+def test_folder_counts_are_available_without_listing_notes(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "folder-counts@example.com",
+            "name": "Folder Counts User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    first_folder = client.post("/api/folders", json={"name": "Counts One"}).json()
+    second_folder = client.post("/api/folders", json={"name": "Counts Two"}).json()
+    for index in range(2):
+        client.post(
+            "/api/notes/from-text",
+            json={
+                "folder_id": first_folder["id"],
+                "title": f"First folder note {index}",
+                "text": "Body",
+            },
+        )
+    client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": second_folder["id"],
+            "title": "Second folder note",
+            "text": "Body",
+        },
+    )
+
+    response = client.get("/api/folders/counts")
+
+    assert response.status_code == 200
+    counts = response.json()["folders"]
+    assert counts[first_folder["id"]] == 2
+    assert counts[second_folder["id"]] == 1
 
 
 def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
@@ -853,7 +928,7 @@ def test_note_summary_is_limited_to_55_words(client: TestClient):
     assert summary.endswith("...")
 
 
-def test_list_notes_backfills_summary_from_note_body(client: TestClient):
+def test_list_notes_does_not_backfill_summary_from_note_body(client: TestClient):
     client.post(
         "/api/auth/join",
         json={
@@ -884,13 +959,15 @@ def test_list_notes_backfills_summary_from_note_body(client: TestClient):
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    assert (
-        listed.json()["items"][0]["summary"]
-        == "The useful description should come from the note body."
-    )
+    assert listed.json()["items"][0]["summary"] == "Backfill title"
+
+    with next(client.app.dependency_overrides[get_session]()) as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        assert db_note.summary == "Backfill title"
 
 
-def test_list_notes_backfills_stale_wrapped_summary(client: TestClient):
+def test_list_notes_does_not_rewrite_stale_wrapped_summary(client: TestClient):
     client.post(
         "/api/auth/join",
         json={
@@ -924,10 +1001,18 @@ def test_list_notes_backfills_stale_wrapped_summary(client: TestClient):
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    assert (
-        listed.json()["items"][0]["summary"]
-        == "Only this sentence should appear in the note list."
+    assert listed.json()["items"][0]["summary"] == (
+        "Wrapped title Created: 2026 05 18T00:00:00Z Note "
+        "Only this sentence should appear in the note list."
     )
+
+    with next(client.app.dependency_overrides[get_session]()) as session:
+        db_note = session.get(Note, note["id"])
+        assert db_note is not None
+        assert db_note.summary == (
+            "Wrapped title Created: 2026 05 18T00:00:00Z Note "
+            "Only this sentence should appear in the note list."
+        )
 
 
 def test_create_note_from_file_stores_source_and_pending_note(

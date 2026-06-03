@@ -10,10 +10,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser
-from mianotes_web_service.db.models import Folder, PublishedSite
+from mianotes_web_service.db.models import Folder, Note, PublishedSite
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     FolderCreate,
+    FolderNoteCounts,
     FolderRead,
     FolderReorder,
     FolderRestore,
@@ -136,6 +137,14 @@ def list_folders(
     if not include_archived:
         statement = statement.where(Folder.archived_at.is_(None))
     return list(session.scalars(statement))
+
+
+@router.get("/counts", response_model=FolderNoteCounts)
+def list_folder_note_counts(session: SessionDep, user: FoldersReadUser) -> FolderNoteCounts:
+    rows = session.execute(select(Note.folder_id, func.count(Note.id)).group_by(Note.folder_id))
+    return FolderNoteCounts(
+        folders={folder_id: count for folder_id, count in rows if folder_id is not None}
+    )
 
 
 @router.patch("/order", response_model=list[FolderRead])

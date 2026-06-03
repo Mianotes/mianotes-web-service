@@ -206,10 +206,14 @@ class NoteListCounts(BaseModel):
 
 class NoteListPage(BaseModel):
     items: list[NoteListItem]
-    total: int
+    total: int | None = None
     limit: int
     next_cursor: str | None = None
-    counts: NoteListCounts = Field(default_factory=NoteListCounts)
+    counts: NoteListCounts | None = None
+
+
+class FolderNoteCounts(BaseModel):
+    folders: dict[str, int] = Field(default_factory=dict)
 
 
 class SearchResult(BaseModel):

@@ -45,7 +45,6 @@ from mianotes_web_service.services.note_responses import (
     note_is_starred,
     note_list_response,
     note_response,
-    note_summary_needs_refresh,
     starred_note_ids,
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
@@ -163,6 +162,8 @@ def list_notes(
     query: Annotated[str | None, Query()] = None,
     cursor: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_NOTES_LIMIT)] = DEFAULT_NOTES_LIMIT,
+    include_total: Annotated[bool, Query()] = False,
+    include_counts: Annotated[bool, Query()] = False,
 ) -> NoteListPage:
     filter_clauses = _note_filter_clauses(
         user=user,
@@ -172,10 +173,12 @@ def list_notes(
         tag=tag,
         query=query,
     )
-    total_statement = select(func.count()).select_from(Note)
-    for clause in filter_clauses:
-        total_statement = total_statement.where(clause)
-    total = session.scalar(total_statement) or 0
+    total = None
+    if include_total:
+        total_statement = select(func.count()).select_from(Note)
+        for clause in filter_clauses:
+            total_statement = total_statement.where(clause)
+        total = session.scalar(total_statement) or 0
 
     statement = _apply_note_filters(
         select(Note)
@@ -199,7 +202,6 @@ def list_notes(
     has_next_page = len(notes) > limit
     page_notes = notes[:limit]
     note_ids = [note.id for note in page_notes]
-    needs_summary_backfill = any(note_summary_needs_refresh(note) for note in page_notes)
     starred_ids = starred_note_ids(session, note_ids, user.id)
     latest_jobs = _latest_job_by_note(session, note_ids)
     items = [
@@ -212,14 +214,12 @@ def list_notes(
         )
         for note in page_notes
     ]
-    if needs_summary_backfill:
-        session.commit()
     return NoteListPage(
         items=items,
         total=total,
         limit=limit,
         next_cursor=_encode_note_cursor(page_notes[-1]) if has_next_page and page_notes else None,
-        counts={"folders": _folder_note_counts(session)},
+        counts={"folders": _folder_note_counts(session)} if include_counts else None,
     )
 
 

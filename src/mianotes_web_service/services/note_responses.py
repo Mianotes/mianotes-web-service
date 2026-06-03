@@ -24,7 +24,6 @@ from mianotes_web_service.services.paths import (
     workspace_paths_for_session,
 )
 from mianotes_web_service.services.storage_settings import DEFAULT_LOCATION_ID
-from mianotes_web_service.services.storage import summarize_markdown_note
 from mianotes_web_service.services.workspace_context import current_data_dir, session_workspace
 
 MISSING_NOTE_FILE_DETAIL = (
@@ -204,18 +203,6 @@ def note_response(
     )
 
 
-def normalized_summary(value: str) -> str:
-    return " ".join(value.strip().lower().split())
-
-
-def note_summary_needs_refresh(note: Note) -> bool:
-    summary = normalized_summary(note.summary)
-    title = normalized_summary(note.title)
-    if not summary or summary == title:
-        return True
-    return bool(title and summary.startswith(f"{title} created:"))
-
-
 def source_file_list_payload(
     note: Note,
     request: Request,
@@ -246,13 +233,6 @@ def note_list_response(
     latest_job=None,
 ) -> NoteListItem:
     paths = _paths_from_session(session)
-    if note_summary_needs_refresh(note):
-        try:
-            note.summary = summarize_markdown_note(
-                _note_path(note, paths).read_text(encoding="utf-8")
-            )
-        except OSError:
-            note.summary = ""
     if latest_job is None:
         latest_job = latest_note_job(note)
     return NoteListItem(
