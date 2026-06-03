@@ -88,15 +88,19 @@ def test_jobs_can_be_read_by_owner(app_client: tuple[TestClient, sessionmaker[Se
 
     listed = client.get("/api/jobs")
     assert listed.status_code == 200
-    assert listed.json()[0]["id"] == job_id
-    assert listed.json()[0]["status"] == "queued"
-    assert listed.json()[0]["input"] == {"note_id": note["id"]}
-    assert listed.json()[0]["note_title"] == note["title"]
-    assert listed.json()[0]["log"][0]["command"] == "MarkItDown.convert(original.pdf)"
+    listed_job = listed.json()["items"][0]
+    assert listed_job["id"] == job_id
+    assert listed_job["status"] == "queued"
+    assert listed_job["input"] is None
+    assert listed_job["result"] is None
+    assert listed_job["log"] is None
+    assert listed_job["note_title"] == note["title"]
 
     fetched = client.get(f"/api/jobs/{job_id}")
     assert fetched.status_code == 200
     assert fetched.json()["job_type"] == "parse_file"
+    assert fetched.json()["input"] == {"note_id": note["id"]}
+    assert fetched.json()["log"][0]["command"] == "MarkItDown.convert(original.pdf)"
 
 
 def test_jobs_list_keeps_active_failed_and_recent_succeeded_jobs(
@@ -138,7 +142,7 @@ def test_jobs_list_keeps_active_failed_and_recent_succeeded_jobs(
     listed = client.get("/api/jobs")
 
     assert listed.status_code == 200
-    listed_ids = {job["id"] for job in listed.json()}
+    listed_ids = {job["id"] for job in listed.json()["items"]}
     assert visible_ids <= listed_ids
     assert hidden_ids.isdisjoint(listed_ids)
 
@@ -176,10 +180,115 @@ def test_jobs_status_filter_keeps_retention_window(
     listed = client.get("/api/jobs", params={"status": "succeeded"})
 
     assert listed.status_code == 200
-    listed_ids = {job["id"] for job in listed.json()}
+    listed_ids = {job["id"] for job in listed.json()["items"]}
     assert recent_succeeded_id in listed_ids
     assert old_succeeded_id not in listed_ids
     assert failed_id not in listed_ids
+
+
+def test_jobs_list_is_paginated(app_client: tuple[TestClient, sessionmaker[Session]]):
+    client, testing_session = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+
+    with testing_session() as session:
+        user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+        for index in range(6):
+            job = create_job(session, user, job_type="parse_file")
+            job.created_at = datetime(2026, 1, 1, 12, index, tzinfo=UTC)
+        session.commit()
+
+    first_page = client.get("/api/jobs", params={"limit": 3})
+
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert len(first_payload["items"]) == 3
+    assert first_payload["next_cursor"] is not None
+
+    second_page = client.get(
+        "/api/jobs",
+        params={"limit": 3, "cursor": first_payload["next_cursor"]},
+    )
+
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert len(second_payload["items"]) == 3
+    assert second_payload["next_cursor"] is None
+    assert {
+        item["id"] for item in first_payload["items"]
+    }.isdisjoint({item["id"] for item in second_payload["items"]})
+
+
+def test_jobs_list_payload_decoding_is_opt_in(
+    app_client: tuple[TestClient, sessionmaker[Session]],
+):
+    client, testing_session = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+
+    with testing_session() as session:
+        user = session.scalars(select(User).where(User.email == "admin@example.com")).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_file",
+            input_payload={"source": "upload"},
+        )
+        append_job_log(job, command="MarkItDown.convert(original.pdf)", response="started")
+        mark_job_succeeded(job, {"ok": True})
+        job.log_json = """[{"timestamp":"2026-01-01T12:00:00+00:00","status":"info","command":"kept"}]"""
+        session.commit()
+        job_id = job.id
+
+    default_list = client.get("/api/jobs", params={"status": "succeeded"})
+    assert default_list.status_code == 200
+    default_job = default_list.json()["items"][0]
+    assert default_job["id"] == job_id
+    assert default_job["input"] is None
+    assert default_job["result"] is None
+    assert default_job["log"] is None
+
+    verbose_list = client.get(
+        "/api/jobs",
+        params={"status": "succeeded", "include_logs": "true", "include_payloads": "true"},
+    )
+    assert verbose_list.status_code == 200
+    verbose_job = verbose_list.json()["items"][0]
+    assert verbose_job["input"] == {"source": "upload"}
+    assert verbose_job["result"] == {"ok": True}
+    assert verbose_job["log"][0]["command"] == "kept"
+
+
+def test_jobs_list_rejects_invalid_cursor(app_client: tuple[TestClient, sessionmaker[Session]]):
+    client, _testing_session = app_client
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "admin@example.com",
+            "name": "Admin",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+
+    listed = client.get("/api/jobs", params={"cursor": "not-a-cursor"})
+
+    assert listed.status_code == 422
+    assert listed.json()["detail"] == "Invalid jobs cursor"
 
 
 def test_job_status_helpers(app_client: tuple[TestClient, sessionmaker[Session]]):

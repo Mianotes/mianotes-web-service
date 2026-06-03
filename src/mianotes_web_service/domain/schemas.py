@@ -395,6 +395,30 @@ class MiaJobRead(BaseModel):
     finished_at: datetime | None = None
 
 
+class MiaJobListItem(BaseModel):
+    id: str
+    user: UserRead
+    client: AgentClientRead | None = None
+    note_id: str | None = None
+    note_title: str | None = None
+    job_type: str
+    status: JobStatus
+    input: dict[str, object] | None = None
+    result: dict[str, object] | None = None
+    log: list[MiaJobLogEntry] | None = None
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+
+class MiaJobListPage(BaseModel):
+    items: list[MiaJobListItem]
+    limit: int
+    next_cursor: str | None = None
+
+
 class NoteIngestionRead(NoteRead):
     note_id: str
     job_id: str

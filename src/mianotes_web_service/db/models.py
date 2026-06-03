@@ -248,6 +248,11 @@ class ApiToken(Base, TimestampMixin):
 
 class MiaJob(Base, TimestampMixin):
     __tablename__ = "mia_jobs"
+    __table_args__ = (
+        Index("ix_mia_jobs_status_finished_created", "status", "finished_at", "created_at"),
+        Index("ix_mia_jobs_user_status_created", "user_id", "status", "created_at"),
+        Index("ix_mia_jobs_note_status_created", "note_id", "status", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
