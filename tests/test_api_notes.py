@@ -30,6 +30,13 @@ def _png_bytes(size: tuple[int, int] = (16, 16)) -> bytes:
     return image_bytes.getvalue()
 
 
+def _allow_url_ingestion(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "mianotes_web_service.api.note_ingestion.validate_fetch_url",
+        lambda url: None,
+    )
+
+
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestClient, None, None]:
     get_settings.cache_clear()
@@ -458,7 +465,11 @@ def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path
     assert new_folder_notes.json()["items"][0]["id"] == note["id"]
 
 
-def test_updating_failed_note_clears_failed_status_and_console_job(client: TestClient):
+def test_updating_failed_note_clears_failed_status_and_console_job(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _allow_url_ingestion(monkeypatch)
     client.post(
         "/api/auth/join",
         json={
@@ -1185,7 +1196,12 @@ def test_create_note_from_file_rejects_blank_title(client: TestClient):
     assert response.json()["detail"] == "Title required"
 
 
-def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Path):
+def test_create_note_from_url_queues_parse_job(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _allow_url_ingestion(monkeypatch)
     user = client.post(
         "/api/auth/join",
         json={
@@ -1253,7 +1269,11 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
     )
 
 
-def test_create_note_from_url_preserves_remote_file_extension(client: TestClient):
+def test_create_note_from_url_preserves_remote_file_extension(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _allow_url_ingestion(monkeypatch)
     client.post(
         "/api/auth/join",
         json={
@@ -1285,7 +1305,11 @@ def test_create_note_from_url_preserves_remote_file_extension(client: TestClient
     )
 
 
-def test_agent_created_url_job_includes_client(client: TestClient):
+def test_agent_created_url_job_includes_client(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    _allow_url_ingestion(monkeypatch)
     client.post(
         "/api/auth/join",
         json={
