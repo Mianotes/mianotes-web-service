@@ -112,6 +112,130 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
     ]
 
 
+def test_mcp_tool_call_loads_package_env_file(monkeypatch, tmp_path):
+    env_file = tmp_path / "mianotes.env"
+    env_file.write_text(
+        'MIANOTES_API_URL="http://127.0.0.1:9999"\n'
+        'MIANOTES_API_KEY="mia_package_token"\n',
+        encoding="utf-8",
+    )
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        seen.append(
+            {
+                "url": request.full_url,
+                "authorization": request.get_header("Authorization"),
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        return FakeResponse([])
+
+    monkeypatch.delenv("MIANOTES_API_URL", raising=False)
+    monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
+    monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
+    monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
+    monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(mcp_server.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", (str(env_file),))
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 15,
+            "method": "tools/call",
+            "params": {"name": "list_notes", "arguments": {}},
+        }
+    )
+
+    assert response is not None
+    assert seen[0] == {
+        "url": "http://127.0.0.1:9999/api/auth/agent-session",
+        "authorization": "Bearer mia_package_token",
+    }
+
+
+def test_mcp_tool_call_loads_source_venv_env_file(monkeypatch, tmp_path):
+    project_dir = tmp_path / "mianotes-web-service"
+    venv_dir = project_dir / ".venv"
+    venv_dir.mkdir(parents=True)
+    (project_dir / ".env").write_text(
+        'MIANOTES_API_URL="http://127.0.0.1:7777"\n'
+        'MIANOTES_API_KEY="mia_source_token"\n',
+        encoding="utf-8",
+    )
+    seen = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return json.dumps(self.payload).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int):
+        seen.append(
+            {
+                "url": request.full_url,
+                "authorization": request.get_header("Authorization"),
+            }
+        )
+        if request.full_url.endswith("/api/auth/agent-session"):
+            return FakeResponse({"token": "agent-session-token"})
+        return FakeResponse([])
+
+    monkeypatch.delenv("MIANOTES_API_URL", raising=False)
+    monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
+    monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
+    monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
+    monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
+    agent_project = tmp_path / "agent-project"
+    agent_project.mkdir()
+    monkeypatch.chdir(agent_project)
+    monkeypatch.setattr(mcp_server.sys, "prefix", str(venv_dir))
+    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", ())
+    monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
+
+    response = handle_request(
+        {
+            "jsonrpc": "2.0",
+            "id": 16,
+            "method": "tools/call",
+            "params": {"name": "list_notes", "arguments": {}},
+        }
+    )
+
+    assert response is not None
+    assert seen[0] == {
+        "url": "http://127.0.0.1:7777/api/auth/agent-session",
+        "authorization": "Bearer mia_source_token",
+    }
+
+
 def test_mcp_tool_call_sends_workspace_header(monkeypatch):
     seen = []
 
@@ -300,9 +424,15 @@ def test_mcp_create_note_in_folder_resolves_folder_name(monkeypatch):
     }
 
 
-def test_mcp_tool_call_reports_missing_api_key(monkeypatch):
+def test_mcp_tool_call_reports_missing_api_key(monkeypatch, tmp_path):
     monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
     monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
+    monkeypatch.delenv("MIANOTES_API_URL", raising=False)
+    monkeypatch.setenv("MIANOTES_ENV_FILE", str(tmp_path / "missing.env"))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(mcp_server.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", ())
+    monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
     response = handle_request(
         {
