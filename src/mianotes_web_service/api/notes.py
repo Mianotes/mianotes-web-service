@@ -29,15 +29,7 @@ from mianotes_web_service.api.note_access import (
     read_note_for_tag_change,
     read_note_reference,
 )
-from mianotes_web_service.db.models import (
-    Comment,
-    Folder,
-    MiaJob,
-    Note,
-    NoteStar,
-    Tag,
-    User,
-)
+from mianotes_web_service.db.models import Folder, MiaJob, Note, NoteStar, Tag, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     NoteListPage,
@@ -139,21 +131,6 @@ def _apply_note_filters(statement: Select[tuple[Note]], clauses) -> Select[tuple
     return statement
 
 
-def _comments_count_by_note(session: Session, note_ids: list[str]) -> dict[str, int]:
-    if not note_ids:
-        return {}
-    rows = session.execute(
-        select(Comment.note_id, func.count(Comment.id))
-        .where(
-            Comment.note_id.in_(note_ids),
-            Comment.body.is_not(None),
-            Comment.body != "",
-        )
-        .group_by(Comment.note_id)
-    )
-    return {note_id: count for note_id, count in rows}
-
-
 def _latest_job_by_note(session: Session, note_ids: list[str]) -> dict[str, MiaJob]:
     if not note_ids:
         return {}
@@ -224,7 +201,6 @@ def list_notes(
     note_ids = [note.id for note in page_notes]
     needs_summary_backfill = any(note_summary_needs_refresh(note) for note in page_notes)
     starred_ids = starred_note_ids(session, note_ids, user.id)
-    comments_count = _comments_count_by_note(session, note_ids)
     latest_jobs = _latest_job_by_note(session, note_ids)
     items = [
         note_list_response(
@@ -232,7 +208,6 @@ def list_notes(
             request,
             is_starred=note.id in starred_ids,
             session=session,
-            comments_count=comments_count.get(note.id, 0),
             latest_job=latest_jobs.get(note.id),
         )
         for note in page_notes

@@ -7,9 +7,9 @@ from .context import router as context_router
 from .files import router as files_router
 from .folders import router as folders_router
 from .jobs import router as jobs_router
-from .note_comments import router as note_comments_router
 from .note_images import router as note_images_router
 from .note_ingestion import router as note_ingestion_router
+from .note_prompts import router as note_prompts_router
 from .note_sharing import router as note_sharing_router
 from .notes import router as notes_router
 from .publish import router as publish_router
@@ -34,7 +34,7 @@ api_router.include_router(jobs_router, prefix="/api")
 api_router.include_router(note_ingestion_router, prefix="/api")
 api_router.include_router(note_images_router, prefix="/api")
 api_router.include_router(note_sharing_router, prefix="/api")
-api_router.include_router(note_comments_router, prefix="/api")
+api_router.include_router(note_prompts_router, prefix="/api")
 api_router.include_router(notes_router, prefix="/api")
 api_router.include_router(search_router, prefix="/api")
 api_router.include_router(context_router, prefix="/api")

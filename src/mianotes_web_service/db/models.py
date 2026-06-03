@@ -118,10 +118,6 @@ class Note(Base, TimestampMixin):
         back_populates="note",
         cascade="all, delete-orphan",
     )
-    comments: Mapped[list[Comment]] = relationship(
-        back_populates="note",
-        cascade="all, delete-orphan",
-    )
     tags: Mapped[list[Tag]] = relationship(
         secondary="note_tags",
         back_populates="notes",
@@ -167,18 +163,6 @@ class SourceFile(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     note: Mapped[Note] = relationship(back_populates="source_files")
-
-
-class Comment(Base, TimestampMixin):
-    __tablename__ = "comments"
-
-    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
-    note_id: Mapped[str] = mapped_column(ForeignKey("notes.id"), index=True, nullable=False)
-    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True)
-    body: Mapped[str | None] = mapped_column(Text)
-
-    note: Mapped[Note] = relationship(back_populates="comments")
-    user: Mapped[User | None] = relationship()
 
 
 class Tag(Base, TimestampMixin):

@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from mianotes_web_service.db.models import Comment, Note, User
+from mianotes_web_service.db.models import Note, User
 from mianotes_web_service.services.share import get_share_secret, hash_share_token
 
 
@@ -40,7 +40,6 @@ def _response_options():
         selectinload(Note.user),
         joinedload(Note.folder),
         selectinload(Note.source_files),
-        selectinload(Note.comments).selectinload(Comment.user),
         selectinload(Note.tags),
         selectinload(Note.jobs),
     )
@@ -74,14 +73,6 @@ def read_note_for_tag_change(session: Session, note_id: str) -> Note:
             joinedload(Note.folder),
             selectinload(Note.tags),
         ),
-    )
-
-
-def read_note_for_comments(session: Session, note_id: str) -> Note:
-    return _read_note_or_404(
-        session,
-        note_id,
-        options=(selectinload(Note.comments).selectinload(Comment.user),),
     )
 
 

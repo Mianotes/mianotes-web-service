@@ -131,25 +131,9 @@ class TagsUpdate(BaseModel):
     tags: list[str] = Field(default_factory=list, max_length=MAX_TAGS_PER_NOTE)
 
 
-class CommentCreate(BaseModel):
-    body: str = Field(min_length=1)
+class MiaPromptCreate(BaseModel):
+    prompt: str
     markdown: str | None = None
-
-
-class CommentUpdate(BaseModel):
-    body: str = Field(min_length=1)
-
-
-class CommentRead(BaseModel):
-    type: Literal["comment"] = "comment"
-    id: str
-    note_id: str
-    user: UserRead | None = None
-    body: str
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 class MiaPromptRead(BaseModel):
@@ -184,8 +168,6 @@ class NoteRead(BaseModel):
     text: str
     note_url: str
     source_files: list[dict[str, object]]
-    comments_count: int
-    comments_url: str
     tags: list[TagRead]
     share_url: str | None = None
     job_id: str | None = None
@@ -211,7 +193,6 @@ class NoteListItem(BaseModel):
     source_files: list[dict[str, object]] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
-    comments_count: int = 0
     tags: list[TagRead] = Field(default_factory=list)
     job_id: str | None = None
     job_status: str | None = None

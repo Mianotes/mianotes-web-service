@@ -3,7 +3,6 @@ from __future__ import annotations
 from .models import (
     ApiToken,
     AppSetting,
-    Comment,
     Folder,
     MiaJob,
     Note,
@@ -27,7 +26,6 @@ WORKSPACE_TABLES = (
     Note.__table__,
     PublishedSite.__table__,
     SourceFile.__table__,
-    Comment.__table__,
     Tag.__table__,
     NoteTag.__table__,
     NoteStar.__table__,

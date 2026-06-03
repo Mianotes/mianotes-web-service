@@ -5,12 +5,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import selectinload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Note, NoteStar
+from mianotes_web_service.db.models import Note
 from mianotes_web_service.domain.schemas import NoteListItem, SearchResult
+from mianotes_web_service.services.note_responses import starred_note_ids
 from mianotes_web_service.services.paths import (
     WorkspacePaths,
     note_file_path,
@@ -23,34 +25,57 @@ from mianotes_web_service.services.workspace_context import current_data_dir
 router = APIRouter(prefix="/search", tags=["search"])
 
 
-def _notes_by_path(session: Session, paths: WorkspacePaths | None = None) -> dict[str, Note]:
-    notes = (
-        session.scalars(
-            select(Note).options(joinedload(Note.folder), joinedload(Note.source_files))
+def _candidate_note_path_values(match_path: Path, paths: WorkspacePaths) -> set[str]:
+    resolved_path = match_path.resolve()
+    values = {str(match_path), str(resolved_path)}
+    try:
+        values.add(str(resolved_path.relative_to(paths.data_dir.resolve())))
+    except ValueError:
+        pass
+    try:
+        values.add(str(resolved_path.relative_to(paths.markdown_root.resolve())))
+    except ValueError:
+        pass
+    return values
+
+
+def _notes_by_matched_path(
+    session: Session,
+    matched_paths: list[Path],
+    paths: WorkspacePaths,
+) -> dict[str, Note]:
+    if not matched_paths:
+        return {}
+    note_path_values = {
+        value
+        for matched_path in matched_paths
+        for value in _candidate_note_path_values(matched_path, paths)
+    }
+    notes = session.scalars(
+        select(Note)
+        .options(
+            selectinload(Note.folder),
+            selectinload(Note.source_files),
+            selectinload(Note.tags),
         )
-        .unique()
-        .all()
+        .where(Note.note_path.in_(note_path_values))
     )
     by_path: dict[str, Note] = {}
     for note in notes:
-        note_path = _resolved_note_path(note, paths)
-        if note_path is not None:
+        for note_path in _resolved_note_paths(note, paths):
             by_path[note_path] = note
     return by_path
 
 
-def _resolved_note_path(note: Note, paths: WorkspacePaths | None = None) -> str | None:
+def _resolved_note_paths(note: Note, paths: WorkspacePaths | None = None) -> set[str]:
+    values = {note.note_path}
     try:
         path = paths.note_file_path(note) if paths is not None else note_file_path(note)
-        return str(path.resolve())
+        values.add(str(path))
+        values.add(str(path.resolve()))
     except OSError:
-        return None
-
-
-def _is_starred_by_user(session: Session, note_id: str, user_id: str) -> bool:
-    return session.scalars(
-        select(NoteStar.note_id).where(NoteStar.note_id == note_id, NoteStar.user_id == user_id)
-    ).first() is not None
+        pass
+    return values
 
 
 def _file_url(request: Request, path: str | Path, data_dir: Path | None = None) -> str:
@@ -114,7 +139,6 @@ def _note_list_item(
         source_files=_source_file_list_payload(note, request, paths),
         created_at=note.created_at,
         updated_at=note.updated_at,
-        comments_count=len([comment for comment in note.comments if comment.body]),
         tags=note.tags,
     )
 
@@ -136,7 +160,13 @@ def search_notes(
             detail=str(exc),
         ) from exc
 
-    notes_by_path = _notes_by_path(session, paths)
+    notes_by_path = _notes_by_matched_path(
+        session,
+        [match.path for match in matches],
+        paths,
+    )
+    matched_notes = {note.id: note for note in notes_by_path.values()}
+    starred_ids = starred_note_ids(session, list(matched_notes), user.id)
     results: list[SearchResult] = []
     for match in matches:
         note = notes_by_path.get(str(match.path))
@@ -147,7 +177,7 @@ def search_notes(
                 note=_note_list_item(
                     note,
                     request,
-                    is_starred=_is_starred_by_user(session, note.id, user.id),
+                    is_starred=note.id in starred_ids,
                     paths=paths,
                 ),
                 line_number=match.line_number,

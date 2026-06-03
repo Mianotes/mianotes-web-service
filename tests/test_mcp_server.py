@@ -18,7 +18,6 @@ def test_mcp_initialize_and_tool_list():
     assert "read_note_context" in tool_names
     assert "create_note_in_folder" in tool_names
     assert "create_note_from_url" in tool_names
-    assert "add_comment" in tool_names
 
 
 def test_mcp_initialized_notification_has_no_response():

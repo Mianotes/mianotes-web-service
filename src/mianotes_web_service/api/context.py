@@ -4,12 +4,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from sqlalchemy import func, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
-from mianotes_web_service.api.search import _is_starred_by_user, _note_list_item
+from mianotes_web_service.api.search import _note_list_item
 from mianotes_web_service.db.models import Folder, Note
 from mianotes_web_service.domain.schemas import ContextResponse, ContextResult
+from mianotes_web_service.services.note_responses import starred_note_ids
 from mianotes_web_service.services.paths import WorkspacePaths, workspace_paths_for_session
 from mianotes_web_service.services.search import search_markdown_files
 from mianotes_web_service.services.storage import slugify
@@ -55,16 +56,16 @@ def get_context(
             select(Note)
             .where(Note.folder_id.in_(folder_ids))
             .options(
-                joinedload(Note.folder),
-                joinedload(Note.source_files),
-                joinedload(Note.comments),
-                joinedload(Note.tags),
+                selectinload(Note.folder),
+                selectinload(Note.source_files),
+                selectinload(Note.tags),
             )
             .order_by(Note.updated_at.desc())
         )
         .unique()
         .all()
     )
+    starred_ids = starred_note_ids(session, [note.id for note in notes], user.id)
 
     title_query = _normalized(title)
     results: list[ContextResult] = []
@@ -83,7 +84,7 @@ def get_context(
                     note=_note_list_item(
                         note,
                         request,
-                        is_starred=_is_starred_by_user(session, note.id, user.id),
+                        is_starred=note.id in starred_ids,
                         paths=paths,
                     ),
                     text=text,
@@ -115,7 +116,7 @@ def get_context(
                     note=_note_list_item(
                         note,
                         request,
-                        is_starred=_is_starred_by_user(session, note.id, user.id),
+                        is_starred=note.id in starred_ids,
                         paths=paths,
                     ),
                     text=text,

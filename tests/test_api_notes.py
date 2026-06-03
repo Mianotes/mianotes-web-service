@@ -18,7 +18,7 @@ from mianotes_web_service.api.note_access import (
 )
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import Base, Comment, MiaJob, Note, SourceFile, Tag, User
+from mianotes_web_service.db.models import Base, MiaJob, Note, SourceFile, Tag, User
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services import job_runner
 from mianotes_web_service.services.storage_settings import (
@@ -114,8 +114,6 @@ def _create_note_with_related_rows(client: TestClient, *, email_prefix: str = "l
         db_note.tags = [first_tag, second_tag]
         session.add_all(
             [
-                Comment(note_id=note["id"], user_id=user["id"], body="First comment"),
-                Comment(note_id=note["id"], user_id=user["id"], body="Second comment"),
                 SourceFile(
                     note_id=note["id"],
                     filename="original.txt",
@@ -183,7 +181,6 @@ def test_note_response_loader_uses_separate_collection_queries(client: TestClien
             assert loaded_note.user.name == "Loader User"
             assert loaded_note.folder.name == "Loader Notes"
             assert len(loaded_note.source_files) == 3
-            assert len(loaded_note.comments) == 2
             assert {tag.slug for tag in loaded_note.tags} == {"initial", "performance"}
             assert len(loaded_note.jobs) == 2
 
@@ -194,10 +191,9 @@ def test_note_response_loader_uses_separate_collection_queries(client: TestClien
     ]
     assert len(main_note_selects) == 1
     main_note_select = main_note_selects[0]
-    for collection_table in ("source_files", "comments", "note_tags", "mia_jobs"):
+    for collection_table in ("source_files", "note_tags", "mia_jobs"):
         assert collection_table not in main_note_select
     assert any(" from source_files " in statement for statement in statements)
-    assert any(" from comments " in statement for statement in statements)
     assert any(" join note_tags " in statement for statement in statements)
     assert any(" from mia_jobs " in statement for statement in statements)
 
@@ -222,7 +218,6 @@ def test_note_change_loader_does_not_load_child_collections(client: TestClient):
     assert len(main_note_selects) == 1
     for statement in statements:
         assert "source_files" not in statement
-        assert "comments" not in statement
         assert "note_tags" not in statement
         assert "mia_jobs" not in statement
 
@@ -271,9 +266,6 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert note["source_files"][0]["url"].endswith(
         f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
     )
-    assert note["comments_count"] == 0
-    assert note["comments_url"].endswith(f"/api/notes/{note['id']}/comments")
-
     note_path = tmp_path / "data" / "markdown" / "meeting-notes" / f"{note_filename}.md"
     source_path = (
         tmp_path
@@ -358,8 +350,6 @@ def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClie
         ).json()
         for index in range(3)
     ]
-    client.post(f"/api/notes/{notes[0]['id']}/comments", json={"body": "One comment"})
-
     first_page = client.get("/api/notes", params={"folder_id": folder["id"], "limit": 2})
 
     assert first_page.status_code == 200
@@ -382,11 +372,6 @@ def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClie
     assert len(second_payload["items"]) == 1
     returned_ids = {item["id"] for item in first_payload["items"] + second_payload["items"]}
     assert returned_ids == {note["id"] for note in notes}
-    comment_counts = {
-        item["id"]: item["comments_count"]
-        for item in first_payload["items"] + second_payload["items"]
-    }
-    assert comment_counts[notes[0]["id"]] == 1
 
 
 def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
@@ -1589,7 +1574,7 @@ def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):
     assert missing.status_code == 404
 
 
-def test_note_tags_comments_and_share_link(client: TestClient):
+def test_note_tags_and_share_link(client: TestClient):
     user = client.post(
         "/api/auth/join",
         json={
@@ -1641,20 +1626,6 @@ def test_note_tags_comments_and_share_link(client: TestClient):
         },
     )
     assert rejected_create.status_code == 422
-
-    comment = client.post(
-        f"/api/notes/{note['id']}/comments",
-        json={"body": "This is useful for the next call."},
-    )
-    assert comment.status_code == 201
-    comment_body = comment.json()
-    assert comment_body["type"] == "comment"
-    assert comment_body["body"] == "This is useful for the next call."
-    assert comment_body["user"]["id"] == user["id"]
-
-    comments = client.get(f"/api/notes/{note['id']}/comments")
-    assert comments.status_code == 200
-    assert [item["body"] for item in comments.json()] == ["This is useful for the next call."]
 
     avatar_relative_path = Path(".profiles") / user["id"] / "avatar-seed.jpg"
     avatar_path = get_settings().data_dir / avatar_relative_path
@@ -1745,11 +1716,11 @@ def test_non_admin_user_can_share_readable_note_without_editing_it(client: TestC
     assert disabled_by_admin.status_code == 204
 
 
-def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
+def test_mia_prompt_returns_markdown(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from mianotes_web_service.api import notes
+    from mianotes_web_service.api import note_prompts
     from mianotes_web_service.services.mia import MiaTextResult
 
     captured: dict[str, str] = {}
@@ -1764,12 +1735,12 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
             model="test-model",
         )
 
-    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    monkeypatch.setattr(note_prompts, "prompt_markdown", fake_prompt_markdown)
     client.post(
         "/api/auth/join",
         json={
-            "email": "mia-comment@example.com",
-            "name": "Mia Comment User",
+            "email": "mia-prompt@example.com",
+            "name": "Mia Prompt User",
             "password": "house-password",
             "password_confirmation": "house-password",
         },
@@ -1785,8 +1756,8 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     ).json()
 
     response = client.post(
-        f"/api/notes/{note['id']}/comments",
-        json={"body": "@mia summarise this text"},
+        f"/api/notes/{note['id']}/prompt",
+        json={"prompt": "summarise this text"},
     )
 
     assert response.status_code == 200
@@ -1796,7 +1767,6 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     assert body["note_id"] == note["id"]
     assert body["text"] == "## Summary\n\nThis is the short version."
     assert body["format"] == "markdown"
-    assert "comment" not in body
     assert captured["title"] == "Planning trip to Mallorca"
     assert captured["markdown"] == "Long text goes here."
     assert "# Planning trip to Mallorca" not in captured["markdown"]
@@ -1804,16 +1774,12 @@ def test_mia_comment_prompt_returns_markdown_without_saving_prompt_comment(
     assert "## Note" not in captured["markdown"]
     assert captured["prompt"] == "summarise this text"
 
-    comments = client.get(f"/api/notes/{note['id']}/comments")
-    assert comments.status_code == 200
-    assert comments.json() == []
 
-
-def test_mia_comment_prompt_can_use_unsaved_markdown(
+def test_mia_prompt_can_use_unsaved_markdown(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from mianotes_web_service.api import notes
+    from mianotes_web_service.api import note_prompts
     from mianotes_web_service.services.mia import MiaTextResult
 
     captured: dict[str, str] = {}
@@ -1827,7 +1793,7 @@ def test_mia_comment_prompt_can_use_unsaved_markdown(
             model="test-model",
         )
 
-    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    monkeypatch.setattr(note_prompts, "prompt_markdown", fake_prompt_markdown)
     client.post(
         "/api/auth/join",
         json={
@@ -1848,9 +1814,9 @@ def test_mia_comment_prompt_can_use_unsaved_markdown(
     ).json()
 
     response = client.post(
-        f"/api/notes/{note['id']}/comments",
+        f"/api/notes/{note['id']}/prompt",
         json={
-            "body": "@mia improve this",
+            "prompt": "improve this",
             "markdown": "Unsaved draft text.",
         },
     )
@@ -1861,7 +1827,7 @@ def test_mia_comment_prompt_can_use_unsaved_markdown(
     assert captured["prompt"] == "improve this"
 
 
-def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
+def test_mia_prompt_requires_prompt_text(client: TestClient):
     client.post(
         "/api/auth/join",
         json={
@@ -1882,30 +1848,30 @@ def test_mia_comment_prompt_requires_prompt_text(client: TestClient):
     ).json()
 
     response = client.post(
-        f"/api/notes/{note['id']}/comments",
-        json={"body": "@mia"},
+        f"/api/notes/{note['id']}/prompt",
+        json={"prompt": ""},
     )
 
     assert response.status_code == 422
     assert response.json()["detail"] == "Mia prompt cannot be empty"
 
 
-def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
+def test_mia_prompt_failure_returns_provider_message(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ):
-    from mianotes_web_service.api import notes
+    from mianotes_web_service.api import note_prompts
     from mianotes_web_service.services.mia import MiaUnavailable
 
     def fake_prompt_markdown(**_kwargs):
         raise MiaUnavailable("LLM key is not configured")
 
-    monkeypatch.setattr(notes, "prompt_markdown", fake_prompt_markdown)
+    monkeypatch.setattr(note_prompts, "prompt_markdown", fake_prompt_markdown)
     client.post(
         "/api/auth/join",
         json={
-            "email": "failed-mia-comment@example.com",
-            "name": "Failed Mia Comment User",
+            "email": "failed-mia-prompt@example.com",
+            "name": "Failed Mia Prompt User",
             "password": "house-password",
             "password_confirmation": "house-password",
         },
@@ -1921,12 +1887,9 @@ def test_mia_comment_prompt_failure_does_not_save_prompt_comment(
     ).json()
 
     response = client.post(
-        f"/api/notes/{note['id']}/comments",
-        json={"body": "@mia summarise text"},
+        f"/api/notes/{note['id']}/prompt",
+        json={"prompt": "summarise text"},
     )
 
     assert response.status_code == 503
     assert response.json()["detail"] == "Mia needs an AI provider before it can answer prompts."
-    comments = client.get(f"/api/notes/{note['id']}/comments")
-    assert comments.status_code == 200
-    assert comments.json() == []

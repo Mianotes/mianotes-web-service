@@ -156,15 +156,6 @@ TOOL_DEFINITIONS: list[JsonObject] = [
         },
     },
     {
-        "name": "add_comment",
-        "description": "Add a comment to a Mianotes note.",
-        "inputSchema": {
-            "type": "object",
-            "required": ["note_id", "body"],
-            "properties": {"note_id": {"type": "string"}, "body": {"type": "string"}},
-        },
-    },
-    {
         "name": "set_tags",
         "description": "Replace a note's tags.",
         "inputSchema": {
@@ -398,13 +389,6 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
             if key in arguments
         }
         return _request("PATCH", f"/api/notes/{note_id}", body=body, workspace=workspace)
-    if name == "add_comment":
-        return _request(
-            "POST",
-            f"/api/notes/{arguments['note_id']}/comments",
-            body={"body": arguments["body"]},
-            workspace=workspace,
-        )
     if name == "set_tags":
         return _request(
             "PUT",

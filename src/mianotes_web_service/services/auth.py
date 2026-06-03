@@ -33,7 +33,6 @@ ALLOWED_API_TOKEN_SCOPES = frozenset(
         "folders:write",
         "notes:read",
         "notes:write",
-        "comments:write",
         "tags:read",
         "tags:write",
         "share:write",

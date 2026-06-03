@@ -185,8 +185,6 @@ def note_response(
         text=text,
         note_url=file_url(request, note_path, _data_dir(paths)),
         source_files=source_files,
-        comments_count=len([comment for comment in note.comments if comment.body]),
-        comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
         tags=note.tags,
         share_url=share_url(request, note, share_token, session),
         job_id=latest_job.id if latest_job is not None else None,
@@ -197,10 +195,6 @@ def note_response(
             "delete": {
                 "method": "DELETE",
                 "url": str(request.url_for("get_note", note_id=note.id)),
-            },
-            "comments": {
-                "method": "GET",
-                "url": str(request.url_for("get_note_comments", note_id=note.id)),
             },
             "star": {
                 "method": "PATCH",
@@ -249,7 +243,6 @@ def note_list_response(
     *,
     is_starred: bool = False,
     session: Session | None = None,
-    comments_count: int | None = None,
     latest_job=None,
 ) -> NoteListItem:
     paths = _paths_from_session(session)
@@ -278,11 +271,6 @@ def note_list_response(
         source_files=source_file_list_payload(note, request, paths),
         created_at=note.created_at,
         updated_at=note.updated_at,
-        comments_count=(
-            comments_count
-            if comments_count is not None
-            else len([comment for comment in note.comments if comment.body])
-        ),
         tags=note.tags,
         job_id=latest_job.id if latest_job is not None else None,
         job_status=latest_job.status if latest_job is not None else None,
