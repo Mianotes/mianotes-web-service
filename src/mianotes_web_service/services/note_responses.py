@@ -225,6 +225,8 @@ def note_list_response(
     *,
     is_starred: bool = False,
     session: Session | None = None,
+    comments_count: int | None = None,
+    latest_job=None,
 ) -> NoteListItem:
     paths = _paths_from_session(session)
     if note_summary_needs_refresh(note):
@@ -234,7 +236,8 @@ def note_list_response(
             )
         except OSError:
             note.summary = ""
-    latest_job = latest_note_job(note)
+    if latest_job is None:
+        latest_job = latest_note_job(note)
     return NoteListItem(
         id=note.id,
         user_id=note.user_id,
@@ -251,7 +254,11 @@ def note_list_response(
         source_files=source_file_list_payload(note, request, paths),
         created_at=note.created_at,
         updated_at=note.updated_at,
-        comments_count=len([comment for comment in note.comments if comment.body]),
+        comments_count=(
+            comments_count
+            if comments_count is not None
+            else len([comment for comment in note.comments if comment.body])
+        ),
         tags=note.tags,
         job_id=latest_job.id if latest_job is not None else None,
         job_status=latest_job.status if latest_job is not None else None,

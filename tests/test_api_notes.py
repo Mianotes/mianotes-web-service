@@ -148,13 +148,16 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     )
     listed = client.get("/api/notes", params={"folder_id": folder["id"]})
     assert listed.status_code == 200
-    assert listed.json()[0]["id"] == note["id"]
-    assert listed.json()[0]["status"] == "ready"
-    assert listed.json()[0]["source_type"] == "text"
-    assert listed.json()[0]["is_starred"] is False
-    assert listed.json()[0]["summary"] == "We agreed to build Mianotes with Markdown notes."
-    assert listed.json()[0]["filename"] == f"{note_filename}.md"
-    assert "text" not in listed.json()[0]
+    assert listed.json()["items"][0]["id"] == note["id"]
+    assert listed.json()["items"][0]["status"] == "ready"
+    assert listed.json()["items"][0]["source_type"] == "text"
+    assert listed.json()["items"][0]["is_starred"] is False
+    assert (
+        listed.json()["items"][0]["summary"]
+        == "We agreed to build Mianotes with Markdown notes."
+    )
+    assert listed.json()["items"][0]["filename"] == f"{note_filename}.md"
+    assert "text" not in listed.json()["items"][0]
 
     note_file_response = client.get(f"/markdown/meeting-notes/{note_filename}.md")
     assert note_file_response.status_code == 200
@@ -185,6 +188,59 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert client.get("/workspace.db").status_code == 404
     assert client.get("/system.db").status_code == 404
     assert client.get("/system.db-wal").status_code == 404
+
+
+def test_list_notes_uses_cursor_pagination_and_aggregate_counts(client: TestClient):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "pagination@example.com",
+            "name": "Pagination User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Pagination"}).json()
+    notes = [
+        client.post(
+            "/api/notes/from-text",
+            json={
+                "folder_id": folder["id"],
+                "title": f"Paged note {index}",
+                "text": f"Body for note {index}",
+            },
+        ).json()
+        for index in range(3)
+    ]
+    client.post(f"/api/notes/{notes[0]['id']}/comments", json={"body": "One comment"})
+
+    first_page = client.get("/api/notes", params={"folder_id": folder["id"], "limit": 2})
+
+    assert first_page.status_code == 200
+    first_payload = first_page.json()
+    assert first_payload["total"] == 3
+    assert first_payload["limit"] == 2
+    assert first_payload["next_cursor"]
+    assert len(first_payload["items"]) == 2
+    assert first_payload["counts"]["folders"][folder["id"]] == 3
+
+    second_page = client.get(
+        "/api/notes",
+        params={"folder_id": folder["id"], "limit": 2, "cursor": first_payload["next_cursor"]},
+    )
+
+    assert second_page.status_code == 200
+    second_payload = second_page.json()
+    assert second_payload["total"] == 3
+    assert second_payload["next_cursor"] is None
+    assert len(second_payload["items"]) == 1
+    returned_ids = {item["id"] for item in first_payload["items"] + second_payload["items"]}
+    assert returned_ids == {note["id"] for note in notes}
+    comment_counts = {
+        item["id"]: item["comments_count"]
+        for item in first_payload["items"] + second_payload["items"]
+    }
+    assert comment_counts[notes[0]["id"]] == 1
 
 
 def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
@@ -398,8 +454,8 @@ def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path
 
     old_folder_notes = client.get("/api/notes", params={"folder_id": inbox["id"]})
     new_folder_notes = client.get("/api/notes", params={"folder_id": archive["id"]})
-    assert old_folder_notes.json() == []
-    assert new_folder_notes.json()[0]["id"] == note["id"]
+    assert old_folder_notes.json()["items"] == []
+    assert new_folder_notes.json()["items"][0]["id"] == note["id"]
 
 
 def test_updating_failed_note_clears_failed_status_and_console_job(client: TestClient):
@@ -490,8 +546,8 @@ def test_create_empty_text_note_does_not_create_source_file(
 
     listed = client.get("/api/notes", params={"folder_id": folder["id"]})
     assert listed.status_code == 200
-    assert listed.json()[0]["id"] == note["id"]
-    assert listed.json()[0]["source_files"] == []
+    assert listed.json()["items"][0]["id"] == note["id"]
+    assert listed.json()["items"][0]["source_files"] == []
 
 
 def test_get_note_returns_clear_error_when_markdown_file_is_missing(
@@ -560,9 +616,9 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     assert starred.json()["updated_at"] == note["updated_at"]
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
-    assert [item["id"] for item in listed.json()] == [note["id"]]
-    assert listed.json()[0]["is_starred"] is True
-    assert listed.json()[0]["updated_at"] == note["updated_at"]
+    assert [item["id"] for item in listed.json()["items"]] == [note["id"]]
+    assert listed.json()["items"][0]["is_starred"] is True
+    assert listed.json()["items"][0]["updated_at"] == note["updated_at"]
 
     second_user = client.post(
         "/api/auth/join",
@@ -575,7 +631,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     ).json()["user"]
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
-    assert listed.json() == []
+    assert listed.json()["items"] == []
     visible_note = client.get(f"/api/notes/{note['id']}")
     assert visible_note.status_code == 200
     assert visible_note.json()["is_starred"] is False
@@ -585,7 +641,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     assert second_starred.json()["is_starred"] is True
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
-    assert [item["id"] for item in listed.json()] == [note["id"]]
+    assert [item["id"] for item in listed.json()["items"]] == [note["id"]]
 
     client.post("/api/auth/login", json={"user_id": admin["id"], "password": "house-password"})
     unstarred = client.patch(f"/api/notes/{note['id']}/star", json={"is_starred": False})
@@ -595,7 +651,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     assert unstarred.json()["updated_at"] == note["updated_at"]
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
-    assert listed.json() == []
+    assert listed.json()["items"] == []
 
     client.post(
         "/api/auth/login",
@@ -603,7 +659,7 @@ def test_note_star_can_be_toggled_and_filtered(client: TestClient):
     )
     listed = client.get("/api/notes", params={"starred": True})
     assert listed.status_code == 200
-    assert [item["id"] for item in listed.json()] == [note["id"]]
+    assert [item["id"] for item in listed.json()["items"]] == [note["id"]]
 
 
 def test_create_note_from_text_accepts_plain_notes_endpoint(client: TestClient):
@@ -693,7 +749,10 @@ def test_list_notes_backfills_summary_from_note_body(client: TestClient):
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    assert listed.json()[0]["summary"] == "The useful description should come from the note body."
+    assert (
+        listed.json()["items"][0]["summary"]
+        == "The useful description should come from the note body."
+    )
 
 
 def test_list_notes_backfills_stale_wrapped_summary(client: TestClient):
@@ -730,7 +789,10 @@ def test_list_notes_backfills_stale_wrapped_summary(client: TestClient):
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    assert listed.json()[0]["summary"] == "Only this sentence should appear in the note list."
+    assert (
+        listed.json()["items"][0]["summary"]
+        == "Only this sentence should appear in the note list."
+    )
 
 
 def test_create_note_from_file_stores_source_and_pending_note(
@@ -779,7 +841,7 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    listed_note = next(item for item in listed.json() if item["id"] == note["id"])
+    listed_note = next(item for item in listed.json()["items"] if item["id"] == note["id"])
     assert listed_note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert listed_note["source_files"][0]["url"].endswith(
         f"/markdown/uploads/sources/{note['id'][:8]}/original.pdf"
@@ -1182,7 +1244,7 @@ def test_create_note_from_url_queues_parse_job(client: TestClient, tmp_path: Pat
 
     listed = client.get("/api/notes")
     assert listed.status_code == 200
-    listed_note = next(item for item in listed.json() if item["id"] == note["id"])
+    listed_note = next(item for item in listed.json()["items"] if item["id"] == note["id"])
     assert listed_note["source_files"][0]["original_filename"] == (
         "https://example.com/articles/mianotes"
     )

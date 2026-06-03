@@ -211,6 +211,18 @@ class NoteListItem(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NoteListCounts(BaseModel):
+    folders: dict[str, int] = Field(default_factory=dict)
+
+
+class NoteListPage(BaseModel):
+    items: list[NoteListItem]
+    total: int
+    limit: int
+    next_cursor: str | None = None
+    counts: NoteListCounts = Field(default_factory=NoteListCounts)
+
+
 class SearchResult(BaseModel):
     note: NoteListItem
     line_number: int
