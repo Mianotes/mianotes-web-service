@@ -23,8 +23,9 @@ from mianotes_web_service.services.paths import (
     source_file_path,
     workspace_paths_for_session,
 )
+from mianotes_web_service.services.storage_settings import DEFAULT_LOCATION_ID
 from mianotes_web_service.services.storage import summarize_markdown_note
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.workspace_context import current_data_dir, session_workspace
 
 MISSING_NOTE_FILE_DETAIL = (
     "This note still exists in the database, but its Markdown file no longer exists "
@@ -42,11 +43,33 @@ def file_url(request: Request, path: str | Path, data_dir: Path | None = None) -
     return f"/{public_path.as_posix().lstrip('/')}"
 
 
-def share_url(request: Request, note: Note, token: str | None = None) -> str | None:
+def shared_workspace_id(session: Session | None) -> str:
+    workspace = session_workspace(session) if session is not None else None
+    return workspace.id if workspace is not None else DEFAULT_LOCATION_ID
+
+
+def share_url(
+    request: Request,
+    note: Note,
+    token: str | None = None,
+    session: Session | None = None,
+) -> str | None:
     if token:
-        return str(request.url_for("get_shared_note", token=token))
+        return str(
+            request.url_for(
+                "get_shared_note",
+                workspace_id=shared_workspace_id(session),
+                token=token,
+            )
+        )
     if note.shared_at is not None:
-        return str(request.url_for("get_shared_note", token="<share-token>"))
+        return str(
+            request.url_for(
+                "get_shared_note",
+                workspace_id=shared_workspace_id(session),
+                token="<share-token>",
+            )
+        )
     return None
 
 
@@ -128,6 +151,7 @@ def note_response(
                 str(
                     request.url_for(
                         "get_shared_source_file",
+                        workspace_id=shared_workspace_id(session),
                         token=share_token,
                         source_file_id=source_file.id,
                     )
@@ -164,7 +188,7 @@ def note_response(
         comments_count=len([comment for comment in note.comments if comment.body]),
         comments_url=str(request.url_for("get_note_comments", note_id=note.id)),
         tags=note.tags,
-        share_url=share_url(request, note, share_token),
+        share_url=share_url(request, note, share_token, session),
         job_id=latest_job.id if latest_job is not None else None,
         job_status=latest_job.status if latest_job is not None else None,
         actions={

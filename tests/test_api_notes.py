@@ -993,18 +993,54 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         shared = workspace_client.post(f"/api/notes/{note['id']}/share", headers=headers)
         assert shared.status_code == 200
         share_path = shared.json()["share_url"].removeprefix("http://testserver")
+        assert share_path.startswith("/api/notes/shared/workspaces/blog/")
 
-        guest_detail = TestClient(workspace_client.app).get(share_path)
+        from mianotes_web_service.api import note_sharing
+
+        opened_workspace_ids: list[str] = []
+        original_sessionmaker_for_workspace = note_sharing.sessionmaker_for_workspace
+
+        def tracking_sessionmaker_for_workspace(workspace):
+            opened_workspace_ids.append(workspace.id)
+            return original_sessionmaker_for_workspace(workspace)
+
+        monkeypatch.setattr(
+            note_sharing,
+            "sessionmaker_for_workspace",
+            tracking_sessionmaker_for_workspace,
+        )
+
+        guest_client = TestClient(workspace_client.app)
+        guest_detail = guest_client.get(share_path)
         assert guest_detail.status_code == 200
         assert guest_detail.json()["text"].startswith("# PM intro")
         assert guest_detail.json()["note_url"].endswith(f"/markdown/research/{note_filename}")
+        assert opened_workspace_ids == ["blog"]
 
         shared_source_url = guest_detail.json()["source_files"][0]["url"]
-        shared_source = TestClient(workspace_client.app).get(
-            shared_source_url.removeprefix("http://testserver")
-        )
+        assert shared_source_url.startswith("http://testserver/api/notes/shared/workspaces/blog/")
+
+        opened_workspace_ids.clear()
+        shared_source = guest_client.get(shared_source_url.removeprefix("http://testserver"))
         assert shared_source.status_code == 200
         assert shared_source.content == b"PM intro source"
+        assert opened_workspace_ids == ["blog"]
+
+        opened_workspace_ids.clear()
+        missing_share = guest_client.get("/api/notes/shared/workspaces/blog/not-a-real-token")
+        assert missing_share.status_code == 404
+        assert opened_workspace_ids == ["blog"]
+
+        opened_workspace_ids.clear()
+        legacy_missing_share = guest_client.get("/api/notes/shared/not-a-real-token")
+        assert legacy_missing_share.status_code == 404
+        assert opened_workspace_ids == []
+
+        unknown_workspace_share = guest_client.get(
+            "/api/notes/shared/workspaces/missing/not-a-real-token"
+        )
+        assert unknown_workspace_share.status_code == 404
+        assert opened_workspace_ids == []
 
     get_settings.cache_clear()
 
@@ -1495,7 +1531,7 @@ def test_note_tags_comments_and_share_link(client: TestClient):
     shared = client.post(f"/api/notes/{note['id']}/share")
     assert shared.status_code == 200
     share_url = shared.json()["share_url"]
-    assert "/api/notes/shared/" in share_url
+    assert "/api/notes/shared/workspaces/default/" in share_url
 
     guest_note = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
     assert guest_note.status_code == 200
@@ -1552,6 +1588,7 @@ def test_non_admin_user_can_share_readable_note_without_editing_it(client: TestC
     shared = client.post(f"/api/notes/{note['id']}/share")
     assert shared.status_code == 200
     share_url = shared.json()["share_url"]
+    assert "/api/notes/shared/workspaces/default/" in share_url
 
     guest_note = TestClient(client.app).get(share_url.removeprefix("http://testserver"))
     assert guest_note.status_code == 200
