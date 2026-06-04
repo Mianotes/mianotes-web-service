@@ -198,7 +198,10 @@ def fetch_url_to_file(
             request = Request(current_url, headers={"User-Agent": user_agent})
             try:
                 with _open_url(request, timeout=timeout) as response:
-                    response_url = getattr(response, "geturl", lambda: current_url)()
+                    get_response_url = getattr(response, "geturl", None)
+                    response_url = (
+                        get_response_url() if callable(get_response_url) else current_url
+                    )
                     validate_fetch_url(response_url)
                     content_length = _response_content_length(response)
                     if content_length is not None and content_length > max_bytes:

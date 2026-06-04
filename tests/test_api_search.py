@@ -7,8 +7,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from mianotes_web_service.app import create_app
 from mianotes_web_service.api import context as context_api
+from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base
 from mianotes_web_service.db.session import get_session

@@ -11,7 +11,12 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from mianotes_web_service.api.dependencies import NotesReadUser, SessionDep
 from mianotes_web_service.db.models import MiaJob, User
-from mianotes_web_service.domain.schemas import AgentClientRead, MiaJobListItem, MiaJobListPage, MiaJobRead
+from mianotes_web_service.domain.schemas import (
+    AgentClientRead,
+    MiaJobListItem,
+    MiaJobListPage,
+    MiaJobRead,
+)
 from mianotes_web_service.services.jobs import decode_job_log, decode_job_payload
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])

@@ -11,11 +11,11 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from mianotes_web_service.api.note_ingestion import _enqueue_job
 from mianotes_web_service.api.note_access import (
     read_note_for_change,
     read_note_for_response,
 )
+from mianotes_web_service.api.note_ingestion import _enqueue_job
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Base, MiaJob, Note, SourceFile, Tag, User
