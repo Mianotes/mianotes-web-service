@@ -274,11 +274,7 @@ class MarkItDownParser:
                 _convert_with_markitdown(path, **markitdown_image_options())
             )
         except MiaUnavailable:
-            return ParsedDocument(
-                text=IMAGE_NEEDS_CLOUD_MESSAGE,
-                parser="tesseract",
-                source_path=path,
-            )
+            raise ParserError(IMAGE_NEEDS_CLOUD_MESSAGE) from None
         except ParserError:
             image_text = None
 
@@ -289,11 +285,7 @@ class MarkItDownParser:
                 source_path=path,
             )
 
-        return ParsedDocument(
-            text=IMAGE_UNREADABLE_MESSAGE,
-            parser="markitdown+vlm",
-            source_path=path,
-        )
+        raise ParserError(IMAGE_UNREADABLE_MESSAGE)
 
 
 class ParserRegistry:

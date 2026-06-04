@@ -134,6 +134,48 @@ def test_job_runner_parses_file_and_updates_note(
         assert log[-1]["status"] == "succeeded"
 
 
+def test_job_runner_marks_unreadable_image_failed_with_safe_message(
+    tmp_path: Path,
+    monkeypatch,
+):
+    testing_session = _session_factory()
+    source_path = tmp_path / "data" / "folder" / "sources" / "note1234" / "original.png"
+    note_id, source_file_id = _seed_note(testing_session, tmp_path, source_path=source_path)
+
+    def fake_parse_document(_path: Path) -> ParsedDocument:
+        raise parsing.ParserError(parsing.IMAGE_NEEDS_CLOUD_MESSAGE)
+
+    monkeypatch.setattr(job_use_cases, "parse_document", fake_parse_document)
+    with testing_session() as session:
+        user = session.query(User).one()
+        job = create_job(
+            session,
+            user,
+            job_type="parse_file",
+            note_id=note_id,
+            input_payload={"source_file_id": source_file_id},
+        )
+        session.commit()
+        job_id = job.id
+
+    InProcessJobRunner(testing_session).run(job_id)
+
+    with testing_session() as session:
+        note = session.get(Note, note_id)
+        job = session.get(job_runner.MiaJob, job_id)
+        assert note is not None
+        assert job is not None
+        assert note.status == "failed"
+        assert job.status == "failed"
+        assert job.error == parsing.IMAGE_NEEDS_CLOUD_MESSAGE
+        note_text = Path(note.note_path).read_text(encoding="utf-8")
+        assert "Mia couldn't read the text in this image." in note_text
+        assert "Mia couldn't process this file." not in note_text
+        log = decode_job_log(job.log_json)
+        assert log[-1]["command"] == "finish parse_file"
+        assert log[-1]["status"] == "failed"
+
+
 def test_job_runner_parses_regular_url_with_html_fetch(
     tmp_path: Path,
     monkeypatch,

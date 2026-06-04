@@ -22,7 +22,14 @@ FAILED_LINK_WITH_REASON_MESSAGE = (
     "{reason}\n\n"
     "You can check the {console_link} screen for the technical details."
 )
+FAILED_FILE_WITH_REASON_MESSAGE = (
+    "{reason}\n\n"
+    "You can check the {console_link} screen for the technical details."
+)
 USER_SAFE_FAILURE_REASONS = frozenset({NO_YOUTUBE_SPEECH_MESSAGE})
+USER_SAFE_FAILURE_PREFIXES = (
+    "Mia couldn't read the text in this image.",
+)
 NOTE_JOB_TYPES = frozenset({"parse_file", "parse_url"})
 
 
@@ -58,8 +65,13 @@ def persist_note_text_update(session: Session, job_id: str, text: str) -> None:
 
 def _failure_message(job: MiaJob, *, failure_reason: str | None) -> str:
     console_link = f"[Console](/jobs?job={job.id})"
-    if job.job_type == "parse_url" and failure_reason in USER_SAFE_FAILURE_REASONS:
-        return FAILED_LINK_WITH_REASON_MESSAGE.format(
+    if failure_reason and _is_user_safe_failure_reason(failure_reason):
+        message_template = (
+            FAILED_LINK_WITH_REASON_MESSAGE
+            if job.job_type == "parse_url"
+            else FAILED_FILE_WITH_REASON_MESSAGE
+        )
+        return message_template.format(
             console_link=console_link,
             reason=failure_reason,
         )
@@ -68,3 +80,9 @@ def _failure_message(job: MiaJob, *, failure_reason: str | None) -> str:
         FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
     )
     return message_template.format(console_link=console_link)
+
+
+def _is_user_safe_failure_reason(failure_reason: str) -> bool:
+    return failure_reason in USER_SAFE_FAILURE_REASONS or failure_reason.startswith(
+        USER_SAFE_FAILURE_PREFIXES
+    )

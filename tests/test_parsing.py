@@ -704,7 +704,7 @@ def test_image_parser_uses_tesseract_before_llm(
     assert parsed.text == "Receipt total\n\n£42.50"
 
 
-def test_image_parser_uses_tiff_preprocess_when_png_reader_fails(
+def test_image_parser_uses_pgm_preprocess_when_png_reader_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -715,7 +715,7 @@ def test_image_parser_uses_tiff_preprocess_when_png_reader_fails(
     attempted_paths: list[Path] = []
 
     def fake_preprocess(_source_path: Path, output_path: Path):
-        output_path.write_bytes(b"fake tiff")
+        output_path.write_bytes(b"fake pgm")
         return output_path
 
     def fake_run(args, **_kwargs):
@@ -750,22 +750,22 @@ def test_image_parser_uses_tiff_preprocess_when_png_reader_fails(
     assert parsed.parser == "tesseract"
     assert parsed.text == "Readable text from the preprocessed screenshot."
     assert any(path.suffix == ".png" for path in attempted_paths)
-    assert any(path.name == "image.tiff" for path in attempted_paths)
+    assert any(path.name == "image.pgm" for path in attempted_paths)
 
 
-def test_preprocess_image_for_ocr_writes_tiff(
+def test_preprocess_image_for_ocr_writes_pgm(
     tmp_path: Path,
 ):
     Image = pytest.importorskip("PIL.Image")
     source = tmp_path / "source.png"
-    output = tmp_path / "image.tiff"
+    output = tmp_path / "image.pgm"
     Image.new("RGB", (12, 12), color="white").save(source)
 
     processed_path = parser_image.preprocess_image_for_ocr(source, output)
 
     assert processed_path == output
     with Image.open(output) as image:
-        assert image.format == "TIFF"
+        assert image.format == "PPM"
 
 
 def test_image_parser_uses_tesseract_without_markitdown_metadata(
@@ -957,10 +957,10 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
 
-    parsed = parse_document(source)
+    with pytest.raises(ParserError) as exc_info:
+        parse_document(source)
 
-    assert parsed.parser == "tesseract"
-    assert parsed.text == IMAGE_NEEDS_CLOUD_MESSAGE
+    assert str(exc_info.value) == IMAGE_NEEDS_CLOUD_MESSAGE
 
 
 def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
@@ -986,10 +986,10 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
         lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
     )
 
-    parsed = parse_document(source)
+    with pytest.raises(ParserError) as exc_info:
+        parse_document(source)
 
-    assert parsed.parser == "markitdown+vlm"
-    assert parsed.text == IMAGE_UNREADABLE_MESSAGE
+    assert str(exc_info.value) == IMAGE_UNREADABLE_MESSAGE
 
 
 def test_missing_markitdown_reports_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

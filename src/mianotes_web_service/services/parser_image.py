@@ -123,7 +123,7 @@ def preprocess_image_for_ocr(source_path: Path, output_path: Path) -> Path | Non
             image = ImageEnhance.Sharpness(image).enhance(1.8)
             if max(image.size) < 2400:
                 image = image.resize((image.width * 2, image.height * 2))
-            image.save(output_path, format="TIFF")
+            image.save(output_path, format="PPM")
     except OSError:
         log_parser_command(command, "could not preprocess image", status="failed")
         return None
@@ -143,7 +143,7 @@ def tesseract_ocr(path: Path, *, executable: str | None = None) -> str | None:
             attempts.append(text)
 
     with tempfile.TemporaryDirectory(prefix="mianotes-ocr-") as temp_dir:
-        processed_path = preprocess_image_for_ocr(path, Path(temp_dir) / "image.tiff")
+        processed_path = preprocess_image_for_ocr(path, Path(temp_dir) / "image.pgm")
         if processed_path is not None:
             for psm in ("6", "11"):
                 text = run_tesseract(executable, processed_path, psm=psm)
