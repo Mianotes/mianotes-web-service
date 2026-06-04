@@ -1199,6 +1199,32 @@ def test_create_note_from_file_uses_requested_workspace_storage(
             f"/markdown/research/{source_filename}"
         )
 
+        text_response = workspace_client.post(
+            "/api/notes/from-text",
+            json={
+                "folder_id": folder["id"],
+                "title": "Workspace markdown source",
+                "text": "This is the raw Markdown body.",
+            },
+            headers=headers,
+        )
+        assert text_response.status_code == 201
+        text_note = text_response.json()
+
+        markdown_source = workspace_client.get(
+            f"/api/workspaces/blog/markdown/{text_note['id']}"
+        )
+        assert markdown_source.status_code == 200
+        assert markdown_source.headers["content-disposition"].startswith("inline;")
+        assert markdown_source.headers["content-type"].startswith("text/plain")
+        assert markdown_source.text.startswith("# Workspace markdown source")
+        assert "This is the raw Markdown body." in markdown_source.text
+
+        public_markdown_source = TestClient(workspace_client.app).get(
+            f"/api/workspaces/blog/markdown/{text_note['id']}"
+        )
+        assert public_markdown_source.status_code == 401
+
         shared = workspace_client.post(f"/api/notes/{note['id']}/share", headers=headers)
         assert shared.status_code == 200
         share_path = shared.json()["share_url"].removeprefix("http://testserver")

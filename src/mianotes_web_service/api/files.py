@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import (
     NotesReadUser,
@@ -14,14 +14,21 @@ from mianotes_web_service.api.dependencies import (
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile
-from mianotes_web_service.db.workspace_routing import workspace_by_id
+from mianotes_web_service.db.workspace_routing import (
+    sessionmaker_for_workspace,
+    workspace_by_id,
+)
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
     SQLITE_SIDECAR_SUFFIXES,
     SYSTEM_DATABASE_FILENAME,
 )
-from mianotes_web_service.services.workspace_context import current_data_dir
+from mianotes_web_service.services.workspace_context import (
+    current_data_dir,
+    reset_current_workspace,
+    set_current_workspace,
+)
 
 router = APIRouter(tags=["files"])
 PRIVATE_DATA_FILENAMES = {
@@ -48,6 +55,19 @@ def _file_response(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
     headers = {"Cache-Control": "no-store"} if no_store else None
     return FileResponse(target, headers=headers)
+
+
+def _inline_markdown_response(target: Path) -> FileResponse:
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(
+        target,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'inline; filename="{target.name}"',
+        },
+    )
 
 
 def _clean_file_path(file_path: str) -> str:
@@ -101,6 +121,17 @@ def _has_authenticated_file_access(request: Request, session: Session) -> bool:
     except HTTPException:
         return False
     return "admin" in context.scopes or "notes:read" in context.scopes
+
+
+def _note_markdown_response(note: Note, session: Session) -> FileResponse:
+    paths = workspace_paths_for_session(session)
+    markdown_root = paths.markdown_root.resolve()
+    target = paths.note_file_path(note).resolve()
+    try:
+        target.relative_to(markdown_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found") from exc
+    return _inline_markdown_response(target)
 
 
 def _published_markdown_response(file_path: str, session: Session) -> FileResponse:
@@ -218,6 +249,42 @@ def get_markdown_file(
     if _has_authenticated_file_access(request, session):
         return _file_response(f"markdown/{clean}", data_dir=data_dir)
     return _published_markdown_response(clean, session)
+
+
+@router.get(
+    "/api/workspaces/{workspace_id}/markdown/{note_id}",
+    name="get_workspace_note_markdown_file",
+    include_in_schema=False,
+)
+def get_workspace_note_markdown_file(
+    workspace_id: str,
+    note_id: str,
+    request: Request,
+) -> FileResponse:
+    workspace = workspace_by_id(workspace_id)
+    token = set_current_workspace(workspace)
+    try:
+        with sessionmaker_for_workspace(workspace)() as session:
+            session.info["workspace"] = workspace
+            if not _has_authenticated_file_access(request, session):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not signed in",
+                )
+            note = session.scalars(
+                select(Note)
+                .options(joinedload(Note.folder))
+                .where(Note.id == note_id)
+                .limit(1)
+            ).one_or_none()
+            if note is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Note not found",
+                )
+            return _note_markdown_response(note, session)
+    finally:
+        reset_current_workspace(token)
 
 
 @router.get("/.profiles/{file_path:path}", include_in_schema=False)
