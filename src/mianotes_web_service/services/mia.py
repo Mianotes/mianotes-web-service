@@ -142,11 +142,7 @@ def markitdown_llm_options() -> dict[str, object]:
     )
 
 
-def markitdown_openai_image_options() -> dict[str, object]:
-    settings = get_settings()
-    if settings.vlm_provider.strip().lower() != "openai":
-        raise MiaUnavailable("OpenAI image OCR is not configured")
-
+def markitdown_image_options() -> dict[str, object]:
     config = _vlm_config()
     return _markitdown_image_options(
         client=_client_for(config),

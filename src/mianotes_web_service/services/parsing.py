@@ -5,8 +5,8 @@ from pathlib import Path
 
 from mianotes_web_service.services.mia import (
     MiaUnavailable,
+    markitdown_image_options,
     markitdown_llm_options,
-    markitdown_openai_image_options,
 )
 from mianotes_web_service.services.parser_audio import (
     AUDIO_CHUNK_SECONDS as AUDIO_CHUNK_SECONDS,
@@ -265,20 +265,18 @@ class MarkItDownParser:
         raise ParserError(NO_AUDIO_SPEECH_MESSAGE)
 
     def _parse_image(self, path: Path) -> ParsedDocument:
-        _convert_with_markitdown(path)
-
         ocr_text = _tesseract_ocr(path)
         if ocr_text:
-            return ParsedDocument(text=ocr_text, parser="markitdown+tesseract", source_path=path)
+            return ParsedDocument(text=ocr_text, parser="tesseract", source_path=path)
 
         try:
             image_text = _normalise_image_markdown(
-                _convert_with_markitdown(path, **markitdown_openai_image_options())
+                _convert_with_markitdown(path, **markitdown_image_options())
             )
         except MiaUnavailable:
             return ParsedDocument(
                 text=IMAGE_NEEDS_CLOUD_MESSAGE,
-                parser="markitdown+tesseract",
+                parser="tesseract",
                 source_path=path,
             )
         except ParserError:
@@ -287,13 +285,13 @@ class MarkItDownParser:
         if image_text:
             return ParsedDocument(
                 text=image_text,
-                parser="markitdown+tesseract+openai",
+                parser="markitdown+vlm",
                 source_path=path,
             )
 
         return ParsedDocument(
             text=IMAGE_UNREADABLE_MESSAGE,
-            parser="markitdown+tesseract+openai",
+            parser="markitdown+vlm",
             source_path=path,
         )
 

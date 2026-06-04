@@ -652,7 +652,7 @@ def test_image_parser_uses_configured_llm_options(
 
     monkeypatch.setattr(
         parsing,
-        "markitdown_openai_image_options",
+        "markitdown_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "llama3.2-vision",
@@ -700,8 +700,37 @@ def test_image_parser_uses_tesseract_before_llm(
 
     parsed = parse_document(source)
 
-    assert parsed.parser == "markitdown+tesseract"
+    assert parsed.parser == "tesseract"
     assert parsed.text == "Receipt total\n\n£42.50"
+
+
+def test_image_parser_uses_tesseract_without_markitdown_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scan.tiff"
+    source.write_bytes(b"fake image")
+    tesseract = tmp_path / "tesseract"
+    tesseract.write_text("fake executable", encoding="utf-8")
+
+    def fake_run(*_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout="Invoice number 12345\n\nTotal due £90.00\n",
+        )
+
+    def fail_if_markitdown_is_loaded(_: str):
+        pytest.fail("MarkItDown should not run before local image OCR")
+
+    monkeypatch.setattr(shutil, "which", lambda command: str(tesseract))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
+    monkeypatch.setattr(parser_markitdown.importlib, "import_module", fail_if_markitdown_is_loaded)
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "tesseract"
+    assert parsed.text == "Invoice number 12345\n\nTotal due £90.00"
 
 
 def test_image_parser_strips_ocr_code_block_indentation(
@@ -761,7 +790,7 @@ def test_image_parser_strips_markdown_fence_from_llm_output(
     monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
-        "markitdown_openai_image_options",
+        "markitdown_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "gpt-4o-mini",
@@ -825,7 +854,7 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
     monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", lambda *_args: None)
     monkeypatch.setattr(
         parsing,
-        "markitdown_openai_image_options",
+        "markitdown_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "gpt-4o-mini",
@@ -841,7 +870,7 @@ def test_image_parser_falls_back_to_llm_when_tesseract_has_no_text(
     parsed = parse_document(source)
 
     assert parsed.text == "A photo of a whiteboard."
-    assert parsed.parser == "markitdown+tesseract+openai"
+    assert parsed.parser == "markitdown+vlm"
     assert created_with["llm_model"] == "gpt-4o-mini"
 
 
@@ -855,7 +884,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
     monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
-        "markitdown_openai_image_options",
+        "markitdown_image_options",
         lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("OpenAI is not configured")),
     )
     monkeypatch.setattr(
@@ -866,7 +895,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
 
     parsed = parse_document(source)
 
-    assert parsed.parser == "markitdown+tesseract"
+    assert parsed.parser == "tesseract"
     assert parsed.text == IMAGE_NEEDS_CLOUD_MESSAGE
 
 
@@ -880,7 +909,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
     monkeypatch.setattr(shutil, "which", lambda command: None)
     monkeypatch.setattr(
         parsing,
-        "markitdown_openai_image_options",
+        "markitdown_image_options",
         lambda: {
             "llm_client": object(),
             "llm_model": "gpt-4o-mini",
@@ -895,7 +924,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
 
     parsed = parse_document(source)
 
-    assert parsed.parser == "markitdown+tesseract+openai"
+    assert parsed.parser == "markitdown+vlm"
     assert parsed.text == IMAGE_UNREADABLE_MESSAGE
 
 
