@@ -45,6 +45,9 @@ artifacts = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+  "performance: opt-in tests that seed larger datasets and inspect database behavior",
+]
 
 [tool.ruff]
 line-length = 100
