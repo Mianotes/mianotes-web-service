@@ -659,7 +659,7 @@ def test_image_parser_uses_configured_llm_options(
             "llm_prompt": "Convert this image into useful Markdown.",
         },
     )
-    monkeypatch.setattr(shutil, "which", lambda command: None)
+    monkeypatch.setattr(parser_image, "tesseract_executable", lambda: None)
     monkeypatch.setattr(
         parser_markitdown.importlib,
         "import_module",
@@ -702,6 +702,70 @@ def test_image_parser_uses_tesseract_before_llm(
 
     assert parsed.parser == "tesseract"
     assert parsed.text == "Receipt total\n\n£42.50"
+
+
+def test_image_parser_uses_tiff_preprocess_when_png_reader_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "screenshot.png"
+    source.write_bytes(b"fake image")
+    tesseract = tmp_path / "tesseract"
+    tesseract.write_text("fake executable", encoding="utf-8")
+    attempted_paths: list[Path] = []
+
+    def fake_preprocess(_source_path: Path, output_path: Path):
+        output_path.write_bytes(b"fake tiff")
+        return output_path
+
+    def fake_run(args, **_kwargs):
+        if args[1] == "--version":
+            return SimpleNamespace(returncode=0, stdout="tesseract 5.5.2", stderr="")
+
+        attempted_path = Path(args[1])
+        attempted_paths.append(attempted_path)
+        if attempted_path.suffix == ".png":
+            return SimpleNamespace(
+                returncode=1,
+                stdout="",
+                stderr="Error in pixReadStreamPng: png_ptr not made",
+            )
+        return SimpleNamespace(
+            returncode=0,
+            stdout="Readable text from the preprocessed screenshot.",
+            stderr="",
+        )
+
+    monkeypatch.setattr(shutil, "which", lambda command: str(tesseract))
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(parser_image, "preprocess_image_for_ocr", fake_preprocess)
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: _fake_markitdown_module("ImageSize: 1179x1967"),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "tesseract"
+    assert parsed.text == "Readable text from the preprocessed screenshot."
+    assert any(path.suffix == ".png" for path in attempted_paths)
+    assert any(path.name == "image.tiff" for path in attempted_paths)
+
+
+def test_preprocess_image_for_ocr_writes_tiff(
+    tmp_path: Path,
+):
+    Image = pytest.importorskip("PIL.Image")
+    source = tmp_path / "source.png"
+    output = tmp_path / "image.tiff"
+    Image.new("RGB", (12, 12), color="white").save(source)
+
+    processed_path = parser_image.preprocess_image_for_ocr(source, output)
+
+    assert processed_path == output
+    with Image.open(output) as image:
+        assert image.format == "TIFF"
 
 
 def test_image_parser_uses_tesseract_without_markitdown_metadata(
@@ -787,7 +851,7 @@ def test_image_parser_strips_markdown_fence_from_llm_output(
                 )
             )
 
-    monkeypatch.setattr(shutil, "which", lambda command: None)
+    monkeypatch.setattr(parser_image, "tesseract_executable", lambda: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_image_options",
@@ -881,7 +945,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_is_not_configured(
     source = tmp_path / "photo.png"
     source.write_bytes(b"fake image")
 
-    monkeypatch.setattr(shutil, "which", lambda command: None)
+    monkeypatch.setattr(parser_image, "tesseract_executable", lambda: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_image_options",
@@ -906,7 +970,7 @@ def test_image_parser_adds_feedback_when_cloud_llm_finds_no_text(
     source = tmp_path / "photo.png"
     source.write_bytes(b"fake image")
 
-    monkeypatch.setattr(shutil, "which", lambda command: None)
+    monkeypatch.setattr(parser_image, "tesseract_executable", lambda: None)
     monkeypatch.setattr(
         parsing,
         "markitdown_image_options",

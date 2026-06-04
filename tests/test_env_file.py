@@ -49,6 +49,13 @@ def test_upsert_env_value_quotes_and_replaces_existing_export(tmp_path: Path):
     assert read_env_value(env_file, "MIANOTES_API_KEY") == 'mia_"quoted"'
 
 
+def test_read_env_value_ignores_invalid_env_file(tmp_path: Path):
+    env_file = tmp_path / ".env"
+    env_file.write_bytes(b"\x89PNG\r\n")
+
+    assert read_env_value(env_file, "MIANOTES_API_KEY") is None
+
+
 def test_ensure_service_api_url_writes_default_when_missing(tmp_path: Path):
     env_file = tmp_path / ".env"
 

@@ -30,7 +30,11 @@ def read_env_value(path: Path, key: str) -> str | None:
     if not path.exists():
         return None
     pattern = re.compile(rf"^\s*(?:export\s+)?{re.escape(key)}\s*=\s*(.*)$")
-    for line in path.read_text(encoding="utf-8").splitlines():
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in contents.splitlines():
         match = pattern.match(line)
         if match:
             return _unquote_env_value(match.group(1))
