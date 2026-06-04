@@ -21,6 +21,7 @@ from mianotes_web_service.services.jobs import (
     mark_job_running,
     mark_job_succeeded,
 )
+from mianotes_web_service.services.parser_types import PartialParseError
 from mianotes_web_service.services.parser_youtube import NO_YOUTUBE_SPEECH_MESSAGE
 from mianotes_web_service.services.parsing import (
     parser_job_logging,
@@ -114,7 +115,15 @@ class InProcessJobRunner:
             session.rollback()
             failed_job = session.get(MiaJob, job_id)
             if failed_job is not None:
-                mark_note_failed(failed_job, failure_reason=str(exc))
+                if isinstance(exc, PartialParseError):
+                    mark_note_failed(
+                        failed_job,
+                        failure_reason=str(exc),
+                        partial_text=exc.partial_text,
+                        partial_failure_message=exc.partial_failure_message,
+                    )
+                else:
+                    mark_note_failed(failed_job, failure_reason=str(exc))
                 append_job_log(
                     failed_job,
                     command=f"finish {failed_job.job_type}",

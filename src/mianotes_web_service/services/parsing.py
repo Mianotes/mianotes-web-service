@@ -91,6 +91,7 @@ from mianotes_web_service.services.parser_types import (
     DocumentParser,
     ParsedDocument,
     ParserError,
+    PartialParseError,
 )
 from mianotes_web_service.services.parser_types import (
     ParserUnavailable as ParserUnavailable,
@@ -135,10 +136,18 @@ DOCUMENT_UNREADABLE_MESSAGE = (
     "like this, connect Mia to a local or cloud AI model, then upload the file again."
 )
 NO_AUDIO_SPEECH_MESSAGE = "Mia could not detect speech in the audio."
+PARTIAL_AUDIO_TRANSCRIPT_MESSAGE = (
+    "Mia could not finish transcribing this audio.\n\n"
+    "The partial transcript above was saved."
+)
 
 
 def _is_audio_not_understood_error(exc: ParserError) -> bool:
     return "UnknownValueError" in str(exc)
+
+
+def _audio_transcript_text(transcript_parts: list[str]) -> str:
+    return "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
 
 
 def _normalise_document_text(path: Path, text: str) -> str:
@@ -251,17 +260,21 @@ class MarkItDownParser:
                             NO_AUDIO_SPEECH_MESSAGE,
                         )
                         continue
+                    if transcript_parts:
+                        raise PartialParseError(
+                            f"Audio chunk transcription failed for {chunk_path.name}: {exc}",
+                            partial_text=_audio_transcript_text(transcript_parts),
+                            partial_failure_message=PARTIAL_AUDIO_TRANSCRIPT_MESSAGE,
+                        ) from exc
                     raise ParserError(
                         f"Audio chunk transcription failed for {chunk_path.name}: {exc}"
                     ) from exc
                 if chunk_text.strip():
                     transcript_parts.append(f"### Part {index}\n\n{chunk_text}")
-                    _emit_parser_text_update(
-                        "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
-                    )
+                    _emit_parser_text_update(_audio_transcript_text(transcript_parts))
 
             if transcript_parts:
-                return "## Audio transcript\n\n" + "\n\n".join(transcript_parts)
+                return _audio_transcript_text(transcript_parts)
         raise ParserError(NO_AUDIO_SPEECH_MESSAGE)
 
     def _parse_image(self, path: Path) -> ParsedDocument:

@@ -26,6 +26,10 @@ FAILED_FILE_WITH_REASON_MESSAGE = (
     "{reason}\n\n"
     "You can check the {console_link} screen for the technical details."
 )
+PARTIAL_FILE_FAILURE_MESSAGE = (
+    "{reason}\n\n"
+    "You can check the {console_link} screen for the technical details."
+)
 USER_SAFE_FAILURE_REASONS = frozenset({NO_YOUTUBE_SPEECH_MESSAGE})
 USER_SAFE_FAILURE_PREFIXES = (
     "Mia couldn't read the text in this image.",
@@ -42,12 +46,25 @@ def write_note_markdown(note: Note, text: str) -> None:
     )
 
 
-def mark_note_failed(job: MiaJob, *, failure_reason: str | None = None) -> None:
+def mark_note_failed(
+    job: MiaJob,
+    *,
+    failure_reason: str | None = None,
+    partial_text: str | None = None,
+    partial_failure_message: str | None = None,
+) -> None:
     if job.note is None or job.job_type not in NOTE_JOB_TYPES:
         return
 
     job.note.status = "failed"
-    message = _failure_message(job, failure_reason=failure_reason)
+    if partial_text:
+        failure_message = _partial_failure_message(
+            job,
+            partial_failure_message=partial_failure_message,
+        )
+        message = f"{partial_text.rstrip()}\n\n---\n\n{failure_message}"
+    else:
+        message = _failure_message(job, failure_reason=failure_reason)
     write_note_markdown(job.note, message)
     job.note.summary = summarize_text(message)
 
@@ -80,6 +97,19 @@ def _failure_message(job: MiaJob, *, failure_reason: str | None) -> str:
         FAILED_LINK_MESSAGE if job.job_type == "parse_url" else FAILED_FILE_MESSAGE
     )
     return message_template.format(console_link=console_link)
+
+
+def _partial_failure_message(
+    job: MiaJob,
+    *,
+    partial_failure_message: str | None,
+) -> str:
+    console_link = f"[Console](/jobs?job={job.id})"
+    reason = partial_failure_message or "Mia could not finish processing this file."
+    return PARTIAL_FILE_FAILURE_MESSAGE.format(
+        console_link=console_link,
+        reason=reason,
+    )
 
 
 def _is_user_safe_failure_reason(failure_reason: str) -> bool:

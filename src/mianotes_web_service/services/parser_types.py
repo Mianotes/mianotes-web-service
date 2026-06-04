@@ -9,6 +9,19 @@ class ParserError(RuntimeError):
     pass
 
 
+class PartialParseError(ParserError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        partial_text: str,
+        partial_failure_message: str,
+    ) -> None:
+        super().__init__(message)
+        self.partial_text = partial_text
+        self.partial_failure_message = partial_failure_message
+
+
 class ParserUnavailable(ParserError):
     pass
 

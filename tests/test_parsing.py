@@ -25,6 +25,7 @@ from mianotes_web_service.services.parsing import (
     MarkItDownParser,
     ParserError,
     ParserUnavailable,
+    PartialParseError,
     fetch_url_to_html,
     is_youtube_url,
     parse_document,
@@ -1259,6 +1260,54 @@ def test_audio_parser_reports_original_and_fallback_failures(
 
     with pytest.raises(ParserError, match="chunk-000.mp3"):
         parse_document(source)
+
+
+def test_audio_parser_preserves_partial_transcript_when_later_chunk_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "recording.m4a"
+    source.write_bytes(b"fake audio")
+
+    class FakeMarkItDown:
+        def convert(self, path: str):
+            name = Path(path).name
+            if name == "chunk-000.mp3":
+                return SimpleNamespace(text_content="First chunk transcript")
+            if name == "chunk-001.mp3":
+                raise RuntimeError("Connection reset by peer")
+            return SimpleNamespace(text_content="")
+
+    def fake_run(args, **_kwargs):
+        if args[-1] in {"-version", "--version"}:
+            return SimpleNamespace(returncode=0, stdout="ffmpeg ok", stderr="")
+        if "segment" in args:
+            chunk_dir = Path(args[-1]).parent
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            (chunk_dir / "chunk-000.mp3").write_bytes(b"chunk one")
+            (chunk_dir / "chunk-001.mp3").write_bytes(b"chunk two")
+        else:
+            Path(args[-1]).write_bytes(b"low quality mp3")
+        return SimpleNamespace(returncode=0, stdout="", stderr="encoded")
+
+    monkeypatch.setattr(shutil, "which", lambda command: "/opt/homebrew/bin/ffmpeg")
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    with pytest.raises(PartialParseError) as exc_info:
+        parse_document(source)
+
+    assert "chunk-001.mp3" in str(exc_info.value)
+    assert "## Audio transcript" in exc_info.value.partial_text
+    assert "### Part 1" in exc_info.value.partial_text
+    assert "First chunk transcript" in exc_info.value.partial_text
+    assert "Mia could not finish transcribing this audio." in (
+        exc_info.value.partial_failure_message
+    )
 
 
 def test_ffmpeg_executable_skips_broken_path(monkeypatch: pytest.MonkeyPatch):
