@@ -72,7 +72,8 @@ def tesseract_executable() -> str | None:
 
 
 def run_tesseract(executable: str, path: Path, *, psm: str) -> str | None:
-    command_parts = [executable, str(path), "stdout", "--psm", psm]
+    resolved_path = path.resolve()
+    command_parts = [executable, str(resolved_path), "stdout", "--psm", psm]
     command = shlex.join(command_parts)
     try:
         completed = subprocess.run(
@@ -143,7 +144,7 @@ def tesseract_ocr(path: Path, *, executable: str | None = None) -> str | None:
             attempts.append(text)
 
     with tempfile.TemporaryDirectory(prefix="mianotes-ocr-") as temp_dir:
-        processed_path = preprocess_image_for_ocr(path, Path(temp_dir) / "image.pgm")
+        processed_path = preprocess_image_for_ocr(path, Path(temp_dir) / "image.ppm")
         if processed_path is not None:
             for psm in ("6", "11"):
                 text = run_tesseract(executable, processed_path, psm=psm)

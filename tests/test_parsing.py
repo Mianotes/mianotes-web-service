@@ -750,15 +750,43 @@ def test_image_parser_uses_pgm_preprocess_when_png_reader_fails(
     assert parsed.parser == "tesseract"
     assert parsed.text == "Readable text from the preprocessed screenshot."
     assert any(path.suffix == ".png" for path in attempted_paths)
-    assert any(path.name == "image.pgm" for path in attempted_paths)
+    assert any(path.name == "image.ppm" for path in attempted_paths)
 
 
-def test_preprocess_image_for_ocr_writes_pgm(
+def test_run_tesseract_resolves_symlinked_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    real_dir = tmp_path / "real"
+    real_dir.mkdir()
+    symlink_dir = tmp_path / "tmp"
+    symlink_dir.symlink_to(real_dir, target_is_directory=True)
+    source = symlink_dir / "image.ppm"
+    source.write_text("P5\n1 1\n255\nx", encoding="utf-8")
+    attempted_paths: list[str] = []
+
+    def fake_run(args, **_kwargs):
+        attempted_paths.append(args[1])
+        return SimpleNamespace(
+            returncode=0,
+            stdout="Readable text from resolved image path.",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    text = parser_image.run_tesseract("tesseract", source, psm="6")
+
+    assert text == "Readable text from resolved image path."
+    assert attempted_paths == [str(source.resolve())]
+
+
+def test_preprocess_image_for_ocr_writes_ppm(
     tmp_path: Path,
 ):
     Image = pytest.importorskip("PIL.Image")
     source = tmp_path / "source.png"
-    output = tmp_path / "image.pgm"
+    output = tmp_path / "image.ppm"
     Image.new("RGB", (12, 12), color="white").save(source)
 
     processed_path = parser_image.preprocess_image_for_ocr(source, output)
