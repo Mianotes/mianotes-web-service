@@ -107,6 +107,7 @@ AUTOLINK_PATTERN = re.compile(
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+)>"
 )
 ACCIDENTAL_TEXT_DIRECTIVE_PATTERN = re.compile(r"(?<![\\:]):(?=[A-Za-z])")
+STANDALONE_PAGE_HEADING_PATTERN = re.compile(r"^#{0,6}\s*Page\s+\d+\s*$", re.IGNORECASE)
 
 
 def normalise_image_markdown(text: str) -> str | None:
@@ -153,6 +154,23 @@ def normalise_document_ocr_markdown(text: str) -> str:
         return text
 
     return re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+
+
+def remove_standalone_page_headings(text: str) -> str:
+    parts = FENCED_CODE_BLOCK_PATTERN.split(text)
+    removed_count = 0
+    for index, part in enumerate(parts):
+        if index % 2 == 0:
+            lines = []
+            for line in part.splitlines():
+                if STANDALONE_PAGE_HEADING_PATTERN.fullmatch(line.strip()):
+                    removed_count += 1
+                    continue
+                lines.append(line)
+            parts[index] = "\n".join(lines)
+    if removed_count == 0:
+        return text
+    return re.sub(r"\n{3,}", "\n\n", "".join(parts)).strip()
 
 
 def normalise_html_void_tags(text: str) -> str:

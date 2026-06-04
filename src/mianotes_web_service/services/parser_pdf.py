@@ -59,15 +59,15 @@ def tesseract_pdf_ocr(path: Path) -> str | None:
             return None
 
         page_parts: list[str] = []
-        for page_number, page_path in enumerate(page_paths, start=1):
+        for page_path in page_paths:
             page_text = tesseract_ocr(page_path, executable=executable)
             if not page_text:
                 continue
-            page_parts.append(f"## Page {page_number}\n\n{page_text}")
-            emit_parser_text_update("## Document OCR\n\n" + "\n\n".join(page_parts))
+            page_parts.append(page_text)
+            emit_parser_text_update("\n\n".join(page_parts))
 
     if not page_parts:
         log_parser_command("Tesseract PDF OCR", "no readable text found", status="failed")
         return None
 
-    return "## Document OCR\n\n" + "\n\n".join(page_parts)
+    return "\n\n".join(page_parts)

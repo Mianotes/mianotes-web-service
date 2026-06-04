@@ -153,10 +153,8 @@ def test_document_parser_unwraps_markitdown_ocr_blocks(
     parsed = parse_document(source)
 
     assert parsed.text == (
-        "## Page 1\n\n"
         "# THE PRODUCT-LED GROWTH MANIFESTO\n\n"
         "**Building a SaaS product that sells itself.**\n\n"
-        "## Page 2\n\n"
         "# Three forces threatening traditional SaaS."
     )
     assert "[Image OCR]" not in parsed.text
@@ -195,7 +193,6 @@ def test_document_parser_removes_unfenced_ocr_markers_and_self_closes_breaks(
     parsed = parse_document(source)
 
     assert parsed.text == (
-        "## Page 1\n\n"
         "| Product Manager | Project Manager |\n"
         "| --- | --- |\n"
         "| Strategy<br />Vision | Delivery<br />Timeline |"
@@ -252,13 +249,90 @@ def test_document_parser_uses_local_tesseract_for_blank_pdf(
 
     assert parsed.parser == "markitdown+ocr"
     assert parsed.text == (
-        "## Document OCR\n\n"
-        "## Page 1\n\n"
         "Text from page-0001.png\n\n"
-        "## Page 2\n\n"
         "Text from page-0002.png"
     )
     assert len(rendered_pages) == 2
+
+
+def test_document_parser_treats_page_only_pdf_output_as_empty(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "scanned.pdf"
+    source.write_bytes(b"%PDF")
+    calls = 0
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, _path: str):
+            nonlocal calls
+            calls += 1
+            return SimpleNamespace(text_content="## Page 1\n\n## Page 2\n\n## Page 3")
+
+    monkeypatch.setattr(
+        parsing,
+        "markitdown_llm_options",
+        lambda: (_ for _ in ()).throw(parsing.MiaUnavailable("LLM is not configured")),
+    )
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+    monkeypatch.setattr(parsing, "_tesseract_pdf_ocr", lambda _path: "OCR text")
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown+ocr"
+    assert parsed.text == "OCR text"
+    assert calls == 1
+
+
+def test_document_parser_strips_pdf_page_headings_from_markitdown_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source = tmp_path / "report.pdf"
+    source.write_bytes(b"%PDF")
+
+    class FakeMarkItDown:
+        def __init__(self, **_kwargs):
+            pass
+
+        def convert(self, _path: str):
+            return SimpleNamespace(
+                text_content=(
+                    "## Page 1\n\n"
+                    "Introduction text.\n\n"
+                    "## Page 2\n\n"
+                    "```text\n"
+                    "## Page 3\n"
+                    "This stays because it is in code.\n"
+                    "```\n\n"
+                    "Conclusion text."
+                )
+            )
+
+    monkeypatch.setattr(
+        parser_markitdown.importlib,
+        "import_module",
+        lambda _: SimpleNamespace(MarkItDown=FakeMarkItDown),
+    )
+
+    parsed = parse_document(source)
+
+    assert parsed.parser == "markitdown"
+    assert parsed.text == (
+        "Introduction text.\n\n"
+        "```text\n"
+        "## Page 3\n"
+        "This stays because it is in code.\n"
+        "```\n\n"
+        "Conclusion text."
+    )
 
 
 def test_document_parser_reports_unreadable_when_pdf_ocr_has_no_text(

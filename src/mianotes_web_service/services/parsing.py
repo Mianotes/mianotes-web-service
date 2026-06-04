@@ -46,6 +46,7 @@ from mianotes_web_service.services.parser_markdown import (
 )
 from mianotes_web_service.services.parser_markdown import (
     normalise_parsed_markdown,
+    remove_standalone_page_headings,
 )
 from mianotes_web_service.services.parser_markitdown import (
     convert_with_markitdown as _convert_with_markitdown,
@@ -140,6 +141,17 @@ def _is_audio_not_understood_error(exc: ParserError) -> bool:
     return "UnknownValueError" in str(exc)
 
 
+def _normalise_document_text(path: Path, text: str) -> str:
+    text = normalise_parsed_markdown(text)
+    if _is_pdf(path):
+        text = remove_standalone_page_headings(text)
+    return text
+
+
+def _has_meaningful_document_text(text: str) -> bool:
+    return bool(text.strip())
+
+
 class MarkItDownParser:
     name = "markitdown"
 
@@ -151,8 +163,8 @@ class MarkItDownParser:
         if _is_audio(path):
             return self._parse_audio(path)
 
-        text = normalise_parsed_markdown(_convert_with_markitdown(path))
-        if text.strip():
+        text = _normalise_document_text(path, _convert_with_markitdown(path))
+        if _has_meaningful_document_text(text):
             return ParsedDocument(
                 text=text,
                 parser=self.name,
@@ -174,8 +186,8 @@ class MarkItDownParser:
             )
         except MiaUnavailable:
             text = ""
-        text = normalise_parsed_markdown(text)
-        if text.strip():
+        text = _normalise_document_text(path, text)
+        if _has_meaningful_document_text(text):
             return text
 
         if _is_pdf(path):
