@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+import shutil
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
@@ -16,10 +17,13 @@ from mianotes_web_service.services.publishing_theme import (
     DEFAULT_SITE_CONFIGURATION,
 )
 
+LATEST_ALIAS = "latest"
+
 
 def write_root_index(*, html_root: Path, version_slug: str) -> None:
     html_root.mkdir(parents=True, exist_ok=True)
-    write_latest_index(html_root=html_root, version_slug=version_slug)
+    if not is_latest_alias(version_slug):
+        write_latest_index(html_root=html_root, version_slug=version_slug)
     (html_root / "index.html").write_text(
         redirect_document(
             title="mianotes documentation",
@@ -35,7 +39,9 @@ def write_root_index(*, html_root: Path, version_slug: str) -> None:
 
 
 def write_latest_index(*, html_root: Path, version_slug: str) -> None:
-    latest_dir = html_root / "latest"
+    latest_dir = html_root / LATEST_ALIAS
+    if latest_dir.exists():
+        shutil.rmtree(latest_dir)
     latest_dir.mkdir(parents=True, exist_ok=True)
     latest_base = f"../{html.escape(version_slug)}/"
     latest_home = f"{latest_base}index.html"
@@ -69,9 +75,17 @@ def write_navigation_js(
     markdown_paths_by_html_path: Mapping[str, str] | None = None,
 ) -> None:
     prune_missing_published_sites(session=session, html_root=html_root)
-    entries = site_navigation_entries(
-        session.scalars(select(PublishedSite).order_by(PublishedSite.created_at.desc())).all()
+    prune_latest_version_when_alias_is_needed(session=session, current_site=current_site)
+    current_configuration = load_json_object(
+        current_site.site_configuration,
+        DEFAULT_SITE_CONFIGURATION,
     )
+    if current_configuration.get("showPreviousVersions") is False:
+        entries = site_navigation_entries([current_site])
+    else:
+        entries = site_navigation_entries(
+            session.scalars(select(PublishedSite).order_by(PublishedSite.created_at.desc())).all()
+        )
     if not entries:
         entries = [
             {
@@ -184,6 +198,24 @@ def prune_missing_published_sites(*, session: Session, html_root: Path) -> None:
         session.commit()
 
 
+def prune_latest_version_when_alias_is_needed(
+    *,
+    session: Session,
+    current_site: PublishedSite,
+) -> None:
+    if is_latest_alias(version_slug(current_site.version)):
+        return
+    did_prune = False
+    for site in session.scalars(select(PublishedSite)).all():
+        if site.id == current_site.id:
+            continue
+        if is_latest_alias(version_slug(site.version)):
+            session.delete(site)
+            did_prune = True
+    if did_prune:
+        session.commit()
+
+
 def site_navigation_entries(sites: Iterable[PublishedSite]) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     seen: set[str] = set()
@@ -234,3 +266,7 @@ def toc_link_path(
 def version_slug(version: str) -> str:
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", version.strip()).strip(".-_")
     return slug or "site"
+
+
+def is_latest_alias(slug: str) -> bool:
+    return slug.casefold() == LATEST_ALIAS

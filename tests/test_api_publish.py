@@ -399,6 +399,93 @@ def test_publish_site_writes_html_markdown_assets_and_records(client: TestClient
     assert next_draft["updated_notes"] == []
 
 
+def test_publish_version_latest_does_not_overwrite_site_index_with_latest_alias(
+    client: TestClient,
+    tmp_path: Path,
+):
+    _join(client)
+
+    published = _publish_single_note_site(client, version="latest")
+
+    assert published["html_path"] == "html/latest"
+    assert published["url_path"] == "html/latest/index.html"
+    latest_index = tmp_path / "data" / "html" / "latest" / "index.html"
+    latest_index_text = latest_index.read_text(encoding="utf-8")
+    assert 'const documentationPath = "./downloadable-' in latest_index_text
+    assert 'const latestBase = "../latest/";' not in latest_index_text
+    assert "../latest/index.html" not in latest_index_text
+
+    root_index = (tmp_path / "data" / "html" / "index.html").read_text(encoding="utf-8")
+    assert 'const latestPath = "./latest/index.html";' in root_index
+
+
+def test_publish_non_latest_reclaims_latest_alias_from_previous_latest_version(
+    client: TestClient,
+    tmp_path: Path,
+):
+    _join(client)
+
+    first = _publish_single_note_site(client, version="latest")
+    assert first["html_path"] == "html/latest"
+    second = _publish_single_note_site(client, folder_name="Docs", version="0.2.0")
+
+    assert second["html_path"] == "html/0.2.0"
+    latest_index = (tmp_path / "data" / "html" / "latest" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert 'const latestBase = "../0.2.0/";' in latest_index
+    navigation_js = (tmp_path / "data" / "html" / "navigation.js").read_text(encoding="utf-8")
+    assert "0.2.0/index.html" in navigation_js
+    assert '"key": "latest"' not in navigation_js
+
+    session_factory = client.app.state.testing_session
+    with session_factory() as session:
+        versions = [site.version for site in session.query(PublishedSite).all()]
+    assert versions == ["0.2.0"]
+
+
+def test_publish_omits_previous_versions_from_navigation_when_disabled(
+    client: TestClient,
+    tmp_path: Path,
+):
+    _join(client)
+    folder = client.post("/api/folders", json={"name": "Docs"}).json()
+    note = _create_note(client, folder["id"], "Guide", "Published guide.")
+    note_path = f"guide-{note['id'][:8]}.html"
+    base_payload = {
+        "folder_id": folder["id"],
+        "theme": "mialight",
+        "site_configuration": {
+            "brand": "Mia Docs",
+            "version": "0.1.0",
+            "headerLinks": [],
+            "footerHtml": "",
+        },
+        "navigation": [{"title": "Docs", "items": [{"title": "Guide", "path": note_path}]}],
+        "updated_notes": [{"title": "Guide", "path": note_path}],
+    }
+
+    first_response = client.post("/api/publish", json=base_payload)
+    assert first_response.status_code == 201
+    second_response = client.post(
+        "/api/publish",
+        json={
+            **base_payload,
+            "site_configuration": {
+                **base_payload["site_configuration"],
+                "version": "0.2.0",
+                "showPreviousVersions": False,
+            },
+        },
+    )
+
+    assert second_response.status_code == 201
+    navigation_js = (tmp_path / "data" / "html" / "navigation.js").read_text(encoding="utf-8")
+    assert "0.2.0/index.html" in navigation_js
+    assert "0.1.0/index.html" not in navigation_js
+    assert '"latest": "0.2.0"' in navigation_js
+
+
 def test_published_site_download_respects_file_count_limit(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
