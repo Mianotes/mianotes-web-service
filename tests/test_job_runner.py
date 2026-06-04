@@ -128,7 +128,10 @@ def test_job_runner_parses_file_and_updates_note(
         assert "Parsed Markdown" in Path(note.note_path).read_text(encoding="utf-8")
         assert job.status == "succeeded"
         assert decode_job_payload(job.result_json)["parser"] == "markitdown"
-        assert decode_job_log(job.log_json) == []
+        log = decode_job_log(job.log_json)
+        assert log[0]["command"] == "start parse_file"
+        assert log[-1]["command"] == "finish parse_file parsing"
+        assert log[-1]["status"] == "succeeded"
 
 
 def test_job_runner_parses_regular_url_with_html_fetch(
@@ -226,6 +229,10 @@ def test_job_runner_parses_remote_file_url_as_document(
         assert note.status == "ready"
         assert "Parsed PDF URL" in Path(note.note_path).read_text(encoding="utf-8")
         assert decode_job_payload(job.result_json)["parser"] == "markitdown"
+        log = decode_job_log(job.log_json)
+        assert log[0]["command"] == "start parse_url"
+        assert log[-1]["command"] == "finish parse_url parsing"
+        assert log[-1]["status"] == "succeeded"
 
 
 def test_job_runner_parses_youtube_url_with_markitdown_url_converter(

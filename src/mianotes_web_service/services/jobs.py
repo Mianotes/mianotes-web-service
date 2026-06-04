@@ -93,7 +93,6 @@ def mark_job_running(job: MiaJob) -> None:
 def mark_job_succeeded(job: MiaJob, result: Mapping[str, object] | None = None) -> None:
     job.status = "succeeded"
     job.result_json = encode_job_payload(result)
-    job.log_json = "[]"
     job.finished_at = datetime.now(UTC)
 
 

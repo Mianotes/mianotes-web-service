@@ -92,6 +92,13 @@ class ParseUrlJob:
         else:
             parsed = parse_html_document(fetch_url_to_html(url, source_path), url=url)
 
+        append_job_log(
+            job,
+            command=f"finish {job.job_type} parsing",
+            response=f"parsed {len(parsed.text)} characters with {parsed.parser}",
+            status="succeeded",
+        )
+        session.commit()
         write_note_markdown(note, parsed.text)
         note.status = "ready"
         note.summary = summarize_text(parsed.text)

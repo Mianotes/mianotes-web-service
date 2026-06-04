@@ -250,7 +250,9 @@ def test_jobs_list_payload_decoding_is_opt_in(
         )
         append_job_log(job, command="MarkItDown.convert(original.pdf)", response="started")
         mark_job_succeeded(job, {"ok": True})
-        job.log_json = """[{"timestamp":"2026-01-01T12:00:00+00:00","status":"info","command":"kept"}]"""
+        job.log_json = (
+            """[{"timestamp":"2026-01-01T12:00:00+00:00","status":"info","command":"kept"}]"""
+        )
         session.commit()
         job_id = job.id
 
@@ -309,12 +311,15 @@ def test_job_status_helpers(app_client: tuple[TestClient, sessionmaker[Session]]
         mark_job_succeeded(job, {"message": "done"})
         assert job.status == "succeeded"
         assert job.result_json == '{"message": "done"}'
-        assert decode_job_log(job.log_json) == []
+        succeeded_log = decode_job_log(job.log_json)
+        assert succeeded_log[0]["command"] == "running command"
         append_job_log(job, command="failed command", response="failed response")
         mark_job_failed(job, "boom")
         assert job.status == "failed"
         assert job.error == "boom"
-        assert decode_job_log(job.log_json)[0]["command"] == "failed command"
+        failed_log = decode_job_log(job.log_json)
+        assert failed_log[0]["command"] == "running command"
+        assert failed_log[1]["command"] == "failed command"
         append_job_log(job, command="cancel command", response="cancel response")
         cancel_job(job)
         assert job.status == "cancelled"
