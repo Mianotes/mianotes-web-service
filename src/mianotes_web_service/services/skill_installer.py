@@ -229,8 +229,10 @@ def render_skill_install_script(
             "__MIANOTES_PROFILE__",
             'mv "${TMP_PROFILE}" "${PROFILE_FILE}"',
             "",
-            'echo "Connected. Mianotes API is now available to Claude Code and Codex."',
-            'echo "We installed the connection settings and agent instructions on this machine."',
+            'echo ""',
+            'printf "\\033[32m✓\\033[0m Installed SKILL.md for Claude Code and Codex.\\n"',
+            'printf "\\033[32m✓\\033[0m Added environment variables for API access.\\n"',
+            'echo ""',
             'echo "You can revoke this key anytime from Settings."',
             "",
         ]
