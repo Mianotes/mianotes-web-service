@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,10 @@ DEFAULT_BINARY_CANDIDATES: dict[str, list[str]] = {
 }
 
 SUPPORTED_DATABASE_ADAPTERS = {"sqlite"}
+SHELL_ENV_REFERENCE_PATTERN = re.compile(
+    r"^\$(?:\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\}|"
+    r"(?P<bare>[A-Za-z_][A-Za-z0-9_]*))$"
+)
 
 
 def _read_dotenv_value(path: Path, key: str) -> str | None:
@@ -65,6 +70,18 @@ def _env_reference_value(reference: object) -> str | None:
     if not isinstance(reference, str) or not reference.startswith("env."):
         return None
     key = reference.removeprefix("env.").strip()
+    if not key:
+        return None
+    return os.environ.get(key) or _read_dotenv_value(Path(".env"), key)
+
+
+def _shell_env_reference_value(value: str | None) -> str | None:
+    if not value:
+        return value
+    match = SHELL_ENV_REFERENCE_PATTERN.fullmatch(value.strip())
+    if not match:
+        return value
+    key = match.group("braced") or match.group("bare")
     if not key:
         return None
     return os.environ.get(key) or _read_dotenv_value(Path(".env"), key)
@@ -218,6 +235,11 @@ class Settings(BaseSettings):
     def set_default_database_url(self) -> Settings:
         if not self.api_token:
             self.api_token = self.api_key
+        self.api_key = _shell_env_reference_value(self.api_key)
+        self.api_token = _shell_env_reference_value(self.api_token)
+        self.llm_api_key = _shell_env_reference_value(self.llm_api_key)
+        self.vlm_api_key = _shell_env_reference_value(self.vlm_api_key)
+        self.openai_api_key = _shell_env_reference_value(self.openai_api_key)
         self.database_adapter = self.database_adapter.strip().lower()
         if self.database_adapter not in SUPPORTED_DATABASE_ADAPTERS:
             raise ValueError(

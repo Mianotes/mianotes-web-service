@@ -43,6 +43,22 @@ def test_mia_uses_openai_provider(monkeypatch, tmp_path):
     get_settings.cache_clear()
 
 
+def test_mia_resolves_openai_key_reference(monkeypatch, tmp_path):
+    calls: dict[str, object] = {}
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
+    monkeypatch.setenv("MIANOTES_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("MIANOTES_LLM_API_KEY", "$OPENAI_API_KEY")
+    monkeypatch.setattr(mia, "OpenAI", _fake_openai(calls))
+    get_settings.cache_clear()
+
+    result = mia.summarise_markdown(title="Test", markdown="# Test")
+
+    assert result.provider == "openai"
+    assert calls["client"] == {"api_key": "sk-openai"}
+    get_settings.cache_clear()
+
+
 def test_mia_uses_local_openai_compatible_provider(monkeypatch, tmp_path):
     calls: dict[str, object] = {}
     monkeypatch.chdir(tmp_path)

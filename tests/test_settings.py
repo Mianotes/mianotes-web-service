@@ -86,6 +86,38 @@ def test_settings_json_secret_reference_can_read_dotenv(
     assert settings.llm_api_key == "sk-dotenv"
 
 
+def test_dotenv_shell_reference_can_read_dotenv_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "OPENAI_API_KEY=sk-openai\n"
+        "MIANOTES_LLM_API_KEY=$OPENAI_API_KEY\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings()
+
+    assert settings.llm_api_key == "sk-openai"
+
+
+def test_dotenv_shell_reference_can_read_process_environment(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-process")
+    (tmp_path / ".env").write_text(
+        "MIANOTES_LLM_API_KEY=${OPENAI_API_KEY}\n",
+        encoding="utf-8",
+    )
+
+    settings = Settings()
+
+    assert settings.llm_api_key == "sk-process"
+
+
 def test_unsupported_database_adapter_fails_clearly(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
