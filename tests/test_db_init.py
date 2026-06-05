@@ -1,6 +1,8 @@
 from contextvars import copy_context
 
 from sqlalchemy import create_engine, inspect, text
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -11,7 +13,7 @@ from mianotes_web_service.db.init import (
     create_system_database,
     create_workspace_database,
 )
-from mianotes_web_service.db.models import ApiToken, Folder, SessionToken, User
+from mianotes_web_service.db.models import ApiToken, Folder, SessionToken, SkillInstallCode, User
 from mianotes_web_service.services.auth import create_session_token
 from mianotes_web_service.services.workspace_context import (
     WorkspaceContext,
@@ -59,7 +61,7 @@ def test_system_and_workspace_databases_have_separate_tables(tmp_path):
     system_tables = set(inspect(system_engine).get_table_names())
     workspace_tables = set(inspect(workspace_engine).get_table_names())
 
-    assert {"users", "session_tokens", "api_tokens", "app_settings"} <= system_tables
+    assert {"users", "session_tokens", "api_tokens", "skill_install_codes", "app_settings"} <= system_tables
     assert "notes" not in system_tables
     assert "folders" not in system_tables
 
@@ -82,7 +84,7 @@ def test_session_factory_routes_global_models_to_system_database(tmp_path):
     create_workspace_database(workspace_engine)
     SessionLocal = sessionmaker(
         bind=workspace_engine,
-        binds={model: system_engine for model in (User, SessionToken, ApiToken)},
+        binds={model: system_engine for model in (User, SessionToken, ApiToken, SkillInstallCode)},
         autoflush=False,
         autocommit=False,
         expire_on_commit=False,
@@ -94,13 +96,23 @@ def test_session_factory_routes_global_models_to_system_database(tmp_path):
         session.flush()
         folder = Folder(user_id=user.id, name="Docs", slug="docs", path="docs")
         session.add(folder)
+        install_code = SkillInstallCode(
+            user_id=user.id,
+            code_hash="hash",
+            api_url="http://localhost:8200",
+            client_name="Codex",
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+        session.add(install_code)
         session.commit()
 
     with system_engine.connect() as connection:
         assert connection.execute(text("SELECT COUNT(*) FROM users")).scalar_one() == 1
+        assert connection.execute(text("SELECT COUNT(*) FROM skill_install_codes")).scalar_one() == 1
 
     with workspace_engine.connect() as connection:
         assert connection.execute(text("SELECT COUNT(*) FROM folders")).scalar_one() == 1
+        assert "skill_install_codes" not in inspect(workspace_engine).get_table_names()
 
 
 def test_session_token_records_current_workspace(tmp_path):

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.engine import create_database_engine
-from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
+from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, SkillInstallCode, User
 from mianotes_web_service.services.storage_settings import (
     StorageConfig,
     StorageLocation,
@@ -17,7 +17,7 @@ from mianotes_web_service.services.storage_settings import (
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
-SYSTEM_MODELS = (User, SessionToken, ApiToken, AppSetting)
+SYSTEM_MODELS = (User, SessionToken, ApiToken, SkillInstallCode, AppSetting)
 
 _system_engines: dict[str, Engine] = {}
 _workspace_engines: dict[str, Engine] = {}
