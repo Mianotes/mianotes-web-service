@@ -264,7 +264,11 @@ class SkillInstallCode(Base, TimestampMixin):
     code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     api_url: Mapped[str] = mapped_column(String(500), nullable=False)
     client_name: Mapped[str] = mapped_column(String(80), nullable=False)
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+        nullable=False,
+    )
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
 
     user: Mapped[User] = relationship()

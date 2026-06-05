@@ -95,7 +95,11 @@ def test_signed_in_user_can_create_one_time_skill_installer(client: TestClient):
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=UTC)
     expected_expires_at = started_at + timedelta(hours=INSTALL_CODE_HOURS)
-    assert expected_expires_at - timedelta(seconds=5) <= expires_at <= expected_expires_at + timedelta(seconds=5)
+    assert (
+        expected_expires_at - timedelta(seconds=5)
+        <= expires_at
+        <= expected_expires_at + timedelta(seconds=5)
+    )
 
 
 def test_skill_installer_redeems_once_and_installs_user_token(client: TestClient):
@@ -143,7 +147,11 @@ def test_skill_installer_token_can_create_agent_session(client: TestClient):
     ).json()
     code = _code_from_install_url(install["install_url"])
     env_file = client.get(f"/skill/install.env?code={code}").text
-    api_key_line = next(line for line in env_file.splitlines() if line.startswith("export MIANOTES_API_KEY="))
+    api_key_line = next(
+        line
+        for line in env_file.splitlines()
+        if line.startswith("export MIANOTES_API_KEY=")
+    )
     api_key = api_key_line.partition("=")[2]
 
     session_response = client.post(
@@ -216,4 +224,7 @@ def test_skill_installer_rejects_public_http_exchange_hosts(client: TestClient):
     )
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Mianotes API URL must use HTTPS or a trusted local/private address"
+    assert (
+        response.json()["detail"]
+        == "Mianotes API URL must use HTTPS or a trusted local/private address"
+    )

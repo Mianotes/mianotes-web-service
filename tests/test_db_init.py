@@ -1,8 +1,7 @@
 from contextvars import copy_context
-
-from sqlalchemy import create_engine, inspect, text
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -61,7 +60,13 @@ def test_system_and_workspace_databases_have_separate_tables(tmp_path):
     system_tables = set(inspect(system_engine).get_table_names())
     workspace_tables = set(inspect(workspace_engine).get_table_names())
 
-    assert {"users", "session_tokens", "api_tokens", "skill_install_codes", "app_settings"} <= system_tables
+    assert {
+        "users",
+        "session_tokens",
+        "api_tokens",
+        "skill_install_codes",
+        "app_settings",
+    } <= system_tables
     assert "notes" not in system_tables
     assert "folders" not in system_tables
 
@@ -84,7 +89,10 @@ def test_session_factory_routes_global_models_to_system_database(tmp_path):
     create_workspace_database(workspace_engine)
     SessionLocal = sessionmaker(
         bind=workspace_engine,
-        binds={model: system_engine for model in (User, SessionToken, ApiToken, SkillInstallCode)},
+        binds={
+            model: system_engine
+            for model in (User, SessionToken, ApiToken, SkillInstallCode)
+        },
         autoflush=False,
         autocommit=False,
         expire_on_commit=False,
@@ -108,7 +116,12 @@ def test_session_factory_routes_global_models_to_system_database(tmp_path):
 
     with system_engine.connect() as connection:
         assert connection.execute(text("SELECT COUNT(*) FROM users")).scalar_one() == 1
-        assert connection.execute(text("SELECT COUNT(*) FROM skill_install_codes")).scalar_one() == 1
+        assert (
+            connection.execute(
+                text("SELECT COUNT(*) FROM skill_install_codes")
+            ).scalar_one()
+            == 1
+        )
 
     with workspace_engine.connect() as connection:
         assert connection.execute(text("SELECT COUNT(*) FROM folders")).scalar_one() == 1

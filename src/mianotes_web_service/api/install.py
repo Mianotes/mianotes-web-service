@@ -19,7 +19,11 @@ from mianotes_web_service.services.skill_installer import (
 router = APIRouter(tags=["install"])
 
 
-@router.post("/api/install/skill", response_model=SkillInstallRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/api/install/skill",
+    response_model=SkillInstallRead,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_skill_install(
     payload: SkillInstallCreate,
     session: SessionDep,
@@ -33,7 +37,10 @@ def create_skill_install(
             client_name=payload.client_name,
         )
     except SkillInstallError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
 
     session.commit()
     api_url = install_code.api_url

@@ -40,7 +40,9 @@ def normalize_api_url(api_url: str) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise SkillInstallError("Mianotes API URL must start with http:// or https://")
     if not _is_allowed_exchange_url(parsed):
-        raise SkillInstallError("Mianotes API URL must use HTTPS or a trusted local/private address")
+        raise SkillInstallError(
+            "Mianotes API URL must use HTTPS or a trusted local/private address"
+        )
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", "", ""))
 
 
@@ -84,7 +86,12 @@ def skill_install_url(api_url: str, code: str) -> str:
 
 
 def skill_install_command(api_url: str, code: str) -> str:
-    install_url = skill_install_url(api_url, code).replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    install_url = (
+        skill_install_url(api_url, code)
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("$", "\\$")
+    )
     return f'curl -fsSL "{install_url}" | bash'
 
 
@@ -177,7 +184,10 @@ def render_skill_install_script(
     install_code: str,
     skill_text: str | None = None,
 ) -> str:
-    env_url = f"{install_base_url.rstrip('/')}/skill/install.env?{urlencode({'code': install_code})}"
+    env_url = (
+        f"{install_base_url.rstrip('/')}/skill/install.env?"
+        f"{urlencode({'code': install_code})}"
+    )
     return "\n".join(
         [
             "#!/usr/bin/env bash",
