@@ -16,7 +16,7 @@ from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import ApiToken, Base, SkillInstallCode
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.services.skill_installer import hash_install_code
+from mianotes_web_service.services.skill_installer import INSTALL_CODE_HOURS, hash_install_code
 
 
 @pytest.fixture
@@ -78,6 +78,7 @@ def _code_from_install_url(install_url: str) -> str:
 
 def test_signed_in_user_can_create_one_time_skill_installer(client: TestClient):
     _join_user(client)
+    started_at = datetime.now(UTC)
 
     response = client.post(
         "/api/install/skill",
@@ -90,6 +91,11 @@ def test_signed_in_user_can_create_one_time_skill_installer(client: TestClient):
     assert payload["command"].startswith('curl -fsSL "')
     assert payload["command"].endswith(" | bash")
     assert "mia_" not in payload["command"]
+    expires_at = datetime.fromisoformat(payload["expires_at"].replace("Z", "+00:00"))
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
+    expected_expires_at = started_at + timedelta(hours=INSTALL_CODE_HOURS)
+    assert expected_expires_at - timedelta(seconds=5) <= expires_at <= expected_expires_at + timedelta(seconds=5)
 
 
 def test_skill_installer_redeems_once_and_installs_user_token(client: TestClient):

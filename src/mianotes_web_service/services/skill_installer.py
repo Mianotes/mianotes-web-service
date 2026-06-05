@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import ApiToken, SkillInstallCode, User
 from mianotes_web_service.services.auth import create_api_token
 
-INSTALL_CODE_HOURS = 1
+INSTALL_CODE_HOURS = 24
 DEFAULT_SKILL_CLIENT = "Codex"
 DEFAULT_PERSONAL_TOKEN_NAME = "Mianotes API"
 DEFAULT_PERSONAL_TOKEN_SCOPES = (
