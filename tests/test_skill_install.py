@@ -86,8 +86,8 @@ def test_signed_in_user_can_create_one_time_skill_installer(client: TestClient):
 
     assert response.status_code == 201
     payload = response.json()
-    assert payload["install_url"].startswith("http://mianotes.local:8200/install/skill.sh?code=")
-    assert payload["command"].startswith("curl -fsSL ")
+    assert payload["install_url"].startswith("http://mianotes.local:8200/skill/install.sh?code=")
+    assert payload["command"].startswith('curl -fsSL "')
     assert payload["command"].endswith(" | bash")
     assert "mia_" not in payload["command"]
 
@@ -100,18 +100,25 @@ def test_skill_installer_redeems_once_and_installs_user_token(client: TestClient
     ).json()
     code = _code_from_install_url(install["install_url"])
 
-    script_response = client.get(f"/install/skill.sh?code={code}")
+    script_response = client.get(f"/skill/install.sh?code={code}")
 
     assert script_response.status_code == 200
     script = script_response.text
-    assert "MIANOTES_API_URL=http://mianotes.local:8200" in script
-    assert "MIANOTES_API_USER=fedecarg@gmail.com" in script
-    assert "MIANOTES_API_KEY=mia_" in script
+    assert "MIANOTES_API_KEY=mia_" not in script
+    assert "curl -fsSL 'http://mianotes.local:8200/skill/install.env?code=" in script
+    assert 'mv "${TMP_ENV}" "${MIANOTES_ENV_FILE}"' in script
     assert ".codex/skills/mianotes/SKILL.md" in script
     assert ".claude/skills/mianotes/SKILL.md" in script
     assert "Mia is the local Mianotes knowledge service." in script
 
-    second_response = client.get(f"/install/skill.sh?code={code}")
+    env_response = client.get(f"/skill/install.env?code={code}")
+    assert env_response.status_code == 200
+    env_file = env_response.text
+    assert "MIANOTES_API_URL=http://mianotes.local:8200" in env_file
+    assert "MIANOTES_API_USER=fedecarg@gmail.com" in env_file
+    assert "MIANOTES_API_KEY=mia_" in env_file
+
+    second_response = client.get(f"/skill/install.env?code={code}")
     assert second_response.status_code == 410
 
     with _session(client) as session:
@@ -127,8 +134,8 @@ def test_skill_installer_token_can_create_agent_session(client: TestClient):
         json={"api_url": "http://mianotes.local:8200", "client_name": "Codex"},
     ).json()
     code = _code_from_install_url(install["install_url"])
-    script = client.get(f"/install/skill.sh?code={code}").text
-    api_key_line = next(line for line in script.splitlines() if line.startswith("export MIANOTES_API_KEY="))
+    env_file = client.get(f"/skill/install.env?code={code}").text
+    api_key_line = next(line for line in env_file.splitlines() if line.startswith("export MIANOTES_API_KEY="))
     api_key = api_key_line.partition("=")[2]
 
     session_response = client.post(
@@ -158,7 +165,47 @@ def test_expired_skill_install_code_is_rejected(client: TestClient):
         )
         session.commit()
 
-    response = client.get("/install/skill.sh?code=expired-code")
+    response = client.get("/skill/install.sh?code=expired-code")
 
     assert response.status_code == 410
     assert response.json()["detail"] == "Install code has expired"
+
+
+@pytest.mark.parametrize(
+    "api_url",
+    [
+        "https://notes.example.com",
+        "http://mianotes.local:8200",
+        "http://localhost:8200",
+        "http://127.0.0.1:8200",
+        "http://10.1.2.3:8200",
+        "http://172.16.0.10:8200",
+        "http://172.31.255.254:8200",
+        "http://192.168.1.20:8200",
+        "http://169.254.1.20:8200",
+    ],
+)
+def test_skill_installer_allows_https_and_local_private_exchange_hosts(
+    client: TestClient,
+    api_url: str,
+):
+    _join_user(client)
+
+    response = client.post(
+        "/api/install/skill",
+        json={"api_url": api_url, "client_name": "Codex"},
+    )
+
+    assert response.status_code == 201
+
+
+def test_skill_installer_rejects_public_http_exchange_hosts(client: TestClient):
+    _join_user(client)
+
+    response = client.post(
+        "/api/install/skill",
+        json={"api_url": "http://example.com:8200", "client_name": "Codex"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Mianotes API URL must use HTTPS or a trusted local/private address"

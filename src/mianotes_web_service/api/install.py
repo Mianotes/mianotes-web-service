@@ -8,7 +8,9 @@ from mianotes_web_service.domain.schemas import SkillInstallCreate, SkillInstall
 from mianotes_web_service.services.skill_installer import (
     SkillInstallError,
     create_skill_install_code,
+    read_redeemable_skill_install_code,
     redeem_skill_install_code,
+    render_skill_env_file,
     render_skill_install_script,
     skill_install_command,
     skill_install_url,
@@ -42,8 +44,33 @@ def create_skill_install(
     )
 
 
-@router.get("/install/skill.sh", response_class=PlainTextResponse)
+@router.get("/skill/install.sh", response_class=PlainTextResponse)
 def download_skill_install_script(
+    session: SessionDep,
+    code: str = Query(min_length=1),
+) -> PlainTextResponse:
+    try:
+        install_code = read_redeemable_skill_install_code(session, raw_code=code)
+    except SkillInstallError as exc:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(exc)) from exc
+
+    script = render_skill_install_script(
+        install_base_url=install_code.api_url,
+        install_code=code,
+    )
+    return PlainTextResponse(script, media_type="text/x-shellscript")
+
+
+@router.get("/install/skill.sh", response_class=PlainTextResponse, include_in_schema=False)
+def download_legacy_skill_install_script(
+    session: SessionDep,
+    code: str = Query(min_length=1),
+) -> PlainTextResponse:
+    return download_skill_install_script(session=session, code=code)
+
+
+@router.get("/skill/install.env", response_class=PlainTextResponse, include_in_schema=False)
+def download_skill_install_env(
     session: SessionDep,
     code: str = Query(min_length=1),
 ) -> PlainTextResponse:
@@ -52,10 +79,10 @@ def download_skill_install_script(
     except SkillInstallError as exc:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(exc)) from exc
 
-    script = render_skill_install_script(
+    env_file = render_skill_env_file(
         api_url=install_code.api_url,
         api_key=raw_token,
         api_user=install_code.user.email,
     )
     session.commit()
-    return PlainTextResponse(script, media_type="text/x-shellscript")
+    return PlainTextResponse(env_file, media_type="text/plain")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import secrets
 import shlex
 from datetime import UTC, datetime, timedelta
@@ -38,7 +39,25 @@ def normalize_api_url(api_url: str) -> str:
     parsed = urlparse(api_url.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise SkillInstallError("Mianotes API URL must start with http:// or https://")
+    if not _is_allowed_exchange_url(parsed):
+        raise SkillInstallError("Mianotes API URL must use HTTPS or a trusted local/private address")
     return urlunparse((parsed.scheme, parsed.netloc, parsed.path.rstrip("/"), "", "", ""))
+
+
+def _is_allowed_exchange_url(parsed) -> bool:
+    if parsed.scheme == "https":
+        return True
+
+    host = (parsed.hostname or "").strip().lower().rstrip(".")
+    if host == "localhost" or host.endswith(".local"):
+        return True
+
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+
+    return address.is_loopback or address.is_private or address.is_link_local
 
 
 def create_skill_install_code(
@@ -61,11 +80,12 @@ def create_skill_install_code(
 
 
 def skill_install_url(api_url: str, code: str) -> str:
-    return f"{api_url.rstrip('/')}/install/skill.sh?{urlencode({'code': code})}"
+    return f"{api_url.rstrip('/')}/skill/install.sh?{urlencode({'code': code})}"
 
 
 def skill_install_command(api_url: str, code: str) -> str:
-    return f"curl -fsSL {shlex.quote(skill_install_url(api_url, code))} | bash"
+    install_url = skill_install_url(api_url, code).replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    return f'curl -fsSL "{install_url}" | bash'
 
 
 def read_skill_install_code(session: Session, raw_code: str) -> SkillInstallCode | None:
@@ -74,11 +94,11 @@ def read_skill_install_code(session: Session, raw_code: str) -> SkillInstallCode
     ).one_or_none()
 
 
-def redeem_skill_install_code(
+def read_redeemable_skill_install_code(
     session: Session,
     *,
     raw_code: str,
-) -> tuple[SkillInstallCode, str]:
+) -> SkillInstallCode:
     install_code = read_skill_install_code(session, raw_code)
     if install_code is None:
         raise SkillInstallError("Install code not found")
@@ -91,6 +111,15 @@ def redeem_skill_install_code(
     if expires_at <= datetime.now(UTC):
         raise SkillInstallError("Install code has expired")
 
+    return install_code
+
+
+def redeem_skill_install_code(
+    session: Session,
+    *,
+    raw_code: str,
+) -> tuple[SkillInstallCode, str]:
+    install_code = read_redeemable_skill_install_code(session, raw_code=raw_code)
     _revoke_existing_default_tokens(session, install_code.user_id)
     token, raw_token = create_api_token(
         session,
@@ -126,30 +155,49 @@ def bundled_skill_text() -> str:
     return packaged.read_text(encoding="utf-8")
 
 
-def render_skill_install_script(
+def render_skill_env_file(
     *,
     api_url: str,
     api_key: str,
     api_user: str,
+) -> str:
+    return "\n".join(
+        [
+            f"export MIANOTES_API_URL={shlex.quote(api_url)}",
+            f"export MIANOTES_API_KEY={shlex.quote(api_key)}",
+            f"export MIANOTES_API_USER={shlex.quote(api_user)}",
+            "",
+        ]
+    )
+
+
+def render_skill_install_script(
+    *,
+    install_base_url: str,
+    install_code: str,
     skill_text: str | None = None,
 ) -> str:
+    env_url = f"{install_base_url.rstrip('/')}/skill/install.env?{urlencode({'code': install_code})}"
     return "\n".join(
         [
             "#!/usr/bin/env bash",
             "set -euo pipefail",
             "",
-            'echo "Installing Mianotes agent skill..."',
+            'echo "Installing Mianotes API credentials and agent instructions..."',
             "",
             'MIANOTES_DIR="${HOME}/.mianotes"',
             'MIANOTES_ENV_FILE="${MIANOTES_DIR}/env"',
+            'TMP_ENV=""',
+            'TMP_PROFILE=""',
+            'trap \'rm -f "${TMP_ENV:-}" "${TMP_PROFILE:-}"\' EXIT',
             'mkdir -p "${MIANOTES_DIR}"',
+            'chmod 700 "${MIANOTES_DIR}"',
             "",
-            'cat > "${MIANOTES_ENV_FILE}" <<\'__MIANOTES_ENV__\'',
-            f"export MIANOTES_API_URL={shlex.quote(api_url)}",
-            f"export MIANOTES_API_KEY={shlex.quote(api_key)}",
-            f"export MIANOTES_API_USER={shlex.quote(api_user)}",
-            "__MIANOTES_ENV__",
-            'chmod 600 "${MIANOTES_ENV_FILE}"',
+            'TMP_ENV="$(mktemp)"',
+            f"curl -fsSL {shlex.quote(env_url)} > \"${{TMP_ENV}}\"",
+            'chmod 600 "${TMP_ENV}"',
+            'mv "${TMP_ENV}" "${MIANOTES_ENV_FILE}"',
+            'TMP_ENV=""',
             "",
             'install_skill() {',
             '  target="$1"',
@@ -181,8 +229,9 @@ def render_skill_install_script(
             "__MIANOTES_PROFILE__",
             'mv "${TMP_PROFILE}" "${PROFILE_FILE}"',
             "",
-            'echo "Mianotes skill installed for Codex and Claude."',
-            'echo "Open a new terminal session so MIANOTES_API_URL and MIANOTES_API_KEY are available."',
+            'echo "Connected. Mianotes API is now available to Claude Code and Codex."',
+            'echo "We installed the connection settings and agent instructions on this machine."',
+            'echo "You can revoke this key anytime from Settings."',
             "",
         ]
     )
