@@ -41,6 +41,7 @@ packages = ["src/mianotes_web_service"]
 artifacts = [
   "src/mianotes_web_service/onboarding_assets/**",
   "src/mianotes_web_service/publishing/themes/**",
+  "src/mianotes_web_service/skills/**",
 ]
 
 [tool.pytest.ini_options]

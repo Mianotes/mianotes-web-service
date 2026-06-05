@@ -16,6 +16,7 @@ from .models import (
     NoteTag,
     PublishedSite,
     SessionToken,
+    SkillInstallCode,
     SourceFile,
     Tag,
     User,
@@ -30,6 +31,7 @@ SYSTEM_TABLES = (
     User.__table__,
     SessionToken.__table__,
     ApiToken.__table__,
+    SkillInstallCode.__table__,
     AppSetting.__table__,
 )
 WORKSPACE_TABLES = (
