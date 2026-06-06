@@ -4,14 +4,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser
+from mianotes_web_service.api.dependencies import FoldersReadUser, FoldersWriteUser, SessionDep
 from mianotes_web_service.db.models import Folder, Note, PublishedSite
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     FolderCreate,
     FolderNoteCounts,
@@ -28,7 +27,6 @@ from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import short_id, slugify
 
 router = APIRouter(prefix="/folders", tags=["folders"])
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def _read_folder_or_404(session: Session, folder_id: str) -> Folder:

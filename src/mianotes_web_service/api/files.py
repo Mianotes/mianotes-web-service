@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from mianotes_web_service.api.dependencies import (
+    AuthContext,
     NotesReadUser,
     SessionDep,
     auth_context_from_bearer_token,
@@ -17,10 +18,13 @@ from mianotes_web_service.api.dependencies import (
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile
 from mianotes_web_service.db.workspace_routing import (
+    default_workspace,
     sessionmaker_for_workspace,
+    system_sessionmaker,
     workspace_by_id,
 )
 from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
+from mianotes_web_service.services.workspace_access import ensure_workspace_access
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage_settings import (
     DEFAULT_LOCATION_ID,
@@ -134,20 +138,44 @@ def _read_bearer_token(authorization: str | None) -> str | None:
     return token.strip()
 
 
-def _has_authenticated_file_access(request: Request, session: Session) -> bool:
-    session_token = request.cookies.get(SESSION_COOKIE_NAME)
-    if read_session_user(session, session_token) is not None:
-        return True
+def _system_session_for_request(request: Request) -> Session:
+    testing_session_factory = getattr(request.app.state, "testing_session_factory", None)
+    return (testing_session_factory or system_sessionmaker())()
 
-    raw_api_token = _read_bearer_token(request.headers.get("authorization"))
-    if raw_api_token is None:
-        return False
 
+def _file_auth_context(request: Request) -> AuthContext | None:
+    session = _system_session_for_request(request)
     try:
-        context = auth_context_from_bearer_token(session, raw_api_token)
-    except HTTPException:
-        return False
-    return "admin" in context.scopes or "notes:read" in context.scopes
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        user = read_session_user(session, session_token)
+        if user is not None:
+            return AuthContext(user=user)
+
+        raw_api_token = _read_bearer_token(request.headers.get("authorization"))
+        if raw_api_token is None:
+            return None
+
+        try:
+            context = auth_context_from_bearer_token(session, raw_api_token)
+        except HTTPException:
+            return None
+        if "admin" in context.scopes or "notes:read" in context.scopes:
+            return context
+        return None
+    finally:
+        session.close()
+
+
+def _authenticated_file_workspace(request: Request, workspace_id: str) -> WorkspaceContext:
+    context = _file_auth_context(request)
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not signed in",
+        )
+    workspace = workspace_by_id(workspace_id)
+    ensure_workspace_access(context.user, workspace)
+    return workspace
 
 
 def _session_for_workspace(workspace: WorkspaceContext, request: Request) -> Session:
@@ -161,8 +189,7 @@ def _session_for_workspace(workspace: WorkspaceContext, request: Request) -> Ses
 
 
 @contextmanager
-def _workspace_session(workspace_id: str, request: Request) -> Generator[Session, None, None]:
-    workspace = workspace_by_id(workspace_id)
+def _workspace_session(workspace: WorkspaceContext, request: Request) -> Generator[Session, None, None]:
     token = set_current_workspace(workspace)
     session = _session_for_workspace(workspace, request)
     try:
@@ -305,10 +332,11 @@ def get_markdown_root() -> FileResponse:
 @router.get("/markdown/{file_path:path}", include_in_schema=False)
 def get_markdown_file(
     file_path: str,
-    session: SessionDep,
+    request: Request,
 ) -> FileResponse:
     clean = _clean_file_path(file_path)
-    return _published_markdown_response(clean, session)
+    with _workspace_session(default_workspace(), request) as session:
+        return _published_markdown_response(clean, session)
 
 
 @router.get(
@@ -326,12 +354,8 @@ def get_workspace_note_markdown_file(
     note_id: str,
     request: Request,
 ) -> FileResponse:
-    with _workspace_session(workspace_id, request) as session:
-        if not _has_authenticated_file_access(request, session):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not signed in",
-            )
+    workspace = _authenticated_file_workspace(request, workspace_id)
+    with _workspace_session(workspace, request) as session:
         return _note_markdown_response(_note_or_404(session, note_id), session)
 
 
@@ -346,12 +370,8 @@ def get_workspace_source_file(
     source_file_id: str,
     request: Request,
 ) -> FileResponse:
-    with _workspace_session(workspace_id, request) as session:
-        if not _has_authenticated_file_access(request, session):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not signed in",
-            )
+    workspace = _authenticated_file_workspace(request, workspace_id)
+    with _workspace_session(workspace, request) as session:
         source_file = session.scalars(
             select(SourceFile)
             .options(joinedload(SourceFile.note).joinedload(Note.folder))
@@ -380,12 +400,8 @@ def get_workspace_note_image(
     request: Request,
 ) -> FileResponse:
     clean = _clean_file_path(file_path)
-    with _workspace_session(workspace_id, request) as session:
-        if not _has_authenticated_file_access(request, session):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Not signed in",
-            )
+    workspace = _authenticated_file_workspace(request, workspace_id)
+    with _workspace_session(workspace, request) as session:
         note = _note_or_404(session, note_id)
         paths = workspace_paths_for_session(session)
         image_root = paths.note_image_directory(note)

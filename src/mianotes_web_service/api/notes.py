@@ -7,7 +7,6 @@ from typing import Annotated
 
 from fastapi import (
     APIRouter,
-    Depends,
     HTTPException,
     Query,
     Request,
@@ -19,6 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 from mianotes_web_service.api.dependencies import (
     NotesReadUser,
     NotesWriteUser,
+    SessionDep,
     TagsWriteUser,
 )
 from mianotes_web_service.api.note_access import (
@@ -30,7 +30,6 @@ from mianotes_web_service.api.note_access import (
     read_note_reference,
 )
 from mianotes_web_service.db.models import Folder, MiaJob, Note, NoteStar, Tag, User
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     NoteListPage,
     NoteRead,
@@ -60,7 +59,6 @@ from mianotes_web_service.services.storage import (
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-SessionDep = Annotated[Session, Depends(get_session)]
 __all__ = ["prompt_markdown", "router"]
 DEFAULT_NOTES_LIMIT = 20
 MAX_NOTES_LIMIT = 100

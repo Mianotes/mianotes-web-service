@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 
-from mianotes_web_service.api.dependencies import AuthContextDep, SessionDep
+from mianotes_web_service.api.dependencies import AuthContextDep, SystemSessionDep
 from mianotes_web_service.db.models import ApiToken, User
 from mianotes_web_service.domain.schemas import ApiTokenCreate, ApiTokenCreated, ApiTokenRead
 from mianotes_web_service.services.auth import (
@@ -57,7 +57,7 @@ def _can_read_tokens(context: AuthContextDep) -> None:
 @router.post("", response_model=ApiTokenCreated, status_code=status.HTTP_201_CREATED)
 def create_token(
     payload: ApiTokenCreate,
-    session: SessionDep,
+    session: SystemSessionDep,
     context: AuthContextDep,
 ) -> ApiTokenCreated:
     _can_manage_tokens(context)
@@ -91,7 +91,7 @@ def create_token(
 
 @router.get("", response_model=list[ApiTokenRead])
 def list_tokens(
-    session: SessionDep,
+    session: SystemSessionDep,
     context: AuthContextDep,
     user_id: Annotated[str | None, Query()] = None,
     include_revoked: Annotated[bool, Query()] = False,
@@ -110,7 +110,7 @@ def list_tokens(
 
 
 @router.delete("/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
-def revoke_token(token_id: str, session: SessionDep, context: AuthContextDep) -> None:
+def revoke_token(token_id: str, session: SystemSessionDep, context: AuthContextDep) -> None:
     _can_manage_tokens(context)
     token = session.get(ApiToken, token_id)
     if token is None:

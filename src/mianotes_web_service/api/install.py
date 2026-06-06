@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 
-from mianotes_web_service.api.dependencies import CurrentUser, SessionDep
+from mianotes_web_service.api.dependencies import CurrentUser, SystemSessionDep
 from mianotes_web_service.domain.schemas import SkillInstallCreate, SkillInstallRead
 from mianotes_web_service.services.skill_installer import (
     SkillInstallError,
@@ -26,7 +26,7 @@ router = APIRouter(tags=["install"])
 )
 def create_skill_install(
     payload: SkillInstallCreate,
-    session: SessionDep,
+    session: SystemSessionDep,
     user: CurrentUser,
 ) -> SkillInstallRead:
     try:
@@ -53,7 +53,7 @@ def create_skill_install(
 
 @router.get("/skill/install.sh", response_class=PlainTextResponse)
 def download_skill_install_script(
-    session: SessionDep,
+    session: SystemSessionDep,
     code: str = Query(min_length=1),
 ) -> PlainTextResponse:
     try:
@@ -70,7 +70,7 @@ def download_skill_install_script(
 
 @router.get("/install/skill.sh", response_class=PlainTextResponse, include_in_schema=False)
 def download_legacy_skill_install_script(
-    session: SessionDep,
+    session: SystemSessionDep,
     code: str = Query(min_length=1),
 ) -> PlainTextResponse:
     return download_skill_install_script(session=session, code=code)
@@ -78,7 +78,7 @@ def download_legacy_skill_install_script(
 
 @router.get("/skill/install.env", response_class=PlainTextResponse, include_in_schema=False)
 def download_skill_install_env(
-    session: SessionDep,
+    session: SystemSessionDep,
     code: str = Query(min_length=1),
 ) -> PlainTextResponse:
     try:

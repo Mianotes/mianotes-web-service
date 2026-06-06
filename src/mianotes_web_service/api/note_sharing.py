@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import ShareWriteUser
+from mianotes_web_service.api.dependencies import ShareWriteUser, SessionDep
 from mianotes_web_service.api.note_access import (
     ensure_can_change_note,
     read_note_for_change,
@@ -19,7 +19,6 @@ from mianotes_web_service.api.note_access import (
     read_shared_note_for_source_file,
 )
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.db.workspace_routing import (
     sessionmaker_for_workspace,
     workspace_by_id,
@@ -41,7 +40,6 @@ from mianotes_web_service.services.workspace_context import (
 )
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-SessionDep = Annotated[Session, Depends(get_session)]
 
 
 def _session_for_shared_workspace(

@@ -5,16 +5,15 @@ from pathlib import Path
 from time import time_ns
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, UsersReadUser
+from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, SessionDep, UsersReadUser
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, Tag, User
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     UserAdminUpdate,
     UserCreate,
@@ -34,7 +33,6 @@ from mianotes_web_service.services.upload_limits import (
 from mianotes_web_service.services.user_limits import enforce_user_capacity
 
 router = APIRouter(prefix="/users", tags=["users"])
-SessionDep = Annotated[Session, Depends(get_session)]
 AVATAR_SIZE = (200, 200)
 SUPPORTED_AVATAR_TYPES = {"image/jpeg", "image/png"}
 

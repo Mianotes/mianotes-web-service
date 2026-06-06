@@ -1,21 +1,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Response, status
 
-from mianotes_web_service.api.dependencies import NotesWriteUser
+from mianotes_web_service.api.dependencies import NotesWriteUser, SessionDep
 from mianotes_web_service.api.note_access import read_note_reference
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import MiaPromptCreate, MiaPromptRead
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import markdown_note_body
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-SessionDep = Annotated[Session, Depends(get_session)]
 MIA_PROVIDER_SETUP_MESSAGE = "Mia needs an AI provider before it can answer prompts."
 logger = logging.getLogger(__name__)
 

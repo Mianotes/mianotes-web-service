@@ -36,6 +36,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.state.testing_session_factory = testing_session
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
@@ -174,6 +175,16 @@ def test_logout_revokes_server_side_session_token(client: TestClient):
     revoked_session = client.get("/api/auth/session")
 
     assert revoked_session.status_code == 401
+
+
+def test_auth_session_does_not_resolve_workspace_before_auth(client: TestClient):
+    response = client.get(
+        "/api/auth/session",
+        headers={"X-Mianotes-Workspace": "missing-workspace"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not signed in"
 
 
 def test_admin_only_workspace_blocks_new_accounts(client: TestClient):

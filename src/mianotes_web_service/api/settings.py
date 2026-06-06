@@ -8,7 +8,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Cookie, HTTPException, status
 
-from mianotes_web_service.api.dependencies import AdminUser, CurrentUser, SessionDep
+from mianotes_web_service.api.dependencies import (
+    AdminUser,
+    CurrentUser,
+    CurrentWorkspace,
+    SystemSessionDep,
+)
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.engine import create_database_engine
 from mianotes_web_service.db.init import create_workspace_database
@@ -44,6 +49,7 @@ from mianotes_web_service.services.storage_settings import (
     write_storage_config,
 )
 from mianotes_web_service.services.workspace_context import WorkspaceContext
+from mianotes_web_service.services.workspace_access import ensure_workspace_access
 from mianotes_web_service.services.workspace_markdown_import import (
     COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
     has_compatible_markdown_notes,
@@ -119,14 +125,13 @@ def _storage_response(
 
 
 @router.get("/storage", response_model=StorageSettingsRead)
-def storage_settings(session: SessionDep, _: CurrentUser) -> StorageSettingsRead:
-    workspace = session.info.get("workspace")
-    active_location = workspace.id if isinstance(workspace, WorkspaceContext) else None
+def storage_settings(workspace: CurrentWorkspace) -> StorageSettingsRead:
+    active_location = workspace.id
     return _storage_response(_read_storage_config(), active_location=active_location)
 
 
 @router.post("/api-key", response_model=ServiceApiKeyRead, status_code=status.HTTP_201_CREATED)
-def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRead:
+def create_service_api_key(session: SystemSessionDep, _: AdminUser) -> ServiceApiKeyRead:
     raw_token = generate_api_token()
     env_file_path = service_env_file_path()
     try:
@@ -146,14 +151,14 @@ def create_service_api_key(session: SessionDep, _: AdminUser) -> ServiceApiKeyRe
 
 
 @router.get("/share", response_model=ShareSettingsRead)
-def share_settings(session: SessionDep, _: CurrentUser) -> ShareSettingsRead:
+def share_settings(session: SystemSessionDep, _: CurrentUser) -> ShareSettingsRead:
     return ShareSettingsRead(workspace_url=get_workspace_url(session))
 
 
 @router.patch("/share", response_model=ShareSettingsRead)
 def update_share_settings(
     payload: ShareSettingsUpdate,
-    session: SessionDep,
+    session: SystemSessionDep,
     _: AdminUser,
 ) -> ShareSettingsRead:
     try:
@@ -216,14 +221,18 @@ def create_storage_location(payload: StorageLocationCreate, user: AdminUser) -> 
 @router.patch("/storage/active", response_model=StorageSwitchRead)
 def switch_storage(
     payload: StorageSwitchRequest,
-    session: SessionDep,
-    _: CurrentUser,
+    session: SystemSessionDep,
+    user: CurrentUser,
     session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> StorageSwitchRead:
     config = _read_storage_config()
     location = next((item for item in config.locations if item.id == payload.location_id), None)
     if location is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    ensure_workspace_access(
+        user,
+        WorkspaceContext(id=location.id, name=location.name, folder_path=location.folder_path),
+    )
     if session_token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not signed in")
     token = session.get(SessionToken, session_token)

@@ -8,7 +8,6 @@ from urllib.parse import urlparse
 from fastapi import (
     APIRouter,
     BackgroundTasks,
-    Depends,
     File,
     Form,
     HTTPException,
@@ -18,11 +17,15 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import AuthContext, AuthContextDep, NotesWriteUser
+from mianotes_web_service.api.dependencies import (
+    AuthContext,
+    AuthContextDep,
+    NotesWriteUser,
+    SessionDep,
+)
 from mianotes_web_service.api.note_access import read_note_for_response
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
-from mianotes_web_service.db.session import get_session
 from mianotes_web_service.domain.schemas import (
     NoteCreateFromText,
     NoteCreateFromUrl,
@@ -48,7 +51,6 @@ from mianotes_web_service.services.upload_limits import UploadTooLargeError
 from mianotes_web_service.services.workspace_context import WorkspaceContext
 
 router = APIRouter(prefix="/notes", tags=["notes"])
-SessionDep = Annotated[Session, Depends(get_session)]
 SUPPORTED_UPLOAD_EXTENSIONS = {
     ".csv",
     ".doc",

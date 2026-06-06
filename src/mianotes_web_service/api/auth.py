@@ -2,19 +2,21 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Header, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Header, HTTPException, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import (
     CurrentUser,
-    SessionDep,
+    SystemSessionDep,
     _read_bearer_token,
     auth_context_from_bearer_token,
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import AppSetting, SessionToken, User
+from mianotes_web_service.db.session import workspace_session_context
+from mianotes_web_service.db.workspace_routing import default_workspace
 from mianotes_web_service.domain.schemas import (
     AgentSessionRead,
     EmailCheck,
@@ -75,7 +77,7 @@ def _master_password_owner_name(session: Session) -> str | None:
 
 
 @router.post("/check-email", response_model=EmailCheckResult)
-def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
+def check_email(payload: EmailCheck, session: SystemSessionDep) -> EmailCheckResult:
     if not _instance_initialized(session):
         return EmailCheckResult(user_id=None, is_first_user=True)
 
@@ -97,7 +99,12 @@ def check_email(payload: EmailCheck, session: SessionDep) -> EmailCheckResult:
 
 
 @router.post("/join", response_model=SessionRead, status_code=status.HTTP_201_CREATED)
-def join(payload: JoinRequest, response: Response, session: SessionDep) -> SessionRead:
+def join(
+    payload: JoinRequest,
+    response: Response,
+    request: Request,
+    session: SystemSessionDep,
+) -> SessionRead:
     email = str(payload.email).lower()
 
     if not _instance_initialized(session):
@@ -134,11 +141,17 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
                 detail=str(exc),
             ) from exc
         session.flush()
-        create_onboarding_note(
-            session,
-            user,
-            data_dir=current_data_dir(get_settings().data_dir),
-        )
+        with workspace_session_context(default_workspace(), request) as onboarding_session:
+            try:
+                create_onboarding_note(
+                    onboarding_session,
+                    user,
+                    data_dir=current_data_dir(get_settings().data_dir),
+                )
+                onboarding_session.commit()
+            except Exception:
+                onboarding_session.rollback()
+                raise
     else:
         if get_workspace_access_mode(session) == WORKSPACE_ACCESS_MODE_ADMIN_ONLY:
             raise HTTPException(
@@ -184,7 +197,7 @@ def join(payload: JoinRequest, response: Response, session: SessionDep) -> Sessi
 
 
 @router.post("/login", response_model=SessionRead)
-def login(payload: LoginRequest, response: Response, session: SessionDep) -> SessionRead:
+def login(payload: LoginRequest, response: Response, session: SystemSessionDep) -> SessionRead:
     user = session.get(User, payload.user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -209,7 +222,7 @@ def session_info(user: CurrentUser) -> SessionRead:
 
 @router.post("/agent-session", response_model=AgentSessionRead, status_code=status.HTTP_201_CREATED)
 def create_agent_session(
-    session: SessionDep,
+    session: SystemSessionDep,
     authorization: Annotated[str | None, Header()] = None,
     x_mianotes_client: Annotated[str | None, Header(alias="X-Mianotes-Client")] = None,
 ) -> AgentSessionRead:
@@ -276,7 +289,7 @@ def create_agent_session(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
     response: Response,
-    session: SessionDep,
+    session: SystemSessionDep,
     session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
 ) -> None:
     if session_token:

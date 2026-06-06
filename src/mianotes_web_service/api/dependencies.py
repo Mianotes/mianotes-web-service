@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import ApiToken, AppSetting, User
-from mianotes_web_service.db.session import get_session
+from mianotes_web_service.db.session import get_system_session, open_workspace_session
+from mianotes_web_service.db.workspace_routing import resolve_workspace
 from mianotes_web_service.services.agent_clients import AgentClient, resolve_agent_client
 from mianotes_web_service.services.auth import (
     INSTANCE_API_TOKEN_PUBLIC_KEY,
@@ -21,8 +23,10 @@ from mianotes_web_service.services.auth import (
     sync_instance_api_token_public_key,
     verify_instance_api_token,
 )
+from mianotes_web_service.services.workspace_access import ensure_workspace_access
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 
-SessionDep = Annotated[Session, Depends(get_session)]
+SystemSessionDep = Annotated[Session, Depends(get_system_session)]
 
 
 @dataclass(frozen=True)
@@ -150,7 +154,7 @@ def auth_context_from_bearer_token(session: Session, raw_api_token: str) -> Auth
 
 
 def current_auth_context(
-    session: SessionDep,
+    session: SystemSessionDep,
     session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
     authorization: Annotated[str | None, Header()] = None,
 ) -> AuthContext:
@@ -165,6 +169,33 @@ def current_auth_context(
 
 
 AuthContextDep = Annotated[AuthContext, Depends(current_auth_context)]
+
+
+def current_workspace_context(
+    context: AuthContextDep,
+    session_token: Annotated[str | None, Cookie(alias=SESSION_COOKIE_NAME)] = None,
+    x_mianotes_workspace: Annotated[str | None, Header(alias="X-Mianotes-Workspace")] = None,
+) -> WorkspaceContext:
+    workspace = resolve_workspace(
+        session_token=session_token,
+        workspace_header=x_mianotes_workspace,
+    )
+    ensure_workspace_access(context.user, workspace)
+    return workspace
+
+
+CurrentWorkspace = Annotated[WorkspaceContext, Depends(current_workspace_context)]
+
+
+def get_authorized_workspace_session(
+    request: Request,
+    workspace: CurrentWorkspace,
+) -> Generator[Session, None, None]:
+    yield from open_workspace_session(workspace, request)
+
+
+WorkspaceSessionDep = Annotated[Session, Depends(get_authorized_workspace_session)]
+SessionDep = WorkspaceSessionDep
 
 
 def current_user(context: AuthContextDep) -> User:

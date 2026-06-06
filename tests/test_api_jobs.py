@@ -48,6 +48,7 @@ def app_client(
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.state.testing_session_factory = testing_session
     with TestClient(app) as test_client:
         yield test_client, testing_session
     app.dependency_overrides.clear()
