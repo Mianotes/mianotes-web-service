@@ -42,8 +42,7 @@ from mianotes_web_service.services.filesystem_uow import (
     commit_with_filesystem_rollback,
 )
 from mianotes_web_service.services.mia import prompt_markdown
-from mianotes_web_service.services.note_deletion import stage_note_files_for_delete
-from mianotes_web_service.services.note_moves import move_note_to_folder
+from mianotes_web_service.services.note_files import NoteFiles
 from mianotes_web_service.services.note_responses import (
     note_is_starred,
     note_list_response,
@@ -51,12 +50,7 @@ from mianotes_web_service.services.note_responses import (
     starred_note_ids,
 )
 from mianotes_web_service.services.note_tags import sync_note_tags
-from mianotes_web_service.services.paths import workspace_paths_for_session
-from mianotes_web_service.services.storage import (
-    render_markdown_note,
-    replace_markdown_title,
-    summarize_text,
-)
+from mianotes_web_service.services.storage import summarize_text
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 __all__ = ["prompt_markdown", "router"]
@@ -300,37 +294,34 @@ def update_note(
     )
     ensure_can_change_note(note, user)
     filesystem = FilesystemUnitOfWork()
+    note_files = NoteFiles(session)
 
     if payload.folder_id is not None:
         folder = session.get(Folder, payload.folder_id)
         if folder is None or folder.archived_at is not None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
-        paths = workspace_paths_for_session(session)
-        move_note_to_folder(
+        note_files.stage_move_to_folder(
             note,
             folder,
-            data_dir=paths.data_dir,
             filesystem=filesystem,
         )
-    else:
-        paths = workspace_paths_for_session(session)
 
     next_title = payload.title or note.title
-    note_path = paths.note_file_path(note)
     is_manual_content_edit = payload.text is not None or payload.title is not None
     if payload.text is not None:
-        filesystem.replace_text(
-            note_path,
-            render_markdown_note(title=next_title, text=payload.text),
-            encoding="utf-8",
+        note_files.stage_replace_body(
+            note,
+            title=next_title,
+            text=payload.text,
+            filesystem=filesystem,
         )
         note.summary = summarize_text(payload.text)
         note.revision_number += 1
     elif payload.title is not None:
-        filesystem.replace_text(
-            note_path,
-            replace_markdown_title(note_path.read_text(encoding="utf-8"), next_title),
-            encoding="utf-8",
+        note_files.stage_replace_title(
+            note,
+            title=next_title,
+            filesystem=filesystem,
         )
         note.revision_number += 1
     if note.status == "failed" and is_manual_content_edit:
@@ -358,6 +349,6 @@ def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None
     note = read_note_for_delete(session, note_id)
     ensure_can_change_note(note, user)
     filesystem = FilesystemUnitOfWork()
-    stage_note_files_for_delete(note, workspace_paths_for_session(session), filesystem)
+    NoteFiles(session).stage_delete(note, filesystem)
     session.delete(note)
     commit_with_filesystem_rollback(session, filesystem)

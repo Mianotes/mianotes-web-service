@@ -28,6 +28,7 @@ from mianotes_web_service.domain.schemas import (
 )
 from mianotes_web_service.services.jobs import create_job
 from mianotes_web_service.services.auth_context import AuthContext
+from mianotes_web_service.services.note_files import NoteFiles
 from mianotes_web_service.services.note_repository import read_note_for_response
 from mianotes_web_service.services.note_responses import (
     note_ingestion_response,
@@ -37,9 +38,7 @@ from mianotes_web_service.services.note_responses import (
 from mianotes_web_service.services.note_tags import sync_note_tags
 from mianotes_web_service.services.parser_types import ParserError
 from mianotes_web_service.services.parser_url import url_source_extension, validate_fetch_url
-from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import (
-    FilesystemStorage,
     infer_title,
     summarize_text,
 )
@@ -133,13 +132,12 @@ def create_note_from_text(
 
     title = payload.title or infer_title(payload.text)
     note_id = new_id()
-    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
-    paths = storage.write_text_note(
-        username=user.username,
-        folder=folder.path,
+    paths = NoteFiles(session).create_text_note(
+        user=user,
+        folder=folder,
         title=title,
         text=payload.text,
-        filename=note_id,
+        note_id=note_id,
     )
 
     note = Note(
@@ -208,13 +206,12 @@ def create_note_from_file(
             status_code=422,
             detail="Title required",
         )
-    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
     try:
-        paths = storage.write_uploaded_file_note(
-            username=user.username,
-            folder=folder.path,
+        paths = NoteFiles(session).create_uploaded_file_note(
+            user=user,
+            folder=folder,
             title=note_title,
-            filename=note_id,
+            note_id=note_id,
             original_filename=file.filename,
             source_stream=file.file,
             max_bytes=get_settings().max_upload_bytes,
@@ -303,12 +300,11 @@ def create_note_from_url(
     title = payload.title or infer_title(parsed_url.path.rsplit("/", 1)[-1] or parsed_url.netloc)
     source_extension = url_source_extension(url) or ".html"
     note_id = new_id()
-    storage = FilesystemStorage(workspace_paths_for_session(session).data_dir)
-    paths = storage.write_url_note_placeholder(
-        username=user.username,
-        folder=folder.path,
+    paths = NoteFiles(session).create_url_note_placeholder(
+        user=user,
+        folder=folder,
         title=title,
-        filename=note_id,
+        note_id=note_id,
         url=url,
         source_extension=source_extension,
     )
