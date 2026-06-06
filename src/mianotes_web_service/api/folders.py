@@ -20,6 +20,10 @@ from mianotes_web_service.domain.schemas import (
     FolderRestore,
     FolderUpdate,
 )
+from mianotes_web_service.services.filesystem_uow import (
+    FilesystemUnitOfWork,
+    commit_with_filesystem_rollback,
+)
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import short_id, slugify
 
@@ -57,10 +61,13 @@ def _unique_folder_slug(session: Session, slug: str, folder_id: str) -> str:
     return candidate
 
 
-def _ensure_folder_gitignore(folder_path: Path) -> None:
+def _ensure_folder_gitignore(
+    folder_path: Path,
+    filesystem: FilesystemUnitOfWork,
+) -> None:
     gitignore_path = folder_path / ".gitignore"
     if not gitignore_path.exists():
-        gitignore_path.write_text("sources/*\n", encoding="utf-8")
+        filesystem.create_text(gitignore_path, "sources/*\n")
 
 
 def _replace_path_prefix(value: str, old_roots: tuple[Path, ...], new_root: Path) -> str:
@@ -199,6 +206,7 @@ def update_folder(
     user: FoldersWriteUser,
 ) -> Folder:
     folder = _read_folder_or_404(session, folder_id)
+    filesystem = FilesystemUnitOfWork()
     if not user.is_admin and folder.user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -227,8 +235,8 @@ def update_folder(
                     detail="A folder with this name already exists",
                 )
             if old_path.exists():
-                old_path.rename(new_path)
-                _ensure_folder_gitignore(new_path)
+                filesystem.move_path(old_path, new_path)
+                _ensure_folder_gitignore(new_path, filesystem)
                 for note in folder.notes:
                     note.note_path = _replace_path_prefix(note.note_path, (old_path,), new_path)
                     for source_file in note.source_files:
@@ -242,9 +250,8 @@ def update_folder(
         folder.is_pinned = payload.is_pinned
 
     try:
-        session.commit()
+        commit_with_filesystem_rollback(session, filesystem)
     except IntegrityError as exc:
-        session.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="A folder with this name already exists",
@@ -289,9 +296,9 @@ def restore_folder(
             detail="A folder with this name already exists",
         )
 
-    restored_path.parent.mkdir(parents=True, exist_ok=True)
-    archived_path.rename(restored_path)
-    _ensure_folder_gitignore(restored_path)
+    filesystem = FilesystemUnitOfWork()
+    filesystem.move_path(archived_path, restored_path)
+    _ensure_folder_gitignore(restored_path, filesystem)
 
     old_roots = (archived_path, previous_live_path)
     for note in folder.notes:
@@ -311,7 +318,7 @@ def restore_folder(
     if payload.is_pinned is not None:
         folder.is_pinned = payload.is_pinned
 
-    session.commit()
+    commit_with_filesystem_rollback(session, filesystem)
     session.refresh(folder)
     return folder
 
@@ -328,6 +335,7 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
         return
 
     archived_at = datetime.now(UTC)
+    filesystem = FilesystemUnitOfWork()
     paths = workspace_paths_for_session(session)
     archive_slug = f"{folder.slug}-{short_id(folder.id)}"
     archive_path = f".archived/{archive_slug}"
@@ -335,8 +343,7 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
     new_path = paths.markdown_root / archive_path
 
     if old_path.exists():
-        new_path.parent.mkdir(parents=True, exist_ok=True)
-        old_path.rename(new_path)
+        filesystem.move_path(old_path, new_path)
 
         for note in folder.notes:
             note.note_path = _replace_path_prefix(note.note_path, (old_path,), new_path)
@@ -351,4 +358,4 @@ def archive_folder(folder_id: str, session: SessionDep, user: FoldersWriteUser) 
     folder.path = archive_path
     folder.archived_at = archived_at
     folder.archived_by_user_id = user.id
-    session.commit()
+    commit_with_filesystem_rollback(session, filesystem)

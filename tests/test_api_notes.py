@@ -456,7 +456,7 @@ def test_folder_counts_are_available_without_listing_notes(client: TestClient):
     assert counts[second_folder["id"]] == 1
 
 
-def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
+def test_delete_note_keeps_markdown_file_on_disk(client: TestClient, tmp_path: Path):
     client.post(
         "/api/auth/join",
         json={
@@ -472,7 +472,7 @@ def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
         json={
             "folder_id": folder["id"],
             "title": "Delete me",
-            "text": "This Markdown file should be deleted with the note.",
+            "text": "This Markdown file should stay on disk when the note is deleted.",
         },
     ).json()
     note_path = (
@@ -487,7 +487,8 @@ def test_delete_note_removes_markdown_file(client: TestClient, tmp_path: Path):
     response = client.delete(f"/api/notes/{note['id']}")
 
     assert response.status_code == 204
-    assert not note_path.exists()
+    assert note_path.exists()
+    assert "This Markdown file should stay on disk" in note_path.read_text(encoding="utf-8")
     assert client.get(f"/api/notes/{note['id']}").status_code == 404
 
 
@@ -672,6 +673,92 @@ def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path
     new_folder_notes = client.get("/api/notes", params={"folder_id": archive["id"]})
     assert old_folder_notes.json()["items"] == []
     assert new_folder_notes.json()["items"][0]["id"] == note["id"]
+
+
+def test_update_note_move_rolls_back_files_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "move-rollback@example.com",
+            "name": "Move Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    inbox = client.post("/api/folders", json={"name": "Move Rollback Inbox"}).json()
+    archive = client.post("/api/folders", json={"name": "Move Rollback Archive"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": inbox["id"],
+            "title": "Move Rollback",
+            "text": "This note should stay in the original folder when commit fails.",
+        },
+    ).json()
+    note_filename = f"move-rollback-{note['id'][:8]}.md"
+    source_filename = f"sources/{note['id'][:8]}/original.txt"
+    old_note_path = tmp_path / "data" / "markdown" / "move-rollback-inbox" / note_filename
+    old_source_path = tmp_path / "data" / "markdown" / "move-rollback-inbox" / source_filename
+    new_note_path = tmp_path / "data" / "markdown" / "move-rollback-archive" / note_filename
+    new_source_path = tmp_path / "data" / "markdown" / "move-rollback-archive" / source_filename
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.patch(f"/api/notes/{note['id']}", json={"folder_id": archive["id"]})
+
+    assert response.status_code == 500
+    assert old_note_path.exists()
+    assert old_source_path.exists()
+    assert not new_note_path.exists()
+    assert not new_source_path.exists()
+
+
+def test_update_note_text_rolls_back_file_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "text-rollback@example.com",
+            "name": "Text Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Text Rollback"}).json()
+    note = client.post(
+        "/api/notes/from-text",
+        json={
+            "folder_id": folder["id"],
+            "title": "Rollback Draft",
+            "text": "Original body.",
+        },
+    ).json()
+    note_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "text-rollback"
+        / f"rollback-draft-{note['id'][:8]}.md"
+    )
+    original_text = note_path.read_text(encoding="utf-8")
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.patch(f"/api/notes/{note['id']}", json={"text": "Updated body."})
+
+    assert response.status_code == 500
+    assert note_path.read_text(encoding="utf-8") == original_text
 
 
 def test_updating_failed_note_clears_failed_status_and_console_job(
@@ -1096,9 +1183,11 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
-    assert not note_path.exists()
+    assert note_path.exists()
     assert source_path.exists()
     assert source_path.parent.exists()
+    assert client.get(note["note_url"]).status_code == 404
+    assert client.get(note["source_files"][0]["url"]).status_code == 404
 
 
 def test_create_note_from_file_rejects_oversized_upload(
@@ -1340,9 +1429,10 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
     note_filename = f"diagram-note-{note['id'][:8]}.md"
-    assert not (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
+    assert (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
     assert image_files[0].exists()
     assert image_files[0].parent.exists()
+    assert client.get(image_url).status_code == 404
 
 
 def test_upload_note_image_rejects_oversized_file(

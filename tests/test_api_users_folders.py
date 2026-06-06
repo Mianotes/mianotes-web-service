@@ -587,6 +587,111 @@ def test_folder_crud_and_user_filter(client: TestClient, tmp_path: Path):
     assert folder["id"] in [item["id"] for item in restored_visible.json()]
 
 
+def test_folder_rename_rolls_back_files_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "folder-rename-rollback@example.com",
+            "name": "Folder Rename Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Rename Rollback"}).json()
+    old_path = tmp_path / "data" / "markdown" / "rename-rollback"
+    new_path = tmp_path / "data" / "markdown" / "renamed-rollback"
+    old_path.mkdir(parents=True, exist_ok=True)
+    (old_path / "note.md").write_text("note", encoding="utf-8")
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.patch(f"/api/folders/{folder['id']}", json={"name": "Renamed Rollback"})
+
+    assert response.status_code == 500
+    assert old_path.exists()
+    assert (old_path / "note.md").read_text(encoding="utf-8") == "note"
+    assert not new_path.exists()
+
+
+def test_folder_archive_rolls_back_files_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "folder-archive-rollback@example.com",
+            "name": "Folder Archive Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Archive Rollback"}).json()
+    live_path = tmp_path / "data" / "markdown" / "archive-rollback"
+    archived_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / ".archived"
+        / f"archive-rollback-{folder['id'][:8]}"
+    )
+    live_path.mkdir(parents=True, exist_ok=True)
+    (live_path / "note.md").write_text("note", encoding="utf-8")
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.delete(f"/api/folders/{folder['id']}")
+
+    assert response.status_code == 500
+    assert live_path.exists()
+    assert (live_path / "note.md").read_text(encoding="utf-8") == "note"
+    assert not archived_path.exists()
+
+
+def test_folder_restore_rolls_back_files_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "folder-restore-rollback@example.com",
+            "name": "Folder Restore Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Restore Rollback"}).json()
+    live_path = tmp_path / "data" / "markdown" / "restore-rollback"
+    live_path.mkdir(parents=True, exist_ok=True)
+    (live_path / "note.md").write_text("note", encoding="utf-8")
+    assert client.delete(f"/api/folders/{folder['id']}").status_code == 204
+    archived_folder = client.get(f"/api/folders/{folder['id']}").json()
+    archived_path = tmp_path / "data" / "markdown" / archived_folder["path"]
+    restored_path = tmp_path / "data" / "markdown" / "restore-rollback"
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.post(f"/api/folders/{folder['id']}/restore", json={})
+
+    assert response.status_code == 500
+    assert archived_path.exists()
+    assert (archived_path / "note.md").read_text(encoding="utf-8") == "note"
+    assert not restored_path.exists()
+
+
 def test_missing_archived_folder_is_removed_from_restore_list(
     client: TestClient,
     tmp_path: Path,

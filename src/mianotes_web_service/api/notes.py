@@ -38,8 +38,11 @@ from mianotes_web_service.domain.schemas import (
     NoteUpdate,
     TagsUpdate,
 )
+from mianotes_web_service.services.filesystem_uow import (
+    FilesystemUnitOfWork,
+    commit_with_filesystem_rollback,
+)
 from mianotes_web_service.services.mia import prompt_markdown
-from mianotes_web_service.services.note_deletion import delete_note_markdown_file
 from mianotes_web_service.services.note_moves import move_note_to_folder
 from mianotes_web_service.services.note_responses import (
     note_is_starred,
@@ -297,6 +300,7 @@ def update_note(
         else read_note_for_change(session, note_id)
     )
     ensure_can_change_note(note, user)
+    filesystem = FilesystemUnitOfWork()
 
     if payload.folder_id is not None:
         folder = session.get(Folder, payload.folder_id)
@@ -307,6 +311,7 @@ def update_note(
             note,
             folder,
             data_dir=paths.data_dir,
+            filesystem=filesystem,
         )
     else:
         paths = workspace_paths_for_session(session)
@@ -315,14 +320,16 @@ def update_note(
     note_path = paths.note_file_path(note)
     is_manual_content_edit = payload.text is not None or payload.title is not None
     if payload.text is not None:
-        note_path.write_text(
+        filesystem.replace_text(
+            note_path,
             render_markdown_note(title=next_title, text=payload.text),
             encoding="utf-8",
         )
         note.summary = summarize_text(payload.text)
         note.revision_number += 1
     elif payload.title is not None:
-        note_path.write_text(
+        filesystem.replace_text(
+            note_path,
             replace_markdown_title(note_path.read_text(encoding="utf-8"), next_title),
             encoding="utf-8",
         )
@@ -338,7 +345,7 @@ def update_note(
         note.published_at = datetime.now(UTC) if payload.is_published else None
     if payload.tags is not None:
         sync_note_tags(session, note, payload.tags)
-    session.commit()
+    commit_with_filesystem_rollback(session, filesystem)
     return note_response(
         read_note_for_response(session, note.id),
         request,
@@ -351,6 +358,5 @@ def update_note(
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = read_note_for_delete(session, note_id)
     ensure_can_change_note(note, user)
-    delete_note_markdown_file(note, workspace_paths_for_session(session))
     session.delete(note)
     session.commit()

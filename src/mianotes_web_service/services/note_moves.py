@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from fastapi import HTTPException, status
 
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile
+from mianotes_web_service.services.filesystem_uow import FilesystemUnitOfWork
 from mianotes_web_service.services.paths import (
     folder_directory,
     note_file_path,
@@ -33,14 +33,13 @@ def validate_stored_moves(moves: list[tuple[Path, Path]]) -> None:
             )
 
 
-def move_stored_path(current_path: Path, target_path: Path) -> None:
-    if current_path.resolve() == target_path.resolve():
-        return
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(current_path), str(target_path))
-
-
-def move_note_to_folder(note: Note, target_folder: Folder, *, data_dir: Path | None = None) -> None:
+def move_note_to_folder(
+    note: Note,
+    target_folder: Folder,
+    *,
+    data_dir: Path | None = None,
+    filesystem: FilesystemUnitOfWork,
+) -> None:
     if note.folder_id == target_folder.id:
         return
 
@@ -90,13 +89,13 @@ def move_note_to_folder(note: Note, target_folder: Folder, *, data_dir: Path | N
         path_moves.append((current_image_dir, target_image_dir))
     validate_stored_moves(path_moves)
 
-    move_stored_path(current_note_path, target_note_path)
+    filesystem.move_path(current_note_path, target_note_path)
     for source_file, current_source_path, target_source_path, source_filename in source_moves:
-        move_stored_path(current_source_path, target_source_path)
+        filesystem.move_path(current_source_path, target_source_path)
         source_file.filename = source_filename
         source_file.file_path = str(target_source_path)
     if current_image_dir.exists():
-        move_stored_path(current_image_dir, target_image_dir)
+        filesystem.move_path(current_image_dir, target_image_dir)
 
     note.folder_id = target_folder.id
     note.folder = target_folder
