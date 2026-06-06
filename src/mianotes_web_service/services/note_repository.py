@@ -23,10 +23,7 @@ def _read_shared_note_or_404(session: Session, token: str, *, options=()) -> Not
     if secret is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shared note not found")
     token_hash = hash_share_token(secret, token)
-    statement = (
-        select(Note)
-        .where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
-    )
+    statement = select(Note).where(Note.share_token_hash == token_hash, Note.shared_at.is_not(None))
     if options:
         statement = statement.options(*options)
     note = session.scalars(statement).one_or_none()

@@ -10,8 +10,6 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.api.dependencies import (
     CurrentUser,
     SystemSessionDep,
-    _read_bearer_token,
-    auth_context_from_bearer_token,
 )
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import AppSetting, SessionToken, User
@@ -42,6 +40,10 @@ from mianotes_web_service.services.auth import (
     set_workspace_access_mode,
     verify_master_password,
     verify_user_password,
+)
+from mianotes_web_service.services.auth_context import (
+    auth_context_from_bearer_token,
+    read_bearer_token,
 )
 from mianotes_web_service.services.onboarding import create_onboarding_note
 from mianotes_web_service.services.storage import make_username
@@ -226,7 +228,7 @@ def create_agent_session(
     authorization: Annotated[str | None, Header()] = None,
     x_mianotes_client: Annotated[str | None, Header(alias="X-Mianotes-Client")] = None,
 ) -> AgentSessionRead:
-    raw_api_token = _read_bearer_token(authorization)
+    raw_api_token = read_bearer_token(authorization)
     if raw_api_token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
     if x_mianotes_client is None:

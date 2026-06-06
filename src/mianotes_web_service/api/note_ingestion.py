@@ -17,13 +17,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import (
-    AuthContext,
-    AuthContextDep,
-    NotesWriteUser,
-    SessionDep,
-)
-from mianotes_web_service.api.note_access import read_note_for_response
+from mianotes_web_service.api.dependencies import AuthContextDep, NotesWriteUser, SessionDep
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Folder, Note, SourceFile, new_id
 from mianotes_web_service.domain.schemas import (
@@ -33,6 +27,8 @@ from mianotes_web_service.domain.schemas import (
     NoteRead,
 )
 from mianotes_web_service.services.jobs import create_job
+from mianotes_web_service.services.auth_context import AuthContext
+from mianotes_web_service.services.note_repository import read_note_for_response
 from mianotes_web_service.services.note_responses import (
     note_ingestion_response,
     note_is_starred,

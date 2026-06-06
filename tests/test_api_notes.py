@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from mianotes_web_service.api.note_access import (
+from mianotes_web_service.services.note_repository import (
     read_note_for_change,
     read_note_for_response,
 )

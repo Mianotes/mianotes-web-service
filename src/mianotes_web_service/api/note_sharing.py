@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.api.dependencies import ShareWriteUser, SessionDep
-from mianotes_web_service.api.note_access import (
+from mianotes_web_service.services.note_repository import (
     ensure_can_change_note,
     read_note_for_change,
     read_note_reference,

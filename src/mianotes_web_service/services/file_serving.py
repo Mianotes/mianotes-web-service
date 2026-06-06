@@ -1,0 +1,335 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import HTTPException, Request, status
+from fastapi.responses import FileResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload
+
+from mianotes_web_service.core.config import get_settings
+from mianotes_web_service.db.models import Folder, Note, SourceFile
+from mianotes_web_service.db.session import workspace_session_context
+from mianotes_web_service.db.workspace_routing import (
+    default_workspace,
+    system_sessionmaker,
+    workspace_by_id,
+)
+from mianotes_web_service.services.auth import SESSION_COOKIE_NAME, read_session_user
+from mianotes_web_service.services.auth_context import (
+    AuthContext,
+    auth_context_from_bearer_token,
+    read_bearer_token,
+)
+from mianotes_web_service.services.paths import workspace_paths_for_session
+from mianotes_web_service.services.storage_settings import (
+    SQLITE_SIDECAR_SUFFIXES,
+    SYSTEM_DATABASE_FILENAME,
+)
+from mianotes_web_service.services.workspace_access import ensure_workspace_access
+from mianotes_web_service.services.workspace_context import WorkspaceContext, current_data_dir
+
+PRIVATE_DATA_FILENAMES = {
+    SYSTEM_DATABASE_FILENAME,
+    *(f"{SYSTEM_DATABASE_FILENAME}{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES),
+}
+
+
+def file_response(
+    file_path: str,
+    *,
+    no_store: bool = False,
+    data_dir: Path | None = None,
+) -> FileResponse:
+    data_dir = (data_dir or current_data_dir(get_settings().data_dir)).resolve()
+    target = (data_dir / file_path).resolve()
+    if data_dir not in target.parents and target != data_dir:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    if _is_private_data_file(target):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    headers = {"Cache-Control": "no-store"} if no_store else None
+    return FileResponse(target, headers=headers)
+
+
+def inline_markdown_response(target: Path) -> FileResponse:
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return FileResponse(
+        target,
+        media_type="text/plain; charset=utf-8",
+        headers={
+            "Cache-Control": "no-store",
+            "Content-Disposition": f'inline; filename="{target.name}"',
+        },
+    )
+
+
+def known_file_response(
+    target: Path,
+    *,
+    root: Path,
+    no_store: bool = False,
+    media_type: str | None = None,
+) -> FileResponse:
+    root = root.resolve()
+    target = target.resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found") from exc
+    if _is_private_data_file(target):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    if not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    headers = {"Cache-Control": "no-store"} if no_store else None
+    return FileResponse(target, media_type=media_type, headers=headers)
+
+
+def clean_file_path(file_path: str) -> str:
+    clean = file_path.strip("/")
+    if not clean:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return clean
+
+
+def serve_published_html_root() -> FileResponse:
+    return file_response("html/index.html", no_store=True)
+
+
+def serve_workspace_published_html_root(workspace_id: str) -> FileResponse:
+    return file_response(
+        "html/index.html",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
+
+
+def serve_workspace_published_latest_root(workspace_id: str) -> FileResponse:
+    return file_response(
+        "html/latest/index.html",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
+
+
+def serve_workspace_published_html_file(workspace_id: str, file_path: str) -> FileResponse:
+    return file_response(
+        f"html/{clean_file_path(file_path)}",
+        no_store=True,
+        data_dir=workspace_by_id(workspace_id).folder_path,
+    )
+
+
+def serve_published_latest_root() -> FileResponse:
+    return file_response("html/latest/index.html", no_store=True)
+
+
+def serve_published_html_file(file_path: str) -> FileResponse:
+    return file_response(f"html/{clean_file_path(file_path)}", no_store=True)
+
+
+def serve_public_markdown_file(file_path: str, request: Request) -> FileResponse:
+    clean = clean_file_path(file_path)
+    with workspace_session_context(default_workspace(), request) as session:
+        return _published_markdown_response(clean, session)
+
+
+def serve_workspace_note_markdown(
+    workspace_id: str,
+    note_id: str,
+    request: Request,
+) -> FileResponse:
+    workspace = authenticated_file_workspace(request, workspace_id)
+    with workspace_session_context(workspace, request) as session:
+        return note_markdown_response(_note_or_404(session, note_id), session)
+
+
+def serve_workspace_source_file(
+    workspace_id: str,
+    note_id: str,
+    source_file_id: str,
+    request: Request,
+) -> FileResponse:
+    workspace = authenticated_file_workspace(request, workspace_id)
+    with workspace_session_context(workspace, request) as session:
+        source_file = session.scalars(
+            select(SourceFile)
+            .options(joinedload(SourceFile.note).joinedload(Note.folder))
+            .where(SourceFile.id == source_file_id, SourceFile.note_id == note_id)
+            .limit(1)
+        ).one_or_none()
+        if source_file is None or source_file.note is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+        paths = workspace_paths_for_session(session)
+        return known_file_response(
+            paths.source_file_path(source_file),
+            root=paths.markdown_root,
+            no_store=True,
+        )
+
+
+def serve_workspace_note_image(
+    workspace_id: str,
+    note_id: str,
+    file_path: str,
+    request: Request,
+) -> FileResponse:
+    clean = clean_file_path(file_path)
+    workspace = authenticated_file_workspace(request, workspace_id)
+    with workspace_session_context(workspace, request) as session:
+        note = _note_or_404(session, note_id)
+        paths = workspace_paths_for_session(session)
+        image_root = paths.note_image_directory(note)
+        return known_file_response(
+            image_root / clean,
+            root=image_root,
+            no_store=True,
+        )
+
+
+def serve_profile_file(file_path: str) -> FileResponse:
+    clean = clean_file_path(file_path)
+    return file_response(f".profiles/{clean}", data_dir=get_settings().data_dir)
+
+
+def authenticated_file_workspace(request: Request, workspace_id: str) -> WorkspaceContext:
+    context = _file_auth_context(request)
+    if context is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not signed in",
+        )
+    workspace = workspace_by_id(workspace_id)
+    ensure_workspace_access(context.user, workspace)
+    return workspace
+
+
+def note_markdown_response(note: Note, session: Session) -> FileResponse:
+    paths = workspace_paths_for_session(session)
+    markdown_root = paths.markdown_root.resolve()
+    target = paths.note_file_path(note).resolve()
+    try:
+        target.relative_to(markdown_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found") from exc
+    return inline_markdown_response(target)
+
+
+def _is_private_data_file(target: Path) -> bool:
+    return target.name in PRIVATE_DATA_FILENAMES or target.name.endswith(
+        (".db", *(f".db{suffix}" for suffix in SQLITE_SIDECAR_SUFFIXES))
+    )
+
+
+def _markdown_target(file_path: str, data_dir: Path) -> Path:
+    target = (data_dir / "markdown" / file_path).resolve()
+    if data_dir not in target.parents and target != data_dir:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return target
+
+
+def _folder_file_parts(file_path: str) -> tuple[str, str]:
+    folder_path, separator, filename = file_path.rpartition("/")
+    if not separator or not folder_path or not filename:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return folder_path, filename
+
+
+def _source_file_parts(file_path: str) -> tuple[str, str]:
+    folder_path, separator, source_path = file_path.partition("/sources/")
+    if not separator or not folder_path or not source_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return folder_path, f"sources/{source_path}"
+
+
+def _system_session_for_request(request: Request) -> Session:
+    testing_session_factory = getattr(request.app.state, "testing_session_factory", None)
+    return (testing_session_factory or system_sessionmaker())()
+
+
+def _file_auth_context(request: Request) -> AuthContext | None:
+    session = _system_session_for_request(request)
+    try:
+        session_token = request.cookies.get(SESSION_COOKIE_NAME)
+        user = read_session_user(session, session_token)
+        if user is not None:
+            return AuthContext(user=user)
+
+        raw_api_token = read_bearer_token(request.headers.get("authorization"))
+        if raw_api_token is None:
+            return None
+
+        try:
+            context = auth_context_from_bearer_token(session, raw_api_token)
+        except HTTPException:
+            return None
+        if "admin" in context.scopes or "notes:read" in context.scopes:
+            return context
+        return None
+    finally:
+        session.close()
+
+
+def _note_or_404(session: Session, note_id: str) -> Note:
+    note = session.scalars(
+        select(Note)
+        .options(joinedload(Note.folder))
+        .where(Note.id == note_id)
+        .limit(1)
+    ).one_or_none()
+    if note is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Note not found",
+        )
+    return note
+
+
+def _published_markdown_response(file_path: str, session: Session) -> FileResponse:
+    if file_path.startswith("sources/") or "/sources/" in file_path:
+        return _published_source_response(file_path, session)
+
+    paths = workspace_paths_for_session(session)
+    data_dir = paths.data_dir.resolve()
+    _markdown_target(file_path, data_dir)
+
+    folder_path, filename = _folder_file_parts(file_path)
+    note_id = session.scalars(
+        select(Note.id)
+        .join(Note.folder)
+        .where(
+            Note.is_published.is_(True),
+            Note.filename == filename,
+            Folder.path == folder_path,
+        )
+        .limit(1)
+    ).first()
+    if note_id is not None:
+        return file_response(f"markdown/{file_path}", data_dir=data_dir)
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+
+def _published_source_response(file_path: str, session: Session) -> FileResponse:
+    paths = workspace_paths_for_session(session)
+    data_dir = paths.data_dir.resolve()
+    _markdown_target(file_path, data_dir)
+
+    folder_path, source_filename = _source_file_parts(file_path)
+    source_file_id = session.scalars(
+        select(SourceFile.id)
+        .join(SourceFile.note)
+        .join(Note.folder)
+        .where(
+            Note.is_published.is_(True),
+            SourceFile.filename == source_filename,
+            Folder.path == folder_path,
+        )
+        .limit(1)
+    ).first()
+    if source_file_id is not None:
+        return file_response(f"markdown/{file_path}", data_dir=data_dir)
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
