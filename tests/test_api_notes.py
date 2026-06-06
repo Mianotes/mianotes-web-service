@@ -456,7 +456,7 @@ def test_folder_counts_are_available_without_listing_notes(client: TestClient):
     assert counts[second_folder["id"]] == 1
 
 
-def test_delete_note_keeps_markdown_file_on_disk(client: TestClient, tmp_path: Path):
+def test_delete_note_removes_managed_files_from_disk(client: TestClient, tmp_path: Path):
     client.post(
         "/api/auth/join",
         json={
@@ -472,7 +472,7 @@ def test_delete_note_keeps_markdown_file_on_disk(client: TestClient, tmp_path: P
         json={
             "folder_id": folder["id"],
             "title": "Delete me",
-            "text": "This Markdown file should stay on disk when the note is deleted.",
+            "text": "This Markdown file should be deleted with the note.",
         },
     ).json()
     note_path = (
@@ -487,8 +487,7 @@ def test_delete_note_keeps_markdown_file_on_disk(client: TestClient, tmp_path: P
     response = client.delete(f"/api/notes/{note['id']}")
 
     assert response.status_code == 204
-    assert note_path.exists()
-    assert "This Markdown file should stay on disk" in note_path.read_text(encoding="utf-8")
+    assert not note_path.exists()
     assert client.get(f"/api/notes/{note['id']}").status_code == 404
 
 
@@ -565,6 +564,65 @@ def test_delete_note_does_not_remove_paths_outside_markdown_root(
     assert response.status_code == 204
     assert outside_path.exists()
     assert client.get(f"/api/notes/{note['id']}").status_code == 404
+
+
+def test_delete_note_rolls_back_files_when_commit_fails(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client.post(
+        "/api/auth/join",
+        json={
+            "email": "delete-rollback@example.com",
+            "name": "Delete Rollback User",
+            "password": "house-password",
+            "password_confirmation": "house-password",
+        },
+    )
+    folder = client.post("/api/folders", json={"name": "Delete Rollback"}).json()
+    note = client.post(
+        "/api/notes/from-file",
+        data={"folder_id": folder["id"], "title": "Delete Rollback"},
+        files={"file": ("receipt.pdf", b"%PDF-1.4 test content", "application/pdf")},
+    ).json()
+    image_response = client.post(
+        f"/api/notes/{note['id']}/images",
+        files={"image": ("diagram.png", _png_bytes(), "image/png")},
+    )
+    assert image_response.status_code == 201
+    note_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "delete-rollback"
+        / f"delete-rollback-{note['id'][:8]}.md"
+    )
+    source_path = (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "delete-rollback"
+        / "sources"
+        / note["id"][:8]
+        / "original.pdf"
+    )
+    image_directory = tmp_path / "data" / "markdown" / "delete-rollback" / "images" / note["id"][:8]
+    image_files = list(image_directory.glob("*.png"))
+    assert note_path.exists()
+    assert source_path.exists()
+    assert len(image_files) == 1
+
+    def fail_commit(self):
+        raise RuntimeError("forced commit failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    response = client.delete(f"/api/notes/{note['id']}")
+
+    assert response.status_code == 500
+    assert note_path.exists()
+    assert source_path.exists()
+    assert image_files[0].exists()
 
 
 def test_get_note_normalizes_parser_markdown(client: TestClient, tmp_path: Path):
@@ -1183,9 +1241,8 @@ def test_create_note_from_file_stores_source_and_pending_note(
 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
-    assert note_path.exists()
-    assert source_path.exists()
-    assert source_path.parent.exists()
+    assert not note_path.exists()
+    assert not source_path.exists()
     assert client.get(note["note_url"]).status_code == 404
     assert client.get(note["source_files"][0]["url"]).status_code == 404
 
@@ -1429,9 +1486,8 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
     deleted = client.delete(f"/api/notes/{note['id']}")
     assert deleted.status_code == 204
     note_filename = f"diagram-note-{note['id'][:8]}.md"
-    assert (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
-    assert image_files[0].exists()
-    assert image_files[0].parent.exists()
+    assert not (tmp_path / "data" / "markdown" / "editor-images" / note_filename).exists()
+    assert not image_files[0].exists()
     assert client.get(image_url).status_code == 404
 
 

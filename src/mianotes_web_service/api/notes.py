@@ -43,6 +43,7 @@ from mianotes_web_service.services.filesystem_uow import (
     commit_with_filesystem_rollback,
 )
 from mianotes_web_service.services.mia import prompt_markdown
+from mianotes_web_service.services.note_deletion import stage_note_files_for_delete
 from mianotes_web_service.services.note_moves import move_note_to_folder
 from mianotes_web_service.services.note_responses import (
     note_is_starred,
@@ -358,5 +359,7 @@ def update_note(
 def delete_note(note_id: str, session: SessionDep, user: NotesWriteUser) -> None:
     note = read_note_for_delete(session, note_id)
     ensure_can_change_note(note, user)
+    filesystem = FilesystemUnitOfWork()
+    stage_note_files_for_delete(note, workspace_paths_for_session(session), filesystem)
     session.delete(note)
-    session.commit()
+    commit_with_filesystem_rollback(session, filesystem)

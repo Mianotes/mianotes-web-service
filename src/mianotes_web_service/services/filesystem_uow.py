@@ -50,6 +50,17 @@ class FilesystemUnitOfWork:
     def replace_text(self, target_path: Path, content: str, *, encoding: str = "utf-8") -> None:
         self.replace_bytes(target_path, content.encode(encoding))
 
+    def delete_path(self, target_path: Path) -> None:
+        target_path = target_path.resolve()
+        if not target_path.exists():
+            return
+
+        backup_dir = Path(tempfile.mkdtemp(prefix="mianotes-delete-backup-"))
+        backup_path = backup_dir / target_path.name
+        shutil.move(str(target_path), str(backup_path))
+        self._rollback_actions.append(lambda: self._move_existing_path(backup_path, target_path))
+        self._cleanup_actions.append(lambda: self._remove_path(backup_dir))
+
     def replace_bytes(self, target_path: Path, content: bytes) -> None:
         target_path = target_path.resolve()
         if target_path.exists() and not target_path.is_file():
@@ -124,6 +135,13 @@ class FilesystemUnitOfWork:
         if backup_path.exists():
             target_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(backup_path), str(target_path))
+
+    @staticmethod
+    def _remove_path(target_path: Path) -> None:
+        if target_path.is_dir():
+            shutil.rmtree(target_path)
+        else:
+            target_path.unlink(missing_ok=True)
 
 
 def commit_with_filesystem_rollback(

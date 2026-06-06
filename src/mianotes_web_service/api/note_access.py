@@ -77,7 +77,15 @@ def read_note_for_tag_change(session: Session, note_id: str) -> Note:
 
 
 def read_note_for_delete(session: Session, note_id: str) -> Note:
-    return read_note_for_change(session, note_id)
+    return _read_note_or_404(
+        session,
+        note_id,
+        options=(
+            selectinload(Note.user),
+            joinedload(Note.folder),
+            selectinload(Note.source_files),
+        ),
+    )
 
 
 def read_shared_note_for_response(session: Session, token: str) -> Note:
