@@ -243,6 +243,8 @@ def render_skill_install_script(
             'printf "\\033[32m✓\\033[0m Installed SKILL.md for Claude Code and Codex.\\n"',
             'printf "\\033[32m✓\\033[0m Added environment variables for API access.\\n"',
             'echo ""',
+            'echo "Open a new terminal to use these variables, or run: source ~/.mianotes/env"',
+            'echo ""',
             'echo "You can revoke this key anytime from Settings."',
             "",
         ]

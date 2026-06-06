@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -10,6 +9,11 @@ from typing import Any
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from mianotes_web_service.services.runtime_env import (
+    env_reference_value,
+    load_env_file_values,
+    shell_env_reference_value,
+)
 from mianotes_web_service.services.storage_settings import (
     ensure_storage_location,
     read_storage_config,
@@ -45,46 +49,35 @@ DEFAULT_BINARY_CANDIDATES: dict[str, list[str]] = {
 }
 
 SUPPORTED_DATABASE_ADAPTERS = {"sqlite"}
-SHELL_ENV_REFERENCE_PATTERN = re.compile(
-    r"^\$(?:\{(?P<braced>[A-Za-z_][A-Za-z0-9_]*)\}|"
-    r"(?P<bare>[A-Za-z_][A-Za-z0-9_]*))$"
-)
 
 
-def _read_dotenv_value(path: Path, key: str) -> str | None:
-    if not path.exists():
-        return None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        name, value = stripped.split("=", 1)
-        if name.strip() != key:
-            continue
-        value = value.strip().strip('"').strip("'")
-        return value or None
-    return None
-
-
-def _env_reference_value(reference: object) -> str | None:
-    if not isinstance(reference, str) or not reference.startswith("env."):
-        return None
-    key = reference.removeprefix("env.").strip()
-    if not key:
-        return None
-    return os.environ.get(key) or _read_dotenv_value(Path(".env"), key)
-
-
-def _shell_env_reference_value(value: str | None) -> str | None:
-    if not value:
-        return value
-    match = SHELL_ENV_REFERENCE_PATTERN.fullmatch(value.strip())
-    if not match:
-        return value
-    key = match.group("braced") or match.group("bare")
-    if not key:
-        return None
-    return os.environ.get(key) or _read_dotenv_value(Path(".env"), key)
+def _service_env_defaults() -> dict[str, Any]:
+    env_keys = {
+        "MIANOTES_HOST": "host",
+        "MIANOTES_PORT": "port",
+        "MIANOTES_SETTINGS_PATH": "settings_path",
+        "MIANOTES_DATA_DIR": "data_dir",
+        "MIANOTES_DATABASE_ADAPTER": "database_adapter",
+        "MIANOTES_DATABASE_URL": "database_url",
+        "MIANOTES_API_KEY": "api_key",
+        "MIANOTES_API_TOKEN": "api_token",
+        "MIANOTES_STORAGE_CONFIG_PATH": "storage_config_path",
+        "MIANOTES_LLM_PROVIDER": "llm_provider",
+        "MIANOTES_LLM_MODEL": "llm_model",
+        "MIANOTES_LLM_BASE_URL": "llm_base_url",
+        "MIANOTES_LLM_API_KEY": "llm_api_key",
+        "MIANOTES_VLM_PROVIDER": "vlm_provider",
+        "MIANOTES_VLM_MODEL": "vlm_model",
+        "MIANOTES_VLM_BASE_URL": "vlm_base_url",
+        "MIANOTES_VLM_API_KEY": "vlm_api_key",
+        "MIANOTES_LLM_IMAGE_MODEL": "llm_image_model",
+        "MIANOTES_OPENAI_API_KEY": "openai_api_key",
+        "MIANOTES_OPENAI_MODEL": "openai_model",
+    }
+    values: dict[str, Any] = {}
+    for env_key, value in load_env_file_values(env_keys).items():
+        values[env_keys[env_key]] = value
+    return values
 
 
 def _settings_json_path(values: dict[str, Any]) -> Path:
@@ -121,7 +114,7 @@ def _flatten_json_settings(payload: dict[str, Any]) -> dict[str, Any]:
             values["database_adapter"] = database["adapter"]
         database_url = database.get("url")
         if isinstance(database_url, str) and database_url.startswith("env."):
-            resolved = _env_reference_value(database_url)
+            resolved = env_reference_value(database_url)
             if resolved:
                 values["database_url"] = resolved
         elif database_url:
@@ -135,7 +128,7 @@ def _flatten_json_settings(payload: dict[str, Any]) -> dict[str, Any]:
             values["llm_model"] = llm["model"]
         if "baseUrl" in llm:
             values["llm_base_url"] = llm["baseUrl"] or None
-        api_key = _env_reference_value(llm.get("apiKey"))
+        api_key = env_reference_value(llm.get("apiKey"))
         if api_key:
             values["llm_api_key"] = api_key
 
@@ -147,7 +140,7 @@ def _flatten_json_settings(payload: dict[str, Any]) -> dict[str, Any]:
             values["vlm_model"] = vlm["model"]
         if "baseUrl" in vlm:
             values["vlm_base_url"] = vlm["baseUrl"] or None
-        api_key = _env_reference_value(vlm.get("apiKey"))
+        api_key = env_reference_value(vlm.get("apiKey"))
         if api_key:
             values["vlm_api_key"] = api_key
 
@@ -164,7 +157,10 @@ def _flatten_json_settings(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _json_settings_defaults(values: dict[str, Any]) -> dict[str, Any]:
     settings_path = _settings_json_path(values)
-    flattened = _flatten_json_settings(_load_json_settings(settings_path))
+    flattened = {
+        **_flatten_json_settings(_load_json_settings(settings_path)),
+        **_service_env_defaults(),
+    }
     flattened["settings_path"] = settings_path
     return flattened
 
@@ -235,11 +231,11 @@ class Settings(BaseSettings):
     def set_default_database_url(self) -> Settings:
         if not self.api_token:
             self.api_token = self.api_key
-        self.api_key = _shell_env_reference_value(self.api_key)
-        self.api_token = _shell_env_reference_value(self.api_token)
-        self.llm_api_key = _shell_env_reference_value(self.llm_api_key)
-        self.vlm_api_key = _shell_env_reference_value(self.vlm_api_key)
-        self.openai_api_key = _shell_env_reference_value(self.openai_api_key)
+        self.api_key = shell_env_reference_value(self.api_key)
+        self.api_token = shell_env_reference_value(self.api_token)
+        self.llm_api_key = shell_env_reference_value(self.llm_api_key)
+        self.vlm_api_key = shell_env_reference_value(self.vlm_api_key)
+        self.openai_api_key = shell_env_reference_value(self.openai_api_key)
         self.database_adapter = self.database_adapter.strip().lower()
         if self.database_adapter not in SUPPORTED_DATABASE_ADAPTERS:
             raise ValueError(

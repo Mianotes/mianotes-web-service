@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -11,15 +10,12 @@ from urllib.request import Request, urlopen
 
 from mianotes_web_service import __version__
 from mianotes_web_service.services.env_file import read_env_value
+from mianotes_web_service.services.runtime_env import env_file_candidates
 
 JsonObject = dict[str, Any]
 
 DEFAULT_API_URL = "http://127.0.0.1:8200"
 MCP_ENV_KEYS = ("MIANOTES_API_URL", "MIANOTES_API_KEY", "MIANOTES_API_TOKEN")
-PACKAGED_ENV_FILES = (
-    "/Library/Application Support/Mianotes/env/mianotes.env",
-    "/etc/mianotes/mianotes.env",
-)
 _AGENT_SESSION_TOKEN: str | None = None
 
 
@@ -206,44 +202,13 @@ for tool in TOOL_DEFINITIONS:
         )
 
 
-def _source_env_file() -> str | None:
-    executable = os.environ.get("VIRTUAL_ENV") or sys.prefix
-    if not executable:
-        return None
-    venv_path = os.path.realpath(executable)
-    if os.path.basename(venv_path) != ".venv":
-        return None
-    return os.path.join(os.path.dirname(venv_path), ".env")
-
-
-def _env_file_candidates() -> list[str]:
-    candidates: list[str] = []
-    configured = os.environ.get("MIANOTES_ENV_FILE") or os.environ.get("MIANOTES_ENV_FILE_PATH")
-    if configured:
-        candidates.append(configured)
-    source_env = _source_env_file()
-    if source_env:
-        candidates.append(source_env)
-    candidates.append(".env")
-    candidates.extend(PACKAGED_ENV_FILES)
-
-    unique_candidates: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        resolved = os.path.realpath(os.path.expanduser(candidate))
-        if resolved not in seen:
-            unique_candidates.append(resolved)
-            seen.add(resolved)
-    return unique_candidates
-
-
 def _load_mcp_environment() -> None:
     missing_keys = [key for key in MCP_ENV_KEYS if not os.environ.get(key)]
     if not missing_keys:
         return
-    for candidate in _env_file_candidates():
+    for candidate in env_file_candidates(include_packaged=True):
         for key in tuple(missing_keys):
-            value = read_env_value(Path(candidate), key)
+            value = read_env_value(candidate, key)
             if value:
                 os.environ[key] = value
                 missing_keys.remove(key)

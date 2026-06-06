@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -16,6 +17,7 @@ from mianotes_web_service.services.storage import markdown_note_body
 router = APIRouter(prefix="/notes", tags=["notes"])
 SessionDep = Annotated[Session, Depends(get_session)]
 MIA_PROVIDER_SETUP_MESSAGE = "Mia needs an AI provider before it can answer prompts."
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -51,11 +53,13 @@ def prompt_note(
             prompt=prompt,
         )
     except MiaUnavailable as exc:
+        logger.info("Mia prompt unavailable: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=MIA_PROVIDER_SETUP_MESSAGE,
         ) from exc
     except Exception as exc:  # pragma: no cover - provider/network boundary
+        logger.exception("Mia prompt failed")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=MIA_PROVIDER_SETUP_MESSAGE,

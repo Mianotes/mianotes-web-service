@@ -4,6 +4,7 @@ from urllib.error import HTTPError
 
 from mianotes_web_service import mcp_server
 from mianotes_web_service.mcp_server import TOOL_DEFINITIONS, handle_request
+from mianotes_web_service.services import runtime_env
 
 
 def test_mcp_initialize_and_tool_list():
@@ -151,8 +152,8 @@ def test_mcp_tool_call_loads_package_env_file(monkeypatch, tmp_path):
     monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
     monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(mcp_server.sys, "prefix", str(tmp_path / "python"))
-    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", (str(env_file),))
+    monkeypatch.setattr(runtime_env.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.setattr(runtime_env, "PACKAGED_ENV_FILES", (env_file,))
     monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
     monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
@@ -215,8 +216,8 @@ def test_mcp_tool_call_loads_source_venv_env_file(monkeypatch, tmp_path):
     agent_project = tmp_path / "agent-project"
     agent_project.mkdir()
     monkeypatch.chdir(agent_project)
-    monkeypatch.setattr(mcp_server.sys, "prefix", str(venv_dir))
-    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", ())
+    monkeypatch.setattr(runtime_env.sys, "prefix", str(venv_dir))
+    monkeypatch.setattr(runtime_env, "PACKAGED_ENV_FILES", ())
     monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
     monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
@@ -430,8 +431,8 @@ def test_mcp_tool_call_reports_missing_api_key(monkeypatch, tmp_path):
     monkeypatch.delenv("MIANOTES_API_URL", raising=False)
     monkeypatch.setenv("MIANOTES_ENV_FILE", str(tmp_path / "missing.env"))
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(mcp_server.sys, "prefix", str(tmp_path / "python"))
-    monkeypatch.setattr(mcp_server, "PACKAGED_ENV_FILES", ())
+    monkeypatch.setattr(runtime_env.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.setattr(runtime_env, "PACKAGED_ENV_FILES", ())
     monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
     response = handle_request(
