@@ -27,7 +27,6 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
     monkeypatch.setenv("MIANOTES_STORAGE_CONFIG_PATH", str(tmp_path / "storage.json"))
     monkeypatch.setenv("MIANOTES_ENV_FILE", str(tmp_path / "mianotes.env"))
     monkeypatch.setenv("MIANOTES_API_KEY", "")
-    monkeypatch.setenv("MIANOTES_API_TOKEN", "")
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -108,27 +107,11 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def test_service_api_token_authenticates_as_database_admin(
+def test_service_api_key_authenticates_as_database_admin(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     _join_admin(client)
     raw_token = "service-private-token"
-    monkeypatch.setenv("MIANOTES_API_TOKEN", raw_token)
-    get_settings.cache_clear()
-
-    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
-
-    assert response.status_code == 200
-    stored_public_key = _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY)
-    assert stored_public_key == hash_api_token(raw_token)
-    assert stored_public_key != raw_token
-
-
-def test_service_api_key_env_alias_authenticates_as_database_admin(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-):
-    _join_admin(client)
-    raw_token = "service-private-key"
     monkeypatch.setenv("MIANOTES_API_KEY", raw_token)
     get_settings.cache_clear()
 
@@ -204,16 +187,13 @@ def test_agent_session_exchanges_service_api_key_for_client_token(client: TestCl
 
     exchanged = client.post(
         "/api/auth/agent-session",
-        headers={
-            "Authorization": f"Bearer {raw_token}",
-            "X-Mianotes-Client": "Codex",
-        },
+        headers={"Authorization": f"Bearer {raw_token}"},
     )
 
     assert exchanged.status_code == 201
     body = exchanged.json()
-    assert body["client_key"] == "codex"
-    assert body["client"] == "Codex"
+    assert body["client_key"] == "api"
+    assert body["client"] == "admin@example.com"
     assert body["token_type"] == "bearer"
     assert body["scopes"] == ["admin"]
     assert body["token"] != raw_token
@@ -223,38 +203,6 @@ def test_agent_session_exchanges_service_api_key_for_client_token(client: TestCl
     response = agent_client.get("/api/users", headers={"Authorization": f"Bearer {body['token']}"})
 
     assert response.status_code == 200
-
-
-def test_agent_session_requires_client_header(client: TestClient):
-    _join_admin(client)
-    created = client.post("/api/settings/api-key", json={})
-    raw_token = created.json()["token"]
-
-    exchanged = client.post(
-        "/api/auth/agent-session",
-        headers={"Authorization": f"Bearer {raw_token}"},
-    )
-
-    assert exchanged.status_code == 422
-    assert exchanged.json()["detail"] == "X-Mianotes-Client is required"
-
-
-def test_agent_session_maps_unknown_client_to_mcp(client: TestClient):
-    _join_admin(client)
-    created = client.post("/api/settings/api-key", json={})
-    raw_token = created.json()["token"]
-
-    exchanged = client.post(
-        "/api/auth/agent-session",
-        headers={
-            "Authorization": f"Bearer {raw_token}",
-            "X-Mianotes-Client": "Some New Agent",
-        },
-    )
-
-    assert exchanged.status_code == 201
-    assert exchanged.json()["client_key"] == "mcp"
-    assert exchanged.json()["client"] == "MCP"
 
 
 def test_agent_session_uses_scoped_token_and_revocation(client: TestClient):
@@ -267,14 +215,11 @@ def test_agent_session_uses_scoped_token_and_revocation(client: TestClient):
 
     exchanged = client.post(
         "/api/auth/agent-session",
-        headers={
-            "Authorization": f"Bearer {raw_token}",
-            "X-Mianotes-Client": "Claude",
-        },
+        headers={"Authorization": f"Bearer {raw_token}"},
     )
     assert exchanged.status_code == 201
-    assert exchanged.json()["client_key"] == "claude-code"
-    assert exchanged.json()["client"] == "Claude Code"
+    assert exchanged.json()["client_key"] == "api"
+    assert exchanged.json()["client"] == "admin@example.com"
     session_token = exchanged.json()["token"]
 
     agent_client = TestClient(client.app)
@@ -360,11 +305,11 @@ def test_user_api_token_updates_stale_last_used(client: TestClient):
     assert _as_utc(token.last_used_at) > stale_last_used
 
 
-def test_service_api_token_requires_initialized_database(
+def test_service_api_key_requires_initialized_database(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     raw_token = "service-private-token"
-    monkeypatch.setenv("MIANOTES_API_TOKEN", raw_token)
+    monkeypatch.setenv("MIANOTES_API_KEY", raw_token)
     get_settings.cache_clear()
 
     response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
@@ -374,11 +319,11 @@ def test_service_api_token_requires_initialized_database(
     assert _read_app_setting(client, INSTANCE_API_TOKEN_PUBLIC_KEY) == hash_api_token(raw_token)
 
 
-def test_service_api_token_rejects_wrong_bearer_token(
+def test_service_api_key_rejects_wrong_bearer_token(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):
     _join_admin(client)
-    monkeypatch.setenv("MIANOTES_API_TOKEN", "service-private-token")
+    monkeypatch.setenv("MIANOTES_API_KEY", "service-private-token")
     get_settings.cache_clear()
 
     response = client.get("/api/users", headers={"Authorization": "Bearer wrong-token"})

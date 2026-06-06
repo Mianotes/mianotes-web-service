@@ -34,7 +34,6 @@ def create_skill_install(
             session,
             user=user,
             api_url=payload.api_url,
-            client_name=payload.client_name,
         )
     except SkillInstallError as exc:
         raise HTTPException(
@@ -69,7 +68,7 @@ def download_skill_install_script(
 
 
 @router.get("/install/skill.sh", response_class=PlainTextResponse, include_in_schema=False)
-def download_legacy_skill_install_script(
+def download_alternate_skill_install_script(
     session: SystemSessionDep,
     code: str = Query(min_length=1),
 ) -> PlainTextResponse:

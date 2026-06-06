@@ -72,7 +72,6 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
 
     monkeypatch.setenv("MIANOTES_API_URL", "http://127.0.0.1:8200/")
     monkeypatch.setenv("MIANOTES_API_KEY", "mia_test_token")
-    monkeypatch.setenv("MIANOTES_CLIENT_NAME", "Codex")
     monkeypatch.setattr(mcp_server, "urlopen", fake_urlopen)
     monkeypatch.setattr(mcp_server, "_AGENT_SESSION_TOKEN", None)
 
@@ -99,7 +98,7 @@ def test_mcp_tool_call_sends_authenticated_api_request(monkeypatch):
             "method": "POST",
             "timeout": 30,
             "authorization": "Bearer mia_test_token",
-            "client": "Codex",
+            "client": None,
             "workspace": None,
         },
         {
@@ -148,7 +147,6 @@ def test_mcp_tool_call_loads_package_env_file(monkeypatch, tmp_path):
 
     monkeypatch.delenv("MIANOTES_API_URL", raising=False)
     monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
-    monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
     monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
     monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
     monkeypatch.chdir(tmp_path)
@@ -210,7 +208,6 @@ def test_mcp_tool_call_loads_source_venv_env_file(monkeypatch, tmp_path):
 
     monkeypatch.delenv("MIANOTES_API_URL", raising=False)
     monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
-    monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
     monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
     monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
     agent_project = tmp_path / "agent-project"
@@ -427,7 +424,6 @@ def test_mcp_create_note_in_folder_resolves_folder_name(monkeypatch):
 
 def test_mcp_tool_call_reports_missing_api_key(monkeypatch, tmp_path):
     monkeypatch.delenv("MIANOTES_API_KEY", raising=False)
-    monkeypatch.delenv("MIANOTES_API_TOKEN", raising=False)
     monkeypatch.delenv("MIANOTES_API_URL", raising=False)
     monkeypatch.setenv("MIANOTES_ENV_FILE", str(tmp_path / "missing.env"))
     monkeypatch.chdir(tmp_path)

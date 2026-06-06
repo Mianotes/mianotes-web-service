@@ -153,11 +153,11 @@ def _agent_session_signing_key(session: Session, *, create: bool = False) -> str
 def normalize_agent_client_name(client_name: str) -> str:
     normalized = " ".join(client_name.strip().split())
     if not normalized:
-        raise ValueError("X-Mianotes-Client is required")
+        raise ValueError("Agent client name is required")
     if len(normalized) > 80:
-        raise ValueError("X-Mianotes-Client must be 80 characters or fewer")
+        raise ValueError("Agent client name must be 80 characters or fewer")
     if any(ord(character) < 32 for character in normalized):
-        raise ValueError("X-Mianotes-Client contains unsupported characters")
+        raise ValueError("Agent client name contains unsupported characters")
     return normalized
 
 

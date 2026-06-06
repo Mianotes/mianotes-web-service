@@ -144,7 +144,7 @@ def create_service_api_key(session: SystemSessionDep, _: AdminUser) -> ServiceAp
         ) from exc
 
     os.environ["MIANOTES_API_KEY"] = raw_token
-    get_settings().api_token = raw_token
+    get_settings().api_key = raw_token
     write_storage_config(get_settings().storage_config_path, _read_storage_config())
     sync_instance_api_token_public_key(session, raw_token)
     return ServiceApiKeyRead(token=raw_token, api_url=api_url)

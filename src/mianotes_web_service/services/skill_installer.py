@@ -15,7 +15,6 @@ from mianotes_web_service.db.models import ApiToken, SkillInstallCode, User
 from mianotes_web_service.services.auth import create_api_token
 
 INSTALL_CODE_HOURS = 24
-DEFAULT_SKILL_CLIENT = "Codex"
 DEFAULT_PERSONAL_TOKEN_NAME = "Mianotes API"
 DEFAULT_PERSONAL_TOKEN_SCOPES = (
     "folders:read",
@@ -67,14 +66,13 @@ def create_skill_install_code(
     *,
     user: User,
     api_url: str,
-    client_name: str = DEFAULT_SKILL_CLIENT,
 ) -> tuple[SkillInstallCode, str]:
     raw_code = secrets.token_urlsafe(32)
     install_code = SkillInstallCode(
         user_id=user.id,
         code_hash=hash_install_code(raw_code),
         api_url=normalize_api_url(api_url),
-        client_name=client_name.strip() or DEFAULT_SKILL_CLIENT,
+        client_name="Mianotes API",
         expires_at=datetime.now(UTC) + timedelta(hours=INSTALL_CODE_HOURS),
     )
     session.add(install_code)

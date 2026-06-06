@@ -81,14 +81,6 @@ def get_shared_note(workspace_id: str, token: str, request: Request) -> NoteRead
         return note_response(note, request, share_token=token, session=session)
 
 
-@router.get("/shared/{token}", response_model=NoteRead, name="get_legacy_shared_note")
-def get_legacy_shared_note(token: str, request: Request) -> NoteRead:
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Shared note not found",
-    )
-
-
 @router.get("/shared/workspaces/{workspace_id}/{token}/avatar", name="get_shared_avatar")
 def get_shared_avatar(workspace_id: str, token: str, request: Request) -> FileResponse:
     with _shared_workspace_session(workspace_id, request) as session:

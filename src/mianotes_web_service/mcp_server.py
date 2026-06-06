@@ -15,7 +15,7 @@ from mianotes_web_service.services.runtime_env import env_file_candidates
 JsonObject = dict[str, Any]
 
 DEFAULT_API_URL = "http://127.0.0.1:8200"
-MCP_ENV_KEYS = ("MIANOTES_API_URL", "MIANOTES_API_KEY", "MIANOTES_API_TOKEN")
+MCP_ENV_KEYS = ("MIANOTES_API_URL", "MIANOTES_API_KEY")
 _AGENT_SESSION_TOKEN: str | None = None
 
 
@@ -223,15 +223,10 @@ def _api_url() -> str:
 
 def _raw_api_token() -> str:
     _load_mcp_environment()
-    token = os.environ.get("MIANOTES_API_KEY") or os.environ.get("MIANOTES_API_TOKEN")
+    token = os.environ.get("MIANOTES_API_KEY")
     if not token:
         raise RuntimeError("MIANOTES_API_KEY is required")
     return token
-
-
-def _client_name() -> str:
-    _load_mcp_environment()
-    return os.environ.get("MIANOTES_CLIENT_NAME") or os.environ.get("MIANOTES_CLIENT") or "MCP"
 
 
 def _api_token() -> str:
@@ -246,7 +241,6 @@ def _api_token() -> str:
         headers={
             "Authorization": f"Bearer {_raw_api_token()}",
             "Content-Type": "application/json",
-            "X-Mianotes-Client": _client_name(),
         },
     )
     try:

@@ -83,7 +83,7 @@ def test_signed_in_user_can_create_one_time_skill_installer(client: TestClient):
 
     response = client.post(
         "/api/install/skill",
-        json={"api_url": "http://mianotes.local:8200/", "client_name": "Codex"},
+        json={"api_url": "http://mianotes.local:8200/"},
     )
 
     assert response.status_code == 201
@@ -107,7 +107,7 @@ def test_skill_installer_redeems_once_and_installs_user_token(client: TestClient
     user = _join_user(client)
     install = client.post(
         "/api/install/skill",
-        json={"api_url": "http://mianotes.local:8200", "client_name": "Codex"},
+        json={"api_url": "http://mianotes.local:8200"},
     ).json()
     code = _code_from_install_url(install["install_url"])
 
@@ -147,7 +147,7 @@ def test_skill_installer_token_can_create_agent_session(client: TestClient):
     _join_user(client)
     install = client.post(
         "/api/install/skill",
-        json={"api_url": "http://mianotes.local:8200", "client_name": "Codex"},
+        json={"api_url": "http://mianotes.local:8200"},
     ).json()
     code = _code_from_install_url(install["install_url"])
     env_file = client.get(f"/skill/install.env?code={code}").text
@@ -160,10 +160,7 @@ def test_skill_installer_token_can_create_agent_session(client: TestClient):
 
     session_response = client.post(
         "/api/auth/agent-session",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "X-Mianotes-Client": "Codex",
-        },
+        headers={"Authorization": f"Bearer {api_key}"},
     )
 
     assert session_response.status_code == 201
@@ -179,7 +176,7 @@ def test_expired_skill_install_code_is_rejected(client: TestClient):
                 user_id=user["id"],
                 code_hash=hash_install_code(code),
                 api_url="http://mianotes.local:8200",
-                client_name="Codex",
+                client_name="Mianotes API",
                 expires_at=datetime.now(UTC) - timedelta(seconds=1),
             )
         )
@@ -213,7 +210,7 @@ def test_skill_installer_allows_https_and_local_private_exchange_hosts(
 
     response = client.post(
         "/api/install/skill",
-        json={"api_url": api_url, "client_name": "Codex"},
+        json={"api_url": api_url},
     )
 
     assert response.status_code == 201
@@ -224,7 +221,7 @@ def test_skill_installer_rejects_public_http_exchange_hosts(client: TestClient):
 
     response = client.post(
         "/api/install/skill",
-        json={"api_url": "http://example.com:8200", "client_name": "Codex"},
+        json={"api_url": "http://example.com:8200"},
     )
 
     assert response.status_code == 422

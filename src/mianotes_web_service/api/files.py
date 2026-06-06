@@ -78,11 +78,6 @@ def get_markdown_file(
     name="get_workspace_note_markdown_file",
     include_in_schema=False,
 )
-@router.get(
-    "/api/workspaces/{workspace_id}/markdown/{note_id}",
-    name="get_legacy_workspace_note_markdown_file",
-    include_in_schema=False,
-)
 def get_workspace_note_markdown_file(
     workspace_id: str,
     note_id: str,

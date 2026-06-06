@@ -23,7 +23,7 @@ from mianotes_web_service.domain.schemas import (
     LoginRequest,
     SessionRead,
 )
-from mianotes_web_service.services.agent_clients import resolve_agent_client
+from mianotes_web_service.services.agent_clients import AgentClient
 from mianotes_web_service.services.auth import (
     INSTANCE_API_TOKEN_PUBLIC_KEY,
     SESSION_COOKIE_NAME,
@@ -34,7 +34,6 @@ from mianotes_web_service.services.auth import (
     decode_api_token_scopes,
     get_master_password_hash,
     get_workspace_access_mode,
-    normalize_agent_client_name,
     set_master_password,
     set_user_password,
     set_workspace_access_mode,
@@ -226,28 +225,15 @@ def session_info(user: CurrentUser) -> SessionRead:
 def create_agent_session(
     session: SystemSessionDep,
     authorization: Annotated[str | None, Header()] = None,
-    x_mianotes_client: Annotated[str | None, Header(alias="X-Mianotes-Client")] = None,
 ) -> AgentSessionRead:
     raw_api_token = read_bearer_token(authorization)
     if raw_api_token is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
-    if x_mianotes_client is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="X-Mianotes-Client is required",
-        )
-    try:
-        client_name = normalize_agent_client_name(x_mianotes_client)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc),
-        ) from exc
-    agent_client = resolve_agent_client(client_name)
 
     context = auth_context_from_bearer_token(session, raw_api_token)
     if context.is_browser_session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="API key is required")
+    agent_client = AgentClient(key="api", name=context.user.email)
 
     if context.is_instance_token:
         scopes = ["admin"]

@@ -1431,11 +1431,6 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         assert missing_share.status_code == 404
         assert opened_workspace_ids == ["blog"]
 
-        opened_workspace_ids.clear()
-        legacy_missing_share = guest_client.get("/api/notes/shared/not-a-real-token")
-        assert legacy_missing_share.status_code == 404
-        assert opened_workspace_ids == []
-
         unknown_workspace_share = guest_client.get(
             "/api/notes/shared/workspaces/missing/not-a-real-token"
         )
@@ -1764,10 +1759,7 @@ def test_agent_created_url_job_includes_client(
     raw_token = created_key.json()["token"]
     session_response = client.post(
         "/api/auth/agent-session",
-        headers={
-            "Authorization": f"Bearer {raw_token}",
-            "X-Mianotes-Client": "Cursor",
-        },
+        headers={"Authorization": f"Bearer {raw_token}"},
     )
     assert session_response.status_code == 201
     session_token = session_response.json()["token"]
@@ -1783,9 +1775,9 @@ def test_agent_created_url_job_includes_client(
 
     assert response.status_code == 201
     job = response.json()["job"]
-    assert job["client"] == {"key": "cursor", "name": "Cursor"}
+    assert job["client"] == {"key": "api", "name": "agent-job@example.com"}
     listed_job = client.get(f"/api/jobs/{job['id']}").json()
-    assert listed_job["client"] == {"key": "cursor", "name": "Cursor"}
+    assert listed_job["client"] == {"key": "api", "name": "agent-job@example.com"}
 
 
 def test_note_changes_are_limited_to_owner_or_admin(client: TestClient):

@@ -7,7 +7,7 @@ description: Use when the user says Mia or Mianotes, asks to save, search, retri
 
 Mia is the local Mianotes knowledge service. Use Mia as the user's local project memory for Markdown notes, files, links, folders, and reusable context.
 
-Prefer Mianotes MCP tools when they are available. If MCP tools are not available, use the REST API.
+Use the Mianotes REST API.
 
 ## Conversational Contract
 
@@ -35,11 +35,10 @@ Never invent notes, folders, search results, API tokens, or extracted content.
 
 - Default API URL: `http://127.0.0.1:8200`
 - Override with `MIANOTES_API_URL`.
-- Authenticate with `MIANOTES_API_KEY`; fall back to `MIANOTES_API_TOKEN` only for older installs.
+- Authenticate with `MIANOTES_API_KEY`.
 - The Mianotes skill installer writes these values to `~/.mianotes/env`.
-- For REST calls, first exchange the API key for an agent session with `X-Mianotes-Client: Codex`, then use the returned session token.
 - Before REST API calls, load `~/.mianotes/env` if the variables are not already set. If that file does not exist and the current working directory is the Mianotes web service project root, load the service `.env`. Do not search unrelated personal folders or print env file contents.
-- Never print, save, quote, log, or commit `MIANOTES_API_KEY`, `MIANOTES_API_TOKEN`, passwords, cookies, or other private credentials.
+- Never print, save, quote, log, or commit `MIANOTES_API_KEY`, passwords, cookies, or other private credentials.
 
 REST environment setup:
 
@@ -50,71 +49,41 @@ if [ -f "${HOME}/.mianotes/env" ]; then
   set +a
 fi
 
-if [ -z "${MIANOTES_API_KEY:-${MIANOTES_API_TOKEN:-}}" ] && [ -f .env ]; then
+if [ -z "${MIANOTES_API_KEY:-}" ] && [ -f .env ]; then
   set -a
   . ./.env
   set +a
 fi
 
 MIANOTES_API_URL="${MIANOTES_API_URL:-http://127.0.0.1:8200}"
-MIANOTES_AUTH_TOKEN="${MIANOTES_API_KEY:-${MIANOTES_API_TOKEN:-}}"
-MIANOTES_CLIENT_NAME="${MIANOTES_CLIENT_NAME:-Codex}"
 
-MIANOTES_SESSION_TOKEN="$(
-  curl -sS -X POST \
-    -H "Authorization: Bearer ${MIANOTES_AUTH_TOKEN}" \
-    -H "X-Mianotes-Client: ${MIANOTES_CLIENT_NAME}" \
-    "${MIANOTES_API_URL}/api/auth/agent-session" \
-    | python3 -c 'import json, sys; print(json.load(sys.stdin)["token"])'
-)"
+if [ -z "${MIANOTES_API_KEY:-}" ]; then
+  echo "MIANOTES_API_KEY is missing. Run the Mianotes install command from Settings -> Connect Claude Code and Codex."
+  exit 1
+fi
 ```
 
 REST call pattern:
 
 ```bash
 curl -sS \
-  -H "Authorization: Bearer ${MIANOTES_SESSION_TOKEN}" \
+  -H "Authorization: Bearer ${MIANOTES_API_KEY}" \
   -H "X-Mianotes-Workspace: docs" \
   "${MIANOTES_API_URL}/api/search?q=settings&limit=10"
 ```
 
 REST rules:
 
-1. Use `MIANOTES_API_KEY` or `MIANOTES_API_TOKEN` from the environment. Do not ask the user to paste it unless no environment file exists and no token variable is set.
-2. Exchange the API key for an agent session with `POST /api/auth/agent-session`; use the returned session token for follow-up calls.
-3. Never echo or display tokens. It is okay to run `test -n "${MIANOTES_AUTH_TOKEN}"` but not `echo "${MIANOTES_AUTH_TOKEN}"`.
-4. If no token is set, say the Mianotes API key is missing and ask the user to run the Mianotes install command from Settings -> Connect AI tools.
+1. Use `MIANOTES_API_KEY` from the environment. Do not ask the user to paste it unless no environment file exists and no API key variable is set.
+2. Use `Authorization: Bearer ${MIANOTES_API_KEY}` for REST API calls.
+3. Never echo or display tokens. It is okay to run `test -n "${MIANOTES_API_KEY}"` but not `echo "${MIANOTES_API_KEY}"`.
+4. If no API key is set, say the Mianotes API key is missing and ask the user to run the Mianotes install command from Settings -> Connect Claude Code and Codex.
 5. Check the API with `GET /api/health` before starting or restarting services. If `MIANOTES_API_URL` uses `localhost` and the check fails, retry once with `127.0.0.1`; if it uses `127.0.0.1` and the check fails, retry once with `localhost`.
 6. If the API is not listening, say Mia is not reachable at `MIANOTES_API_URL` and ask whether to start the service.
 
-## MCP Tools
-
-Use the real Mianotes MCP tool names when available:
-
-- `list_folders`
-- `create_folder`
-- `list_notes`
-- `read_note_context`
-- `get_note`
-- `create_note`
-- `create_note_in_folder`
-- `create_note_from_url`
-- `update_note`
-- `add_comment`
-- `set_tags`
-- `search_notes`
-
-When MCP tools are available:
-
-1. Use MCP first.
-2. Pass workspace, folder, note title, search terms, and content as normal tool arguments.
-3. If an MCP read returns a result, answer from that result instead of searching local files.
-4. If an MCP tool returns an error, report it plainly. Do not diagnose the REST API as unreachable unless you checked the API.
-5. Do not fall back to local workspace files or databases unless the user explicitly asks for filesystem recovery/debugging.
-
 ## REST API Examples
 
-The examples below show the API shape agents should use when MCP tools are not available.
+The examples below show the API shape agents should use.
 
 ### Prompt 1
 
@@ -126,7 +95,7 @@ Find the `Research` folder:
 
 ```http
 GET /api/folders
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -134,7 +103,7 @@ Create the folder if it does not exist:
 
 ```http
 POST /api/folders
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -150,7 +119,7 @@ Upload the PDF:
 
 ```http
 POST /api/notes/from-file
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: multipart/form-data
 ```
@@ -171,7 +140,7 @@ Create the folder:
 
 ```http
 POST /api/folders
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -187,7 +156,7 @@ Create the Markdown note:
 
 ```http
 POST /api/notes/from-text
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -211,7 +180,7 @@ Search notes:
 
 ```http
 GET /api/search?q=OCR%20notes&limit=10
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -219,7 +188,7 @@ Fetch the most relevant note before answering:
 
 ```http
 GET /api/notes/<note_id>
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -235,7 +204,7 @@ Use exact folder/title context when a folder is known:
 
 ```http
 GET /api/context?folder=Architecture&title=Architecture&limit=5
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -243,7 +212,7 @@ If the folder is not known, search first:
 
 ```http
 GET /api/search?q=Architecture&limit=10
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -251,7 +220,7 @@ Then fetch the selected full note:
 
 ```http
 GET /api/notes/<note_id>
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -265,7 +234,7 @@ Create or resolve the target folder, then create the URL note:
 
 ```http
 POST /api/notes/from-url
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -291,7 +260,7 @@ Find and fetch the note:
 
 ```http
 GET /api/search?q=Release%20checklist&limit=10
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 ```
 
@@ -299,7 +268,7 @@ Update the note:
 
 ```http
 PATCH /api/notes/<note_id>
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -321,7 +290,7 @@ Set note tags:
 
 ```http
 PUT /api/notes/<note_id>/tags
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -342,7 +311,7 @@ Ask Mia to process an existing note:
 
 ```http
 POST /api/notes/<note_id>/prompt
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 X-Mianotes-Workspace: docs
 Content-Type: application/json
 ```
@@ -374,7 +343,7 @@ Read the stored Markdown file for a note:
 
 ```http
 GET /api/workspaces/docs/notes/<note_id>/markdown
-Authorization: Bearer <session_token>
+Authorization: Bearer ${MIANOTES_API_KEY}
 ```
 
 Use this for text note source. For uploaded files, images, and links, keep using the note's source file actions.
@@ -413,4 +382,4 @@ When using Mia as context before answering:
 - Do not claim Mia saved, indexed, searched, or read something unless the tool/API returned success.
 - Do not delete notes, folders, source files, workspaces, or local files unless the user explicitly asks.
 - Do not write directly to Mianotes databases.
-- Prefer API and MCP tools over filesystem edits.
+- Prefer the Mianotes API over filesystem edits.

@@ -60,7 +60,6 @@ def _service_env_defaults() -> dict[str, Any]:
         "MIANOTES_DATABASE_ADAPTER": "database_adapter",
         "MIANOTES_DATABASE_URL": "database_url",
         "MIANOTES_API_KEY": "api_key",
-        "MIANOTES_API_TOKEN": "api_token",
         "MIANOTES_STORAGE_CONFIG_PATH": "storage_config_path",
         "MIANOTES_LLM_PROVIDER": "llm_provider",
         "MIANOTES_LLM_MODEL": "llm_model",
@@ -186,7 +185,6 @@ class Settings(BaseSettings):
     database_adapter: str = "sqlite"
     database_url: str | None = None
     api_key: str | None = None
-    api_token: str | None = None
     storage_config_path: Path = Field(default=Path("workspaces.json"))
     llm_provider: str = "openai"
     llm_model: str | None = None
@@ -229,10 +227,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def set_default_database_url(self) -> Settings:
-        if not self.api_token:
-            self.api_token = self.api_key
         self.api_key = shell_env_reference_value(self.api_key)
-        self.api_token = shell_env_reference_value(self.api_token)
         self.llm_api_key = shell_env_reference_value(self.llm_api_key)
         self.vlm_api_key = shell_env_reference_value(self.vlm_api_key)
         self.openai_api_key = shell_env_reference_value(self.openai_api_key)
