@@ -9,7 +9,7 @@ import secrets
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from mianotes_web_service.db.models import ApiToken, AppSetting, SessionToken, User
@@ -25,6 +25,7 @@ SESSION_COOKIE_NAME = "mianotes_session"
 SESSION_DAYS = 90
 AGENT_SESSION_HOURS = 12
 API_TOKEN_PREFIX = "mia"
+API_TOKEN_LAST_USED_UPDATE_INTERVAL = timedelta(minutes=10)
 ALLOWED_API_TOKEN_SCOPES = frozenset(
     {
         "admin",
@@ -271,6 +272,28 @@ def hash_api_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+def should_update_api_token_last_used(token: ApiToken, now: datetime) -> bool:
+    if token.last_used_at is None:
+        return True
+    return _as_utc(token.last_used_at) <= now - API_TOKEN_LAST_USED_UPDATE_INTERVAL
+
+
+def _touch_api_token_last_used(session: Session, token: ApiToken, now: datetime) -> None:
+    session.execute(
+        update(ApiToken)
+        .where(ApiToken.id == token.id)
+        .values(last_used_at=now)
+    )
+    session.commit()
+    token.last_used_at = now
+
+
 def sync_instance_api_token_public_key(session: Session, raw_token: str) -> str:
     """Store the public hash for the service-wide API token in this database."""
 
@@ -319,6 +342,7 @@ def create_api_token(
 def read_api_token(session: Session, raw_token: str | None) -> ApiToken | None:
     if not raw_token:
         return None
+    now = datetime.now(UTC)
     token = session.scalars(
         select(ApiToken).where(ApiToken.token_hash == hash_api_token(raw_token))
     ).one_or_none()
@@ -328,8 +352,8 @@ def read_api_token(session: Session, raw_token: str | None) -> ApiToken | None:
         expires_at = token.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=UTC)
-        if expires_at < datetime.now(UTC):
+        if expires_at < now:
             return None
-    token.last_used_at = datetime.now(UTC)
-    session.commit()
+    if should_update_api_token_last_used(token, now):
+        _touch_api_token_last_used(session, token, now)
     return token

@@ -1,17 +1,18 @@
 import json
 import os
 from collections.abc import Generator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from mianotes_web_service.app import create_app
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.models import AppSetting, Base
+from mianotes_web_service.db.models import ApiToken, AppSetting, Base
 from mianotes_web_service.db.session import get_session
 from mianotes_web_service.services.auth import (
     INSTANCE_API_TOKEN_PUBLIC_KEY,
@@ -72,6 +73,38 @@ def _read_app_setting(client: TestClient, key: str) -> str | None:
         return setting.value if setting is not None else None
     finally:
         session_gen.close()
+
+
+def _read_token_by_raw_value(client: TestClient, raw_token: str) -> ApiToken:
+    session_gen = client.app.dependency_overrides[get_session]()
+    session = next(session_gen)
+    try:
+        token = session.scalars(
+            select(ApiToken).where(ApiToken.token_hash == hash_api_token(raw_token))
+        ).one()
+        session.expunge(token)
+        return token
+    finally:
+        session_gen.close()
+
+
+def _set_token_last_used(client: TestClient, raw_token: str, last_used_at: datetime | None) -> None:
+    session_gen = client.app.dependency_overrides[get_session]()
+    session = next(session_gen)
+    try:
+        token = session.scalars(
+            select(ApiToken).where(ApiToken.token_hash == hash_api_token(raw_token))
+        ).one()
+        token.last_used_at = last_used_at
+        session.commit()
+    finally:
+        session_gen.close()
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def test_service_api_token_authenticates_as_database_admin(
@@ -271,6 +304,59 @@ def test_admin_can_update_workspace_share_address(client: TestClient):
     invalid = client.patch("/api/settings/share", json={"workspace_url": "notes.example.com"})
     assert invalid.status_code == 400
     assert "full workspace address" in invalid.json()["detail"]
+
+
+def test_user_api_token_sets_last_used_on_first_use(client: TestClient):
+    _join_admin(client)
+    created = client.post(
+        "/api/tokens",
+        json={"name": "Read users", "scopes": ["users:read"]},
+    )
+    assert created.status_code == 201
+    raw_token = created.json()["token"]
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
+    token = _read_token_by_raw_value(client, raw_token)
+    assert token.last_used_at is not None
+
+
+def test_user_api_token_does_not_update_recent_last_used(client: TestClient):
+    _join_admin(client)
+    created = client.post(
+        "/api/tokens",
+        json={"name": "Read users", "scopes": ["users:read"]},
+    )
+    assert created.status_code == 201
+    raw_token = created.json()["token"]
+    recent_last_used = datetime.now(UTC) - timedelta(minutes=5)
+    _set_token_last_used(client, raw_token, recent_last_used)
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
+    token = _read_token_by_raw_value(client, raw_token)
+    assert _as_utc(token.last_used_at) == recent_last_used
+
+
+def test_user_api_token_updates_stale_last_used(client: TestClient):
+    _join_admin(client)
+    created = client.post(
+        "/api/tokens",
+        json={"name": "Read users", "scopes": ["users:read"]},
+    )
+    assert created.status_code == 201
+    raw_token = created.json()["token"]
+    stale_last_used = datetime.now(UTC) - timedelta(minutes=11)
+    _set_token_last_used(client, raw_token, stale_last_used)
+
+    response = client.get("/api/users", headers={"Authorization": f"Bearer {raw_token}"})
+
+    assert response.status_code == 200
+    token = _read_token_by_raw_value(client, raw_token)
+    assert token.last_used_at is not None
+    assert _as_utc(token.last_used_at) > stale_last_used
 
 
 def test_service_api_token_requires_initialized_database(
