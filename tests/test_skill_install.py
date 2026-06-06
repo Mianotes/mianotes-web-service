@@ -120,8 +120,11 @@ def test_skill_installer_redeems_once_and_installs_user_token(client: TestClient
     assert 'mv "${TMP_ENV}" "${MIANOTES_ENV_FILE}"' in script
     assert ".codex/skills/mianotes/SKILL.md" in script
     assert ".claude/skills/mianotes/SKILL.md" in script
-    assert 'Installed SKILL.md for Claude Code and Codex.' in script
     assert 'Added environment variables for API access.' in script
+    assert '     |_  ~/.mianotes/env' in script
+    assert 'Installed SKILL.md for Claude Code and Codex.' in script
+    assert '     |_ ~/.codex/skills/mianotes/SKILL.md' in script
+    assert '     |_ ~/.claude/skills/mianotes/SKILL.md' in script
     assert "Mia is the local Mianotes knowledge service." in script
 
     env_response = client.get(f"/skill/install.env?code={code}")
