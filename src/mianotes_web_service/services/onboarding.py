@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from mianotes_web_service.db.models import Folder, Note, SourceFile, User, new_id
 from mianotes_web_service.services.note_tags import sync_note_tags
 from mianotes_web_service.services.storage import FilesystemStorage, short_id, summarize_text
+from mianotes_web_service.services.storage_settings import DEFAULT_LOCATION_ID
+from mianotes_web_service.services.workspace_context import session_workspace
 
 ONBOARDING_FOLDER_NAME = "Mianotes"
 ONBOARDING_FOLDER_SLUG = "mianotes"
@@ -99,13 +101,20 @@ The Mianotes team
 """
 
 
-def onboarding_note_text(*, folder_path: str, note_id: str) -> str:
-    source_dir = f"sources/{short_id(note_id)}"
-    encoded_folder_path = quote(folder_path.strip("/"), safe="/")
+def onboarding_note_text(
+    *,
+    note_id: str,
+    workspace_id: str = DEFAULT_LOCATION_ID,
+) -> str:
+    encoded_workspace_id = quote(workspace_id, safe="")
+    encoded_note_id = quote(note_id, safe="")
 
     def image_markdown(asset_reference: str) -> str:
         filename = onboarding_asset_filename(asset_reference)
-        asset_path = f"/markdown/{encoded_folder_path}/{source_dir}/{quote(filename)}"
+        asset_path = (
+            f"/api/workspaces/{encoded_workspace_id}/notes/{encoded_note_id}/images/"
+            f"{quote(filename)}"
+        )
         return f"![{ONBOARDING_IMAGE_ALTS[asset_reference]}]({asset_path})"
 
     def replace_placeholder(match: re.Match[str]) -> str:
@@ -158,7 +167,11 @@ def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> N
 
     storage = FilesystemStorage(data_dir)
     note_id = new_id()
-    note_text = onboarding_note_text(folder_path=folder.path, note_id=note_id)
+    workspace = session_workspace(session)
+    note_text = onboarding_note_text(
+        note_id=note_id,
+        workspace_id=workspace.id if workspace is not None else DEFAULT_LOCATION_ID,
+    )
     paths = storage.write_text_note(
         username=user.username,
         folder=folder.path,
@@ -166,8 +179,7 @@ def create_onboarding_note(session: Session, user: User, *, data_dir: Path) -> N
         text=note_text,
         filename=note_id,
     )
-    if paths.source_path is not None:
-        copy_onboarding_assets(paths.source_path.parent)
+    copy_onboarding_assets(paths.directory / "images" / short_id(note_id))
     note = Note(
         id=note_id,
         user_id=user.id,

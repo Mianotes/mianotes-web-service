@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -83,7 +83,6 @@ def _title_matches(
 @router.get("", response_model=ContextResponse)
 def get_context(
     session: SessionDep,
-    request: Request,
     user: NotesReadUser,
     folder: Annotated[str, Query(min_length=1, max_length=200)],
     title: Annotated[str, Query(min_length=1, max_length=300)],
@@ -112,9 +111,9 @@ def get_context(
                 ContextResult(
                     note=_note_list_item(
                         note,
-                        request,
                         is_starred=note.id in starred_ids,
                         paths=paths,
+                        session=session,
                     ),
                     text=text,
                     matched_by="title",
@@ -170,9 +169,9 @@ def get_context(
                 ContextResult(
                     note=_note_list_item(
                         note,
-                        request,
                         is_starred=note.id in starred_ids,
                         paths=paths,
+                        session=session,
                     ),
                     text=text,
                     matched_by="search",

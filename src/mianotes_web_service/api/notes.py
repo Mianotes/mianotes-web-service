@@ -153,7 +153,6 @@ def _folder_note_counts(session: Session) -> dict[str, int]:
 @router.get("", response_model=NoteListPage)
 def list_notes(
     session: SessionDep,
-    request: Request,
     user: NotesReadUser,
     user_id: Annotated[str | None, Query()] = None,
     folder_id: Annotated[str | None, Query()] = None,
@@ -207,7 +206,6 @@ def list_notes(
     items = [
         note_list_response(
             note,
-            request,
             is_starred=note.id in starred_ids,
             session=session,
             latest_job=latest_jobs.get(note.id),

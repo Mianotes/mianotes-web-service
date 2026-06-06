@@ -262,9 +262,12 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert "# Kickoff Notes" in note["text"]
     assert "We agreed to build Mianotes" in note["text"]
     note_filename = f"kickoff-notes-{note['id'][:8]}"
-    assert note["note_url"].endswith(f"/markdown/meeting-notes/{note_filename}.md")
+    assert note["note_url"].endswith(
+        f"/api/workspaces/default/notes/{note['id']}/markdown"
+    )
     assert note["source_files"][0]["url"].endswith(
-        f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
     note_path = tmp_path / "data" / "markdown" / "meeting-notes" / f"{note_filename}.md"
     source_path = (
@@ -297,26 +300,30 @@ def test_create_note_from_text_writes_files_and_db_records(client: TestClient, t
     assert listed.json()["items"][0]["filename"] == f"{note_filename}.md"
     assert "text" not in listed.json()["items"][0]
 
-    note_file_response = client.get(f"/markdown/meeting-notes/{note_filename}.md")
+    note_file_response = client.get(note["note_url"])
     assert note_file_response.status_code == 200
     assert note_file_response.text.startswith("# Kickoff Notes")
 
-    source_file_response = client.get(
-        f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
-    )
+    source_file_response = client.get(note["source_files"][0]["url"])
     assert source_file_response.status_code == 200
     assert source_file_response.text == "We agreed to build Mianotes with Markdown notes."
 
     public_client = TestClient(client.app)
-    assert public_client.get(f"/markdown/meeting-notes/{note_filename}.md").status_code == 404
-    assert (
-        public_client.get(
-            f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
-        ).status_code
-        == 404
-    )
+    assert public_client.get(note["note_url"]).status_code == 401
+    assert public_client.get(note["source_files"][0]["url"]).status_code == 401
+    assert client.get(f"/markdown/meeting-notes/{note_filename}.md").status_code == 404
+    source_path = f"/markdown/meeting-notes/sources/{note['id'][:8]}/original.txt"
+    assert client.get(source_path).status_code == 404
 
     assert client.get(f"/data/meeting-notes/{note_filename}.md").status_code == 404
+    (
+        tmp_path
+        / "data"
+        / "markdown"
+        / "meeting-notes"
+        / "not-a-note.txt"
+    ).write_text("private", encoding="utf-8")
+    assert client.get("/markdown/meeting-notes/not-a-note.txt").status_code == 404
     (tmp_path / "data" / "workspace.db").write_text("private database", encoding="utf-8")
     (tmp_path / "data" / "system.db").write_text("private system database", encoding="utf-8")
     (tmp_path / "data" / "system.db-wal").write_text(
@@ -649,9 +656,12 @@ def test_update_note_moves_note_to_different_folder(client: TestClient, tmp_path
     moved_note = response.json()
     assert moved_note["folder"]["id"] == archive["id"]
     assert moved_note["folder_id"] == archive["id"]
-    assert moved_note["note_url"].endswith(f"/markdown/archive/{note_filename}")
+    assert moved_note["note_url"].endswith(
+        f"/api/workspaces/default/notes/{note['id']}/markdown"
+    )
     assert moved_note["source_files"][0]["url"].endswith(
-        f"/markdown/archive/{source_filename}"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{moved_note['source_files'][0]['id']}"
     )
     assert not old_note_path.exists()
     assert not old_source_path.exists()
@@ -1053,10 +1063,13 @@ def test_create_note_from_file_stores_source_and_pending_note(
     assert note["job_api_url"].endswith(f"/api/jobs/{note['job']['id']}")
     assert "Your file has been added to the queue" in note["text"]
     note_filename = f"receipt-{note['id'][:8]}"
-    assert note["note_url"].endswith(f"/markdown/uploads/{note_filename}.md")
+    assert note["note_url"].endswith(
+        f"/api/workspaces/default/notes/{note['id']}/markdown"
+    )
     assert note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert note["source_files"][0]["url"].endswith(
-        f"/markdown/uploads/sources/{note['id'][:8]}/original.pdf"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
 
     listed = client.get("/api/notes")
@@ -1064,7 +1077,8 @@ def test_create_note_from_file_stores_source_and_pending_note(
     listed_note = next(item for item in listed.json()["items"] if item["id"] == note["id"])
     assert listed_note["source_files"][0]["original_filename"] == "receipt.pdf"
     assert listed_note["source_files"][0]["url"].endswith(
-        f"/markdown/uploads/sources/{note['id'][:8]}/original.pdf"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
 
     note_path = tmp_path / "data" / "markdown" / "uploads" / f"{note_filename}.md"
@@ -1194,9 +1208,12 @@ def test_create_note_from_file_uses_requested_workspace_storage(
 
         assert detail.status_code == 200
         assert "Your file has been added to the queue" in detail.json()["text"]
-        assert detail.json()["note_url"].endswith(f"/markdown/research/{note_filename}")
+        assert detail.json()["note_url"].endswith(
+            f"/api/workspaces/blog/notes/{note['id']}/markdown"
+        )
         assert detail.json()["source_files"][0]["url"].endswith(
-            f"/markdown/research/{source_filename}"
+            f"/api/workspaces/blog/notes/{note['id']}/source-files/"
+            f"{detail.json()['source_files'][0]['id']}"
         )
 
         text_response = workspace_client.post(
@@ -1212,7 +1229,7 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         text_note = text_response.json()
 
         markdown_source = workspace_client.get(
-            f"/api/workspaces/blog/markdown/{text_note['id']}"
+            f"/api/workspaces/blog/notes/{text_note['id']}/markdown"
         )
         assert markdown_source.status_code == 200
         assert markdown_source.headers["content-disposition"].startswith("inline;")
@@ -1221,7 +1238,7 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         assert "This is the raw Markdown body." in markdown_source.text
 
         public_markdown_source = TestClient(workspace_client.app).get(
-            f"/api/workspaces/blog/markdown/{text_note['id']}"
+            f"/api/workspaces/blog/notes/{text_note['id']}/markdown"
         )
         assert public_markdown_source.status_code == 401
 
@@ -1249,7 +1266,9 @@ def test_create_note_from_file_uses_requested_workspace_storage(
         guest_detail = guest_client.get(share_path)
         assert guest_detail.status_code == 200
         assert guest_detail.json()["text"].startswith("# PM intro")
-        assert guest_detail.json()["note_url"].endswith(f"/markdown/research/{note_filename}")
+        assert guest_detail.json()["note_url"].endswith(
+            f"/api/workspaces/blog/notes/{note['id']}/markdown"
+        )
         assert opened_workspace_ids == ["blog"]
 
         shared_source_url = guest_detail.json()["source_files"][0]["url"]
@@ -1307,11 +1326,12 @@ def test_upload_note_image_stores_file_for_editor(client: TestClient, tmp_path: 
 
     assert response.status_code == 201
     image_url = response.json()["url"]
-    assert f"/markdown/editor-images/images/{note['id'][:8]}/diagram-" in image_url
+    assert f"/api/workspaces/default/notes/{note['id']}/images/diagram-" in image_url
     assert image_url.endswith(".png")
     image_response = client.get(image_url)
     assert image_response.status_code == 200
     assert image_response.content.startswith(b"\x89PNG")
+    assert TestClient(client.app).get(image_url).status_code == 401
 
     image_directory = tmp_path / "data" / "markdown" / "editor-images" / "images" / note["id"][:8]
     image_files = list(image_directory.glob("*.png"))
@@ -1525,7 +1545,8 @@ def test_create_note_from_url_queues_parse_job(
     assert note_path.read_text(encoding="utf-8").startswith("# mianotes")
     assert note["source_files"][0]["original_filename"] == "https://example.com/articles/mianotes"
     assert note["source_files"][0]["url"].endswith(
-        f"/markdown/links/sources/{note['id'][:8]}/original.html"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
     assert not source_path.exists()
 
@@ -1536,7 +1557,8 @@ def test_create_note_from_url_queues_parse_job(
         "https://example.com/articles/mianotes"
     )
     assert listed_note["source_files"][0]["url"].endswith(
-        f"/markdown/links/sources/{note['id'][:8]}/original.html"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
 
 
@@ -1572,7 +1594,8 @@ def test_create_note_from_url_preserves_remote_file_extension(
     )
     assert note["source_files"][0]["content_type"] == "application/pdf"
     assert note["source_files"][0]["url"].endswith(
-        f"/markdown/remote-pdfs/sources/{note['id'][:8]}/original.pdf"
+        f"/api/workspaces/default/notes/{note['id']}/source-files/"
+        f"{note['source_files'][0]['id']}"
     )
 
 

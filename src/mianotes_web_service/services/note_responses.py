@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.models import Note, NoteStar, SourceFile, User
 from mianotes_web_service.domain.schemas import (
     AgentClientRead,
@@ -24,7 +24,7 @@ from mianotes_web_service.services.paths import (
     workspace_paths_for_session,
 )
 from mianotes_web_service.services.storage_settings import DEFAULT_LOCATION_ID
-from mianotes_web_service.services.workspace_context import current_data_dir, session_workspace
+from mianotes_web_service.services.workspace_context import session_workspace
 
 MISSING_NOTE_FILE_DETAIL = (
     "This note still exists in the database, but its Markdown file no longer exists "
@@ -32,19 +32,29 @@ MISSING_NOTE_FILE_DETAIL = (
 )
 
 
-def file_url(request: Request, path: str | Path, data_dir: Path | None = None) -> str:
-    data_dir = (data_dir or current_data_dir(get_settings().data_dir)).resolve()
-    target = Path(path).resolve()
-    try:
-        public_path = target.relative_to(data_dir)
-    except ValueError:
-        public_path = Path(path)
-    return f"/{public_path.as_posix().lstrip('/')}"
-
-
 def shared_workspace_id(session: Session | None) -> str:
     workspace = session_workspace(session) if session is not None else None
     return workspace.id if workspace is not None else DEFAULT_LOCATION_ID
+
+
+def workspace_note_markdown_url(note: Note, session: Session | None) -> str:
+    workspace_id = quote(shared_workspace_id(session), safe="")
+    note_id = quote(note.id, safe="")
+    return f"/api/workspaces/{workspace_id}/notes/{note_id}/markdown"
+
+
+def workspace_source_file_url(source_file: SourceFile, session: Session | None) -> str:
+    workspace_id = quote(shared_workspace_id(session), safe="")
+    note_id = quote(source_file.note_id, safe="")
+    source_file_id = quote(source_file.id, safe="")
+    return f"/api/workspaces/{workspace_id}/notes/{note_id}/source-files/{source_file_id}"
+
+
+def workspace_note_image_url(note: Note, filename: str, session: Session | None) -> str:
+    workspace_id = quote(shared_workspace_id(session), safe="")
+    note_id = quote(note.id, safe="")
+    clean_filename = quote(filename.strip("/"), safe="/")
+    return f"/api/workspaces/{workspace_id}/notes/{note_id}/images/{clean_filename}"
 
 
 def share_url(
@@ -114,10 +124,6 @@ def _source_path(source_file: SourceFile, paths: WorkspacePaths | None) -> Path:
     )
 
 
-def _data_dir(paths: WorkspacePaths | None) -> Path | None:
-    return paths.data_dir if paths is not None else None
-
-
 def note_response(
     note: Note,
     request: Request,
@@ -156,11 +162,7 @@ def note_response(
                     )
                 )
                 if share_token
-                else file_url(
-                    request,
-                    _source_path(source_file, paths),
-                    _data_dir(paths),
-                )
+                else workspace_source_file_url(source_file, session)
             ),
         }
         for source_file in note.source_files
@@ -182,7 +184,7 @@ def note_response(
         summary=note.summary,
         shared_at=note.shared_at,
         text=text,
-        note_url=file_url(request, note_path, _data_dir(paths)),
+        note_url=workspace_note_markdown_url(note, session),
         source_files=source_files,
         tags=note.tags,
         share_url=share_url(request, note, share_token, session),
@@ -205,8 +207,8 @@ def note_response(
 
 def source_file_list_payload(
     note: Note,
-    request: Request,
     paths: WorkspacePaths | None = None,
+    session: Session | None = None,
 ) -> list[dict[str, object]]:
     return [
         {
@@ -214,11 +216,7 @@ def source_file_list_payload(
             "file_path": str(_source_path(source_file, paths)),
             "original_filename": source_file.original_filename,
             "content_type": source_file.content_type,
-            "url": file_url(
-                request,
-                _source_path(source_file, paths),
-                _data_dir(paths),
-            ),
+            "url": workspace_source_file_url(source_file, session),
         }
         for source_file in note.source_files
     ]
@@ -226,7 +224,6 @@ def source_file_list_payload(
 
 def note_list_response(
     note: Note,
-    request: Request,
     *,
     is_starred: bool = False,
     session: Session | None = None,
@@ -248,7 +245,7 @@ def note_list_response(
         summary=note.summary,
         filename=note.filename,
         note_path=str(_note_path(note, paths)),
-        source_files=source_file_list_payload(note, request, paths),
+        source_files=source_file_list_payload(note, paths, session),
         created_at=note.created_at,
         updated_at=note.updated_at,
         tags=note.tags,

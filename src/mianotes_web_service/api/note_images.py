@@ -5,7 +5,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from mianotes_web_service.api.dependencies import NotesWriteUser
 from mianotes_web_service.api.note_access import ensure_can_change_note, read_note_for_change
 from mianotes_web_service.core.config import get_settings
 from mianotes_web_service.db.session import get_session
-from mianotes_web_service.services.note_responses import file_url
+from mianotes_web_service.services.note_responses import workspace_note_image_url
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import slugify
 from mianotes_web_service.services.upload_limits import (
@@ -44,7 +44,6 @@ EDITOR_IMAGE_EXTENSION_BY_CONTENT_TYPE = {
 def upload_note_image(
     note_id: str,
     session: SessionDep,
-    request: Request,
     user: NotesWriteUser,
     image: Annotated[UploadFile, File()],
 ) -> dict[str, str]:
@@ -102,4 +101,4 @@ def upload_note_image(
     stem = slugify(Path(image.filename).stem, "image")[:80]
     target = directory / f"{stem}-{secrets.token_hex(4)}{extension}"
     target.write_bytes(image_bytes)
-    return {"url": file_url(request, target, paths.data_dir)}
+    return {"url": workspace_note_image_url(note, target.name, session)}
