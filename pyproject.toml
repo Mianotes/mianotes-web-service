@@ -41,8 +41,10 @@ packages = ["src/mianotes_web_service"]
 artifacts = [
   "src/mianotes_web_service/onboarding_assets/**",
   "src/mianotes_web_service/publishing/themes/**",
-  "src/mianotes_web_service/skills/**",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills/mianotes/SKILL.md" = "mianotes_web_service/skills/mianotes/SKILL.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
