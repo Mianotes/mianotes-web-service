@@ -1,5 +1,3 @@
-Based on the uploaded Python review content. 
-
 # Code Review Skill
 
 ## Purpose
