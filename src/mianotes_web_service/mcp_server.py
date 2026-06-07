@@ -332,7 +332,7 @@ def call_tool(name: str, arguments: JsonObject) -> Any:
             workspace=workspace,
         )
     if name == "list_workspaces":
-        return _request("GET", "/api/settings/storage")
+        return _request("GET", "/api/workspaces")
     if name == "create_folder":
         return _request(
             "POST",

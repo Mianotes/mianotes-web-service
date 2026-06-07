@@ -77,6 +77,19 @@ def test_storage_capacity_is_authenticated_and_cached(client: TestClient):
     assert second.json()["refreshed_at"] == payload["refreshed_at"]
 
 
+def test_workspaces_endpoint_replaces_legacy_storage_settings(client: TestClient):
+    _create_admin(client)
+
+    response = client.get("/api/workspaces")
+    legacy_response = client.get("/api/settings/storage")
+
+    assert response.status_code == 200
+    assert legacy_response.status_code == 299
+    assert legacy_response.json() == response.json()
+    assert response.json()["active_location"] == "default"
+    assert response.json()["locations"][0]["name"] == "Main workspace"
+
+
 def test_create_workspace_prompts_before_importing_existing_markdown(
     client: TestClient,
     tmp_path: Path,

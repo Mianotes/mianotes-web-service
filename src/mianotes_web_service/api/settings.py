@@ -57,6 +57,7 @@ from mianotes_web_service.services.workspace_markdown_import import (
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+workspaces_router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 
 def _database_url(workspace_id: str) -> str:
@@ -124,10 +125,19 @@ def _storage_response(
     )
 
 
-@router.get("/storage", response_model=StorageSettingsRead)
-def storage_settings(workspace: CurrentWorkspace) -> StorageSettingsRead:
+def workspace_settings_response(workspace: CurrentWorkspace) -> StorageSettingsRead:
     active_location = workspace.id
     return _storage_response(_read_storage_config(), active_location=active_location)
+
+
+@workspaces_router.get("", response_model=StorageSettingsRead)
+def workspace_settings(workspace: CurrentWorkspace) -> StorageSettingsRead:
+    return workspace_settings_response(workspace)
+
+
+@router.get("/storage", response_model=StorageSettingsRead, status_code=299)
+def storage_settings(workspace: CurrentWorkspace) -> StorageSettingsRead:
+    return workspace_settings_response(workspace)
 
 
 @router.post("/api-key", response_model=ServiceApiKeyRead, status_code=status.HTTP_201_CREATED)
