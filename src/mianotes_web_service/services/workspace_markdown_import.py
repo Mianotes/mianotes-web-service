@@ -49,7 +49,9 @@ def find_compatible_markdown_notes(workspace_folder: Path) -> list[CompatibleMar
             match = COMPATIBLE_MARKDOWN_FILENAME_PATTERN.match(file_path.name)
             if match is None:
                 continue
-            markdown = file_path.read_text(encoding="utf-8")
+            markdown = _read_compatible_markdown(file_path)
+            if markdown is None:
+                continue
             candidates.append(
                 CompatibleMarkdownNote(
                     folder_path=folder_directory.name,
@@ -62,6 +64,13 @@ def find_compatible_markdown_notes(workspace_folder: Path) -> list[CompatibleMar
                 )
             )
     return candidates
+
+
+def _read_compatible_markdown(file_path: Path) -> str | None:
+    try:
+        return file_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
 
 
 def has_compatible_markdown_notes(workspace_folder: Path) -> bool:

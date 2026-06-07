@@ -127,6 +127,35 @@ def test_create_workspace_can_import_existing_markdown_notes(
     assert note_path.read_text(encoding="utf-8") == "# API overview\n\nUseful API docs."
 
 
+def test_create_workspace_import_skips_invalid_markdown_candidates(
+    client: TestClient,
+    tmp_path: Path,
+):
+    _create_admin(client)
+    workspace_path = tmp_path / "docs"
+    good_note_path = workspace_path / "markdown" / "about" / "what-is-mianotes-c08cbf08.md"
+    bad_note_path = workspace_path / "markdown" / "about" / "broken-note-c08cbf09.md"
+    good_note_path.parent.mkdir(parents=True)
+    good_note_path.write_text("# What is Mianotes?\n\nA local-first knowledge base.", encoding="utf-8")
+    bad_note_path.write_bytes(b"# Broken\n\n\x80\x81\x82")
+
+    response = client.post(
+        "/api/settings/storage/locations",
+        json={
+            "name": "Docs",
+            "folder_path": str(workspace_path),
+            "import_existing_markdown": True,
+        },
+    )
+
+    assert response.status_code == 200
+    database_path = workspace_database_path(tmp_path / "data", "docs")
+    with sqlite3.connect(database_path) as connection:
+        notes = connection.execute("SELECT title, filename FROM notes").fetchall()
+    assert notes == [("What is Mianotes?", "what-is-mianotes-c08cbf08.md")]
+    assert bad_note_path.exists()
+
+
 def test_create_workspace_can_ignore_existing_markdown_notes(
     client: TestClient,
     tmp_path: Path,
