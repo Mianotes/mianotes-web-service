@@ -149,7 +149,10 @@ def test_create_workspace_import_skips_invalid_markdown_candidates(
     good_note_path = workspace_path / "markdown" / "about" / "what-is-mianotes-c08cbf08.md"
     bad_note_path = workspace_path / "markdown" / "about" / "broken-note-c08cbf09.md"
     good_note_path.parent.mkdir(parents=True)
-    good_note_path.write_text("# What is Mianotes?\n\nA local-first knowledge base.", encoding="utf-8")
+    good_note_path.write_text(
+        "# What is Mianotes?\n\nA local-first knowledge base.",
+        encoding="utf-8",
+    )
     bad_note_path.write_bytes(b"# Broken\n\n\x80\x81\x82")
 
     response = client.post(
