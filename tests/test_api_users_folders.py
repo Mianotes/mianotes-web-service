@@ -164,12 +164,10 @@ def test_user_profile_summaries_use_workspace_aggregates(client: TestClient):
     summaries = {item["user_id"]: item for item in response.json()}
     assert summaries[admin["id"]]["notes_count"] == 2
     assert summaries[admin["id"]]["folders_count"] == 2
-    assert summaries[admin["id"]]["tags_count"] == 4
+    assert summaries[admin["id"]]["tags_count"] == 2
     assert {tag["slug"] for tag in summaries[admin["id"]]["tags"]} == {
-        "getting-started",
         "planning",
         "research",
-        "welcome",
     }
     assert summaries[member["id"]]["notes_count"] == 1
     assert summaries[member["id"]]["folders_count"] == 1

@@ -43,7 +43,10 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Generator[TestCli
     get_settings.cache_clear()
 
 
-def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
+def test_email_check_first_join_regular_join_and_login_flow(
+    client: TestClient,
+    tmp_path: Path,
+):
     first_check = client.post(
         "/api/auth/check-email",
         json={"email": "admin@example.com"},
@@ -80,24 +83,15 @@ def test_email_check_first_join_regular_join_and_login_flow(client: TestClient):
     onboarding_note = notes.json()["items"][0]
     assert onboarding_note["title"] == "Getting Started"
     assert "Thank you for installing Mianotes" in onboarding_note["summary"]
-    assert {tag["name"] for tag in onboarding_note["tags"]} == {
-        "getting started",
-        "welcome",
-    }
 
     note = client.get(f"/api/notes/{onboarding_note['id']}")
     assert note.status_code == 200
     note_payload = note.json()
     note_text = note_payload["text"]
     assert "https://tally.so/r/xXvQbk" in note_text
-    assert (
-        f"![Workspace switcher](/api/workspaces/default/notes/{onboarding_note['id']}/images/"
-        "onboarding_workspace_switcher.png)"
-        in note_text
-    )
-    source_dir = Path(note_payload["source_files"][0]["file_path"]).parent
-    image_dir = source_dir.parent.parent / "images" / onboarding_note["id"][:8]
-    assert (image_dir / "onboarding_workspace_switcher.png").is_file()
+    assert "![Workspace switcher]" not in note_text
+    seed_note = tmp_path / "data" / "markdown" / "mianotes" / "getting-started-00000001.md"
+    assert seed_note.is_file()
 
     session = client.get("/api/auth/session")
     assert session.status_code == 200

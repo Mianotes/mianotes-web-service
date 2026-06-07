@@ -44,7 +44,7 @@ from mianotes_web_service.services.auth_context import (
     auth_context_from_bearer_token,
     read_bearer_token,
 )
-from mianotes_web_service.services.onboarding import create_onboarding_note
+from mianotes_web_service.services.default_workspace_seed import seed_default_workspace
 from mianotes_web_service.services.storage import make_username
 from mianotes_web_service.services.user_limits import enforce_user_capacity
 from mianotes_web_service.services.workspace_context import current_data_dir
@@ -144,10 +144,10 @@ def join(
         session.flush()
         with workspace_session_context(default_workspace(), request) as onboarding_session:
             try:
-                create_onboarding_note(
+                seed_default_workspace(
                     onboarding_session,
-                    user,
-                    data_dir=current_data_dir(get_settings().data_dir),
+                    workspace_folder=current_data_dir(get_settings().data_dir),
+                    user_id=user.id,
                 )
                 onboarding_session.commit()
             except Exception:
