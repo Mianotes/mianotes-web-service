@@ -5,9 +5,9 @@ import logging
 from fastapi import APIRouter, HTTPException, Response, status
 
 from mianotes_web_service.api.dependencies import NotesWriteUser, SessionDep
-from mianotes_web_service.services.note_repository import read_note_reference
 from mianotes_web_service.domain.schemas import MiaPromptCreate, MiaPromptRead
 from mianotes_web_service.services.mia import MiaUnavailable, prompt_markdown
+from mianotes_web_service.services.note_repository import read_note_reference
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.storage import markdown_note_body
 

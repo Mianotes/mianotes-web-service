@@ -3,13 +3,18 @@ from __future__ import annotations
 from collections.abc import Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from mianotes_web_service.api.dependencies import ShareWriteUser, SessionDep
+from mianotes_web_service.api.dependencies import SessionDep, ShareWriteUser
+from mianotes_web_service.core.config import get_settings
+from mianotes_web_service.db.workspace_routing import (
+    sessionmaker_for_workspace,
+    workspace_by_id,
+)
+from mianotes_web_service.domain.schemas import NoteRead
 from mianotes_web_service.services.note_repository import (
     ensure_can_change_note,
     read_note_for_change,
@@ -18,12 +23,6 @@ from mianotes_web_service.services.note_repository import (
     read_shared_note_for_response,
     read_shared_note_for_source_file,
 )
-from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.db.workspace_routing import (
-    sessionmaker_for_workspace,
-    workspace_by_id,
-)
-from mianotes_web_service.domain.schemas import NoteRead
 from mianotes_web_service.services.note_responses import note_response
 from mianotes_web_service.services.paths import workspace_paths_for_session
 from mianotes_web_service.services.share import (

@@ -48,8 +48,8 @@ from mianotes_web_service.services.storage_settings import (
     workspace_database_path,
     write_storage_config,
 )
-from mianotes_web_service.services.workspace_context import WorkspaceContext
 from mianotes_web_service.services.workspace_access import ensure_workspace_access
+from mianotes_web_service.services.workspace_context import WorkspaceContext
 from mianotes_web_service.services.workspace_markdown_import import (
     COMPATIBLE_MARKDOWN_IMPORT_MESSAGE,
     has_compatible_markdown_notes,

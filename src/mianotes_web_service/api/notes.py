@@ -21,14 +21,6 @@ from mianotes_web_service.api.dependencies import (
     SessionDep,
     TagsWriteUser,
 )
-from mianotes_web_service.services.note_repository import (
-    ensure_can_change_note,
-    read_note_for_change,
-    read_note_for_delete,
-    read_note_for_response,
-    read_note_for_tag_change,
-    read_note_reference,
-)
 from mianotes_web_service.db.models import Folder, MiaJob, Note, NoteStar, Tag, User
 from mianotes_web_service.domain.schemas import (
     NoteListPage,
@@ -43,6 +35,14 @@ from mianotes_web_service.services.filesystem_uow import (
 )
 from mianotes_web_service.services.mia import prompt_markdown
 from mianotes_web_service.services.note_files import NoteFiles
+from mianotes_web_service.services.note_repository import (
+    ensure_can_change_note,
+    read_note_for_change,
+    read_note_for_delete,
+    read_note_for_response,
+    read_note_for_tag_change,
+    read_note_reference,
+)
 from mianotes_web_service.services.note_responses import (
     note_is_starred,
     note_list_response,

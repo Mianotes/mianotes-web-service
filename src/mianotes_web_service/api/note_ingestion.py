@@ -26,8 +26,8 @@ from mianotes_web_service.domain.schemas import (
     NoteIngestionRead,
     NoteRead,
 )
-from mianotes_web_service.services.jobs import create_job
 from mianotes_web_service.services.auth_context import AuthContext
+from mianotes_web_service.services.jobs import create_job
 from mianotes_web_service.services.note_files import NoteFiles
 from mianotes_web_service.services.note_repository import read_note_for_response
 from mianotes_web_service.services.note_responses import (

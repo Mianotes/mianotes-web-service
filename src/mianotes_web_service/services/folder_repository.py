@@ -32,7 +32,8 @@ class FolderRepository:
         return list(self.session.scalars(statement))
 
     def ordered_active(self) -> list[Folder]:
-        return list(self.session.scalars(folder_order_statement().where(Folder.archived_at.is_(None))))
+        statement = folder_order_statement().where(Folder.archived_at.is_(None))
+        return list(self.session.scalars(statement))
 
     def by_ids(self, folder_ids: list[str]) -> dict[str, Folder]:
         folders = list(self.session.scalars(select(Folder).where(Folder.id.in_(folder_ids))))
