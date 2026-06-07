@@ -24,52 +24,94 @@ def navigation_with_new_notes(
     include_folder: bool,
     since: datetime,
 ) -> list[dict[str, object]]:
+    previous_note_ranks = previous_navigation_note_ranks(
+        saved_navigation,
+        notes,
+        include_folder=include_folder,
+    )
+    navigation: list[dict[str, object]] = []
+
+    for title, group_notes in grouped_notes_by_current_folder(notes).items():
+        ordered_notes: list[tuple[int, Note]] = []
+        for current_index, note in enumerate(group_notes):
+            if note.id not in previous_note_ranks and not note_changed_after(note, since):
+                continue
+            ordered_notes.append((current_index, note))
+        if not ordered_notes:
+            continue
+
+        ordered_notes.sort(
+            key=lambda item: (
+                previous_note_ranks.get(item[1].id, len(notes) + item[0]),
+                item[0],
+            )
+        )
+        navigation.append(
+            {
+                "title": title,
+                "items": [
+                    navigation_item_for_note(note, include_folder=include_folder)
+                    for _, note in ordered_notes
+                ],
+            }
+        )
+
+    return navigation
+
+
+def grouped_notes_by_current_folder(notes: list[Note]) -> dict[str, list[Note]]:
+    groups: dict[str, list[Note]] = {}
+    for note in notes:
+        groups.setdefault(note.folder.name, []).append(note)
+    return groups
+
+
+def previous_navigation_note_ranks(
+    saved_navigation: list[dict[str, object]],
+    notes: list[Note],
+    *,
+    include_folder: bool,
+) -> dict[str, int]:
     notes_by_path = {
         published_note_path(note, include_folder=include_folder): note
         for note in notes
     }
-    navigation: list[dict[str, object]] = []
-    groups_by_title: dict[str, dict[str, object]] = {}
-    placed_paths: set[str] = set()
+    note_ids_by_short_id = unique_note_ids_by_short_id(notes)
+    ranks: dict[str, int] = {}
 
-    for group in saved_navigation:
-        title = group.get("title")
-        items = group.get("items")
-        if not isinstance(title, str) or not isinstance(items, list):
-            continue
-        next_items: list[dict[str, object]] = []
-        for item in items:
-            if not isinstance(item, dict):
-                continue
-            path = item.get("path")
-            if not isinstance(path, str) or path in placed_paths:
-                continue
-            note = notes_by_path.get(path)
-            if note is None:
-                continue
-            next_items.append(navigation_item_for_note(note, include_folder=include_folder))
-            placed_paths.add(path)
-        if next_items:
-            next_group: dict[str, object] = {"title": title, "items": next_items}
-            navigation.append(next_group)
-            groups_by_title[title] = next_group
+    for rank, path in enumerate(navigation_paths_in_order(saved_navigation)):
+        note = notes_by_path.get(path)
+        note_id = (
+            note.id if note is not None else note_ids_by_short_id.get(short_id_from_path(path))
+        )
+        if note_id is not None and note_id not in ranks:
+            ranks[note_id] = rank
 
+    return ranks
+
+
+def unique_note_ids_by_short_id(notes: list[Note]) -> dict[str, str]:
+    note_ids_by_short_id: dict[str, str] = {}
+    duplicates: set[str] = set()
     for note in notes:
-        path = published_note_path(note, include_folder=include_folder)
-        if path in placed_paths or not note_changed_after(note, since):
-            continue
-        title = note.folder.name
-        group = groups_by_title.get(title)
-        if group is None:
-            group = {"title": title, "items": []}
-            groups_by_title[title] = group
-            navigation.append(group)
-        items = group["items"]
-        if isinstance(items, list):
-            items.append(navigation_item_for_note(note, include_folder=include_folder))
-            placed_paths.add(path)
+        value = short_id(note.id)
+        if value in note_ids_by_short_id:
+            duplicates.add(value)
+        else:
+            note_ids_by_short_id[value] = note.id
+    for value in duplicates:
+        note_ids_by_short_id.pop(value, None)
+    return note_ids_by_short_id
 
-    return navigation
+
+def short_id_from_path(path: str) -> str | None:
+    filename = path.rsplit("/", 1)[-1]
+    if not filename.endswith(".html"):
+        return None
+    stem = filename[: -len(".html")]
+    if "-" not in stem:
+        return None
+    return stem.rsplit("-", 1)[-1]
 
 
 def navigation_item_for_note(note: Note, *, include_folder: bool) -> dict[str, object]:
