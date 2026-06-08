@@ -40,14 +40,11 @@ def _first_value(*values: str | None) -> str | None:
 
 def _llm_config() -> LLMConfig:
     settings = get_settings()
-    return _provider_config(
+    return build_llm_config(
         provider=settings.llm_provider,
         model=settings.llm_model,
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
-        openai_api_key=settings.openai_api_key,
-        openai_model=settings.openai_model,
-        default_model=LOCAL_LLM_MODEL,
     )
 
 
@@ -127,11 +124,49 @@ def _provider_config(
     raise MiaUnavailable(f"Unsupported LLM provider: {provider}")
 
 
+def build_llm_config(
+    *,
+    provider: str,
+    model: str | None,
+    base_url: str | None,
+    api_key: str | None,
+) -> LLMConfig:
+    settings = get_settings()
+    return _provider_config(
+        provider=provider,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+        openai_api_key=settings.openai_api_key,
+        openai_model=settings.openai_model,
+        default_model=LOCAL_LLM_MODEL,
+    )
+
+
 def _client_for(config: LLMConfig) -> OpenAI:
     kwargs: dict[str, str] = {"api_key": config.api_key}
     if config.base_url:
         kwargs["base_url"] = config.base_url
     return OpenAI(**kwargs)
+
+
+def test_llm_config(config: LLMConfig) -> None:
+    client = _client_for(config)
+    try:
+        response = client.chat.completions.create(
+            model=config.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Reply with OK.",
+                }
+            ],
+        )
+    except Exception as exc:
+        raise MiaUnavailable("Mia could not connect to this AI provider.") from exc
+    content = response.choices[0].message.content
+    if not content:
+        raise MiaUnavailable(f"{config.provider} returned an empty response")
 
 
 def markitdown_llm_options() -> dict[str, object]:

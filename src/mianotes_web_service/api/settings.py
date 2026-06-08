@@ -20,6 +20,10 @@ from mianotes_web_service.db.init import create_workspace_database
 from mianotes_web_service.db.models import SessionToken
 from mianotes_web_service.db.workspace_routing import sessionmaker_for_workspace
 from mianotes_web_service.domain.schemas import (
+    AiProviderConnect,
+    AiProviderConnectRead,
+    AiProviderSettingsRead,
+    AiProviderSettingsUpdate,
     ServiceApiKeyRead,
     ShareSettingsRead,
     ShareSettingsUpdate,
@@ -28,6 +32,13 @@ from mianotes_web_service.domain.schemas import (
     StorageSettingsRead,
     StorageSwitchRead,
     StorageSwitchRequest,
+)
+from mianotes_web_service.services.ai_provider_settings import (
+    AiProviderConnectionError,
+    connect_ai_provider,
+    provider_display_name,
+    read_ai_provider_settings,
+    save_ai_provider_settings,
 )
 from mianotes_web_service.services.auth import (
     SESSION_COOKIE_NAME,
@@ -158,6 +169,63 @@ def create_service_api_key(session: SystemSessionDep, _: AdminUser) -> ServiceAp
     write_storage_config(get_settings().storage_config_path, _read_storage_config())
     sync_instance_api_token_public_key(session, raw_token)
     return ServiceApiKeyRead(token=raw_token, api_url=api_url)
+
+
+@router.get("/ai-provider", response_model=AiProviderSettingsRead)
+def ai_provider_settings(_: AdminUser) -> AiProviderSettingsRead:
+    return AiProviderSettingsRead.model_validate(
+        read_ai_provider_settings(),
+        from_attributes=True,
+    )
+
+
+@router.patch("/ai-provider", response_model=AiProviderSettingsRead)
+def update_ai_provider_settings(
+    payload: AiProviderSettingsUpdate,
+    _: AdminUser,
+) -> AiProviderSettingsRead:
+    try:
+        settings = save_ai_provider_settings(
+            provider=payload.provider,
+            model=payload.model,
+            base_url=payload.base_url,
+        )
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not write the AI provider settings to the Mianotes environment file.",
+        ) from exc
+    return AiProviderSettingsRead.model_validate(settings, from_attributes=True)
+
+
+@router.post("/ai-provider/connect", response_model=AiProviderConnectRead)
+def connect_ai_provider_settings(
+    payload: AiProviderConnect,
+    _: AdminUser,
+) -> AiProviderConnectRead:
+    try:
+        settings = connect_ai_provider(
+            provider=payload.provider,
+            model=payload.model,
+            base_url=payload.base_url,
+            api_key=payload.api_key,
+        )
+    except AiProviderConnectionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not write the AI provider API key to the Mianotes environment file.",
+        ) from exc
+    provider_name = provider_display_name(settings.provider)
+    return AiProviderConnectRead(
+        provider=settings.provider,
+        model=settings.model,
+        base_url=settings.base_url,
+        has_api_key=settings.has_api_key,
+        connected=True,
+        message=f"Connected to {provider_name}",
+    )
 
 
 @router.get("/share", response_model=ShareSettingsRead)

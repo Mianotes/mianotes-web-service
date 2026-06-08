@@ -320,6 +320,31 @@ class ServiceApiKeyRead(BaseModel):
     api_url: str
 
 
+class AiProviderSettingsRead(BaseModel):
+    provider: str
+    model: str | None = None
+    base_url: str | None = None
+    has_api_key: bool = False
+
+
+class AiProviderSettingsUpdate(BaseModel):
+    provider: str = Field(min_length=1, max_length=80)
+    model: str | None = Field(default=None, max_length=200)
+    base_url: str | None = Field(default=None, max_length=500)
+
+
+class AiProviderConnect(BaseModel):
+    provider: str = Field(min_length=1, max_length=80)
+    model: str | None = Field(default=None, max_length=200)
+    base_url: str | None = Field(default=None, max_length=500)
+    api_key: str | None = Field(default=None, max_length=1000)
+
+
+class AiProviderConnectRead(AiProviderSettingsRead):
+    connected: bool = True
+    message: str
+
+
 class SkillInstallCreate(BaseModel):
     api_url: str = Field(min_length=1, max_length=500)
 

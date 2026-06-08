@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -10,7 +11,13 @@ from sqlalchemy import text
 from mianotes_web_service.core.config import Settings, get_settings
 from mianotes_web_service.db.engine import create_database_engine
 from mianotes_web_service.db.workspace_routing import system_database_url
-from mianotes_web_service.services import runtime_env
+from mianotes_web_service.services import mia, runtime_env
+from mianotes_web_service.services.ai_provider_settings import (
+    AiProviderConnectionError,
+    connect_ai_provider,
+    read_ai_provider_settings,
+    save_ai_provider_settings,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +27,14 @@ def isolate_runtime_env_discovery(
 ) -> None:
     monkeypatch.setattr(runtime_env.sys, "prefix", str(tmp_path / "python"))
     monkeypatch.setattr(runtime_env, "PACKAGED_ENV_FILES", ())
+    for key in (
+        "MIANOTES_LLM_PROVIDER",
+        "MIANOTES_LLM_MODEL",
+        "MIANOTES_LLM_BASE_URL",
+        "MIANOTES_LLM_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    get_settings.cache_clear()
 
 
 def write_json(path: Path, payload: dict[str, object]) -> None:
@@ -239,3 +254,102 @@ def test_file_sqlite_databases_enable_wal(tmp_path: Path) -> None:
         journal_mode = connection.execute(text("PRAGMA journal_mode")).scalar_one()
 
     assert journal_mode == "wal"
+
+
+def test_save_ai_provider_settings_writes_service_env_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    env_file = tmp_path / "mianotes.env"
+    monkeypatch.setenv("MIANOTES_ENV_FILE", str(env_file))
+    get_settings.cache_clear()
+
+    settings = save_ai_provider_settings(
+        provider="openai-compatible",
+        model="team-model",
+        base_url="https://llm.example.test/v1",
+    )
+
+    assert settings.provider == "openai-compatible"
+    assert settings.model == "team-model"
+    assert settings.base_url == "https://llm.example.test/v1"
+    assert settings.has_api_key is False
+    env_text = env_file.read_text(encoding="utf-8")
+    assert 'MIANOTES_LLM_PROVIDER="openai-compatible"' in env_text
+    assert 'MIANOTES_LLM_MODEL="team-model"' in env_text
+    assert 'MIANOTES_LLM_BASE_URL="https://llm.example.test/v1"' in env_text
+    assert "MIANOTES_LLM_API_KEY" not in env_text
+    get_settings.cache_clear()
+
+
+def test_connect_ai_provider_tests_before_writing_api_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: dict[str, object] = {}
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            calls["completion"] = kwargs
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="OK"))]
+            )
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            calls["client"] = kwargs
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.chdir(tmp_path)
+    env_file = tmp_path / "mianotes.env"
+    monkeypatch.setenv("MIANOTES_ENV_FILE", str(env_file))
+    monkeypatch.setattr(mia, "OpenAI", FakeOpenAI)
+    get_settings.cache_clear()
+
+    settings = connect_ai_provider(
+        provider="openai",
+        model="gpt-5-nano",
+        base_url="",
+        api_key="sk-test",
+    )
+
+    assert settings.provider == "openai"
+    assert settings.model == "gpt-5-nano"
+    assert settings.has_api_key is True
+    assert calls["client"] == {"api_key": "sk-test"}
+    assert calls["completion"]["model"] == "gpt-5-nano"
+    assert read_ai_provider_settings().has_api_key is True
+    env_text = env_file.read_text(encoding="utf-8")
+    assert 'MIANOTES_LLM_API_KEY="sk-test"' in env_text
+    get_settings.cache_clear()
+
+
+def test_connect_ai_provider_does_not_save_api_key_when_test_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("bad key")
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.chdir(tmp_path)
+    env_file = tmp_path / "mianotes.env"
+    monkeypatch.setenv("MIANOTES_ENV_FILE", str(env_file))
+    monkeypatch.setattr(mia, "OpenAI", FakeOpenAI)
+    get_settings.cache_clear()
+
+    with pytest.raises(AiProviderConnectionError):
+        connect_ai_provider(
+            provider="openai",
+            model="gpt-5-nano",
+            base_url="",
+            api_key="sk-test",
+        )
+
+    assert not env_file.exists()
+    get_settings.cache_clear()

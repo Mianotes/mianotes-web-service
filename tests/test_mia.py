@@ -1,7 +1,25 @@
 from types import SimpleNamespace
 
+import pytest
+
 from mianotes_web_service.core.config import get_settings
-from mianotes_web_service.services import mia
+from mianotes_web_service.services import mia, runtime_env
+
+
+@pytest.fixture(autouse=True)
+def isolate_runtime_env_discovery(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime_env.sys, "prefix", str(tmp_path / "python"))
+    monkeypatch.setattr(runtime_env, "PACKAGED_ENV_FILES", ())
+    monkeypatch.delenv("MIANOTES_ENV_FILE", raising=False)
+    monkeypatch.delenv("MIANOTES_ENV_FILE_PATH", raising=False)
+    for key in (
+        "MIANOTES_LLM_PROVIDER",
+        "MIANOTES_LLM_MODEL",
+        "MIANOTES_LLM_BASE_URL",
+        "MIANOTES_LLM_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    get_settings.cache_clear()
 
 
 def _fake_openai(calls: dict[str, object]):
