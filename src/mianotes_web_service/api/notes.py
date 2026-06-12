@@ -107,7 +107,6 @@ def _note_filter_clauses(
             or_(
                 func.lower(Note.title).like(pattern),
                 func.lower(Note.summary).like(pattern),
-                Note.user.has(func.lower(User.name).like(pattern)),
                 Note.folder.has(func.lower(Folder.name).like(pattern)),
                 Note.tags.any(
                     or_(
